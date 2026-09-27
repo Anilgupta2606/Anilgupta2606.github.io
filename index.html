@@ -205,7 +205,7 @@ function month(txns, m){
   txns.forEach(t => { if(!t.date.startsWith(m) || t.excluded || t.kind === 'ignore') return; const out = t.direction === 'debit';
     if(t.kind === 'spend'){ if(out) a.spend += t.amount; else a.refunds += t.amount; }
     else if(t.kind === 'investment'){ if(out) a.invested += t.amount; else a.redeemed += t.amount; }
-    else if(t.kind === 'cc_bill'){ if(out) a.spend += t.amount; }
+    else if(t.kind === 'cc_bill'){ if(out && !t.paired) a.spend += t.amount; }   // paired: the card's own purchases are counted
     else if(t.kind === 'income' && !out) a.income += t.amount; });
   a.spend -= a.refunds;
   return a;
