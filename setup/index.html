@@ -218,7 +218,7 @@ function aiCard(){
   const rows = MoneyAI.PROVIDERS.map(p=>{
     if(p.id === 'webllm') return privateRow(s);
     const k = s.keys[p.id], r = MoneyAI.resting(p.id), on = s.off.indexOf(p.id) < 0;
-    const st = !k ? ['no key', ''] : !on ? ['off', ''] : r ? ['resting', 'rest'] : ['ready', 'ready'];
+    const st = !k ? ['no key', ''] : !on ? ['off', ''] : r ? ['resting — back ' + MoneyAI.backAt(r.until), 'rest'] : ['ready', 'ready'];
     const res = results[p.id], pinned = (hub.model || {})[p.id] || 'auto', list = models[p.id];
     const now = status.find(x=>x.id === p.id && x.model);
     return `<div class="prov">

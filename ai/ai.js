@@ -101,9 +101,32 @@ const MoneyAI = (function(){
   const restMap = () => lsGet(REST_KEY, {});
   function resting(id){ const r = restMap()[id]; return r && r.until > Date.now() ? r : null; }
   const changed = () => { try{ window.dispatchEvent(new CustomEvent('moneyai-change')); }catch(e){} };
-  function rest(id, why){ const m = restMap(); m[id] = {until: Date.now() + 15 * 60000, why}; lsSet(REST_KEY, m); changed(); }
-  function wake(id){ const m = restMap(); delete m[id]; lsSet(REST_KEY, m); }
+  /* A service (or one of its models: "groq|llama-3.3-70b") out of free quota rests until its limit resets - a daily limit
+     until the day's reset, so the switch shows it amber from the start instead of green until the next failure. */
+  function rest(id, why, until){ const m = restMap(); m[id] = {until: until || Date.now() + 15 * 60000, why}; lsSet(REST_KEY, m); changed(); }
+  function wake(id){ const m = restMap(); if(!m[id]) return; delete m[id]; lsSet(REST_KEY, m); changed(); }
+  // ms until the next midnight in a time zone (Gemini's free quota resets at midnight Pacific, the others' at midnight UTC)
+  function toMidnight(tz){
+    try{ const t = new Date(new Date().toLocaleString('en-US', {timeZone: tz})), m = new Date(t); m.setHours(24, 0, 0, 0); return m - t; }
+    catch(e){ return 6 * 3600000; }
+  }
+  /* When a "free limit reached" answer says the limit ends -> {until, daily} */
+  function limitEnd(id, res, body){
+    const now = Date.now(), h = n => { try{ return res.headers.get(n); }catch(e){ return null; } };
+    let wait = 0;
+    const ra = Number(h('retry-after')); if(ra > 0) wait = ra * 1000;
+    const again = /try again in\s*(?:(\d+)h)?\s*(?:(\d+)m(?!s))?\s*(?:([\d.]+)s)?/i.exec(body);             // Groq: "try again in 7m12.5s"
+    if(again && (again[1] || again[2] || again[3])) wait = Math.max(wait, ((+again[1] || 0) * 3600 + (+again[2] || 0) * 60 + (+again[3] || 0)) * 1000);
+    const rd = /"retryDelay"\s*:\s*"([\d.]+)s"/.exec(body); if(rd) wait = Math.max(wait, rd[1] * 1000);        // Gemini
+    const reset = Number(h('x-ratelimit-reset'));                                                                  // OpenRouter: when, in ms
+    if(reset > now && reset < now + 2 * 86400000) wait = Math.max(wait, reset - now);
+    const daily = /per.?day|perday|daily|\bRPD\b|\bTPD\b|free-models-per-day/i.test(body);
+    // a daily quota lasts to the reset (Gemini's own "retry in 20s" is wrong for those); a per-minute one just a while
+    if(daily && (id === 'gemini' || !wait)) wait = toMidnight(id === 'gemini' ? 'America/Los_Angeles' : 'UTC');
+    return {until: now + Math.min(26 * 3600000, Math.max(60000, wait || 15 * 60000)), daily};
+  }
 
+  const backAt = t => { const d = new Date(t); return (d.toDateString() === new Date().toDateString() ? 'at ' : 'tomorrow at ') + d.toTimeString().slice(0, 5); };
   function Unavailable(message, status, limit){ const e = new Error(message); e.unavailable = true; e.status = status; e.limit = !!limit; return e; }
   async function post(url, headers, body, signal, wait){
     const ctl = new AbortController(), timer = setTimeout(()=>ctl.abort(), wait || 120000);
@@ -120,11 +143,16 @@ const MoneyAI = (function(){
       throw Unavailable('Could not reach the service (offline, or it blocked the request).', 503);
     } finally { clearTimeout(timer); }
   }
-  async function failure(name, res){
+  async function failure(name, res, id){
     const body = await res.text().catch(()=>'');
     if(res.status === 401 || res.status === 403 || (res.status === 400 && /api[ _-]?key|unauthori[sz]ed|invalid.*key/i.test(body))) throw new Error(name + ' rejected the API key.');
-    if(res.status === 429 || /quota|rate.?limit|exhausted|too many/i.test(body)) throw Unavailable(name + ': free limit reached for now.', 429, true);
-    if(res.status === 402) throw Unavailable(name + ': no credit left on this account.', 402, true);
+    if(res.status === 429 || /quota|rate.?limit|exhausted|too many/i.test(body)){
+      const end = limitEnd(id, res, body), e = Unavailable(name + ': free ' + (end.daily ? 'daily ' : '') + 'limit reached' + (end.daily ? ' — back ' + backAt(end.until) : ' for now') + '.', 429, true);
+      // Gemini, Groq and Cerebras count each model on its own: the next model of the same service may still answer
+      e.until = end.until; e.perModel = ['gemini', 'groq', 'cerebras'].indexOf(id) >= 0;
+      throw e;
+    }
+    if(res.status === 402){ const e = Unavailable(name + ': no credit left on this account.', 402, true); e.until = Date.now() + toMidnight('UTC'); throw e; }
     if(res.status === 404) throw Unavailable(name + ': model not available to this key.', 404);
     if(res.status === 400 && /image|vision|multimodal|content type/i.test(body)) throw Unavailable(name + ' cannot read images with this model.', 400);
     if(res.status >= 500) throw Unavailable(name + ' is busy right now.', res.status);
@@ -222,7 +250,7 @@ const MoneyAI = (function(){
       const body = {systemInstruction:{parts:[{text:system}]}, contents, generationConfig:{temperature:0.2, maxOutputTokens:8192}};
       if(opts.search) body.tools = [{google_search:{}}];
       const res = await post('https://generativelanguage.googleapis.com/v1beta/models/' + encodeURIComponent(model) + ':generateContent?key=' + encodeURIComponent(key), {}, body, signal);
-      if(!res.ok) await failure(name, res);
+      if(!res.ok) await failure(name, res, id);
       const d = await res.json();
       const cand = (d.candidates || [])[0] || {};
       const text = ((cand.content || {}).parts || []).map(p=>p.text || '').join('');
@@ -236,7 +264,7 @@ const MoneyAI = (function(){
         : t.content}));
       const res = await post('https://api.anthropic.com/v1/messages', {'x-api-key':key, 'anthropic-version':'2023-06-01', 'anthropic-dangerous-direct-browser-access':'true'},
         {model, max_tokens:8192, temperature:0.2, system, messages}, signal);
-      if(!res.ok) await failure(name, res);
+      if(!res.ok) await failure(name, res, id);
       const d = await res.json();
       return {text: (d.content || []).map(c=>c.text || '').join(''), sources: []};
     }
@@ -244,7 +272,7 @@ const MoneyAI = (function(){
       // Ollama's own API, with "thinking" off: reasoning models otherwise think for minutes on a laptop
       const res = await post(key.replace(/\/+$/, '') + '/api/chat', {},
         {model, stream:false, think:false, options:{temperature:0.2, num_ctx:8192}, messages:[{role:'system', content:system}].concat(turns)}, signal, 600000);
-      if(!res.ok) await failure(name, res);
+      if(!res.ok) await failure(name, res, id);
       const d = await res.json();
       const text = ((d.message || {}).content || '').replace(/<think>[\s\S]*?<\/think>/g, '');
       if(!text) throw Unavailable(name + ' returned an empty answer.', 502);
@@ -255,7 +283,7 @@ const MoneyAI = (function(){
     if(id === 'openrouter'){ headers['HTTP-Referer'] = location.origin; headers['X-Title'] = 'Trip Vault'; }
     const res = await post(base + '/chat/completions', headers,
       {model, temperature:0.2, max_tokens:8192, messages:[{role:'system', content:system}].concat(turns)}, signal, 90000);
-    if(!res.ok) await failure(name, res);
+    if(!res.ok) await failure(name, res, id);
     const d = await res.json();
     const text = ((((d.choices || [])[0] || {}).message) || {}).content || '';
     if(!text) throw Unavailable(name + ' returned an empty answer.', 502);
@@ -326,6 +354,11 @@ const MoneyAI = (function(){
   /* Which model answered last, per service and kind of task (tried first next time), and models a key cannot use (skipped for a day). */
   const WORKING_KEY = 'money-ai-working', BAD_KEY = 'money-ai-bad';
   function remember(id, tier, model){ const w = lsGet(WORKING_KEY, {}); w[id] = Object.assign({}, w[id], {[tier]: model, at: Date.now()}, {last: tier}); lsSet(WORKING_KEY, w); lsSet(WORKING_KEY + '-now', {id, model, at: Date.now()}); changed(); }
+  // every model we would use is out: the service rests until the first of them is back
+  function restAll(id, models){
+    const r = restMap(), until = Math.min.apply(null, models.map(m=>(r[id + '|' + m] || {}).until || Date.now() + 15 * 60000));
+    rest(id, ((r[id + '|' + models[0]] || {}).why) || 'free limit reached', until);
+  }
   function markBad(id, model){ const b = lsGet(BAD_KEY, {}); b[id + '|' + model] = Date.now() + 86400000; lsSet(BAD_KEY, b); }
   const isBad = (id, model) => (lsGet(BAD_KEY, {})[id + '|' + model] || 0) > Date.now();
   /* What answers now, for the settings: [{id, name, model, resting}] in the order they are tried. */
@@ -346,6 +379,8 @@ const MoneyAI = (function(){
     let order = usable(s);
     if(opts.images && opts.images.length) order = order.filter(id=>PROVIDERS.find(p=>p.id === id).vision);
     if(opts.search) order = order.filter(id=>PROVIDERS.find(p=>p.id === id).search);
+    if(opts.only) order = order.filter(id=>opts.only.indexOf(id) >= 0);              // e.g. only the AI on this device
+    if(opts.skip) order = order.filter(id=>opts.skip.indexOf(id) < 0);
     // a web search that is only nice to have: when no AI that can search is free, the next AI answers without it
     if(opts.search && opts.searchOptional){
       const free = order.filter(id=>!resting(id));
@@ -364,7 +399,9 @@ const MoneyAI = (function(){
       const last = id === 'ollama' ? null : (working[id] || {})[tier];     // on this computer: always the light model first, not the one that last answered
       const models = Array.from(new Set(pinned.concat(last ? [last] : [], await bestModels(id, key, tier), PROVIDERS.find(p=>p.id === id).models)))
         .filter(m=>pinned.indexOf(m) >= 0 || !isBad(id, m)).slice(0, 5);
-      for(const model of models){
+      const free = models.filter(m=>!resting(id + '|' + m));
+      if(models.length && !free.length){ restAll(id, models); skipped.push(pname + ' is at its free limit'); tell(pname + ' is at its free limit — skipping'); continue; }
+      for(const model of free){
         try{
           tell('Asking ' + pname + ' · ' + model + (opts.search ? ' (with a web search)' : '') + '…', id);
           const out = await callOne(id, key, model, system, turns, opts, signal);
@@ -376,14 +413,15 @@ const MoneyAI = (function(){
           if(e.unavailable) tell(e.message + ' — trying the next');
           if(!e.unavailable){ skipped.push(e.message); tell(e.message + ' — trying the next'); break; }        // the key itself was refused
           if(e.status === 404) markBad(id, model);                      // this key cannot use that model
-          if(e.limit){ rest(id, e.message); break; }                    // out of free quota: next service
+          if(e.limit && e.perModel){ rest(id + '|' + model, e.message, e.until); if(free.every(m=>resting(id + '|' + m))){ restAll(id, free); break; } continue; }
+          if(e.limit){ rest(id, e.message, e.until); break; }           // out of free quota: next service
         }
       }
     }
     if(opts.search && opts.searchOptional)                     // the searching AI failed: the next one answers without searching
       return Object.assign(await chat(system, turns, Object.assign({}, opts, {search: false, searchOptional: false}), signal), {noSearch: true});
     const why = skipped.concat(lastError && lastError.unavailable ? [lastError.message] : []);
-    throw new Error('No AI service could answer' + (why.length ? ': ' + why.join('; ') : '') + '. Try again later or add another free key.');
+    throw new Error('No AI service could answer' + (why.length ? ': ' + why.join('; ').replace(/\.$/, '') : '') + '. Try again later or add another free key.');
   }
   /* The JSON inside an AI answer (it may wrap it in prose or ``` fences). */
   function json(text){
@@ -417,7 +455,7 @@ const MoneyAI = (function(){
   const setModel = (id, m) => { const h = aiLocal(); h.model = Object.assign({}, h.model, {[id]: m}); saveAiLocal(h); };
 
   return {PRIVATE_MODELS, trialPrivate, removePrivate, privateCached, PROVIDERS, loadAi, aiSettings, aiLocal, saveAiLocal, adoptAppKeys, aiStatus, rankModels, shareableAi, takeSyncedAi,
-          aiAvailable, aiNames, canSee, canSearch, resting, wake, chat, json, test, setModel, listModels};
+          aiAvailable, aiNames, canSee, canSearch, resting, wake, backAt, chat, json, test, setModel, listModels};
 })();
 
 /* =========================================================
@@ -658,7 +696,7 @@ MoneyAI.widget = (function(){
     const {s, list, inUse} = st;
     const opt = (value, on, title, sub, dot, now) => `<label class="mai-opt${on ? ' on' : ''}"><input type="radio" name="mai-first-${value === 'auto' ? 'a' : 'p'}" data-first="${value}" ${on ? 'checked' : ''}>
       ${dot !== null ? `<span class="mai-dot ${dot}"></span>` : ''}<span class="t"><b>${esc(title)}</b><small>${esc(sub)}</small></span>${now ? '<span class="mai-now">in use</span>' : ''}</label>`;
-    const rows = list.map(x=>opt(x.id, s.first === x.id, x.name, x.resting ? 'at its free limit — resting' : (x.model ? mshort(x.model) : 'best model picked on first use'), x.resting ? 'lim' : 'good', inUse && inUse.id === x.id));
+    const rows = list.map(x=>opt(x.id, s.first === x.id, x.name, x.resting ? 'at its free limit — back ' + MoneyAI.backAt(x.resting.until) : (x.model ? mshort(x.model) : 'best model picked on first use'), x.resting ? 'lim' : 'good', inUse && inUse.id === x.id));
     return `<h4>Which AI answers</h4><p class="mai-sub">The same in all your apps.</p>
       ${list.length ? opt('auto', s.first === 'auto', 'Auto', 'The best one that answers — free ones first', null, false) + rows.join('')
         : '<p class="mai-sub">No AI set up yet.</p>'}
