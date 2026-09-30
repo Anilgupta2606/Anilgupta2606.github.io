@@ -345,7 +345,109 @@ If the sources do not answer the question, say so in one sentence — do not use
     return Object.assign({}, found, {text, kind: 'read+ai', by: r.provider + ' · ' + r.model});
   }
 
-  return {answer, rephrase, calc, arith, bestSentences, wikidata, currency, weather, define, localTime};
+  /* ================================================================ DEEP: search the web, read, think, answer
+     deep(question, {search(q, n) -> {provider, results:[{title, url, snippet, content?}]}, read(url, links) -> {title, url, content, links},
+                     chat(system, turns, opts) -> {text, provider, model} (optional), onStep(text)})
+     1. search (a time-bound question gets this month added); 2. read the best pages in parallel (a search's own page
+     text when it has it); 3. keep the passages that answer the question (not whole pages: free AIs take only so much);
+     4. an AI reads them and answers with [n] sources — or asks for one more search or one more page (twice at most);
+     5. its figures must be in the sources, else the sources' own sentences are given. No AI: the best passages, cited. */
+  const DEEP_SYSTEM = today => `You answer questions from web pages fetched just now (today is ${today}). You get numbered sources and, sometimes, links found inside them.
+Reply with JSON only, one of:
+{"answer": "a clear, complete answer in plain sentences, each fact marked with its source like [2]; say what is uncertain or where sources disagree"}
+{"search": "a better web search query"}   (only if the sources do not contain the answer)
+{"open": "one URL from the links listed"}  (only if one of them clearly holds the answer)
+Use only the sources. Copy numbers exactly as the sources give them. Never invent a source number.`;
+  async function deep(question, o){
+    o = o || {};
+    const step = t => { try{ o.onStep && o.onStep(t); }catch(e){} };
+    const today = new Date().toISOString().slice(0, 10);
+    const timely = /\b(today|now|latest|current|currently|this (week|month|year)|recent|news|live|price|rate|score|update)\b/i.test(question);
+    const month = new Date().toLocaleString('en-US', {month: 'long', year: 'numeric'});
+    const sources = [], seen = new Set(), links = [];
+    // page text as reading text: link addresses, citation marks and table pipes out
+    const tidy = t => String(t || '').replace(/\[\[?\d+\]?\]\([^)]*\)/g, '').replace(/\]\(https?:[^)]*\)/g, ']').replace(/\(?https?:\/\/\S+\)?/g, '')
+      .replace(/\S*cite_note\S*/g, '').replace(/\[\d+\]/g, '').replace(/[\[\]]/g, '').replace(/\s*\|\s*/g, ' · ').replace(/(\s*·\s*){2,}/g, ' · ').replace(/[ \t]+/g, ' ');
+    const add = (title, url, text) => {
+      text = tidy(text);
+      if(!text || seen.has(url)) return;
+      seen.add(url);
+      sources.push({n: sources.length + 1, title: String(title || url).slice(0, 120), url, text: String(text)});
+    };
+    const readSome = async (results, max) => {
+      const pick = results.filter(r=>r.url && !seen.has(r.url)).slice(0, max);
+      step('Reading ' + pick.length + ' page' + (pick.length === 1 ? '' : 's') + '…');
+      const got = await Promise.all(pick.map(async r=>{
+        // text already in hand (a file, or a search that sent the page's text) is used as it is
+        if(r.content && (r.content.length > 600 || /^file:/.test(r.url))) return {r, page: {title: r.title, url: r.url, content: r.content, links: []}};
+        try{ return {r, page: await Promise.race([o.read(r.url, true), new Promise((_, rej)=>setTimeout(()=>rej(new Error('slow')), 15000))])}; }
+        catch(e){ return {r, page: {title: r.title, url: r.url, content: r.snippet || '', links: []}}; }
+      }));
+      got.forEach(({r, page})=>{ add(page.title || r.title, page.url || r.url, page.content || r.snippet); (page.links || []).forEach(l=>{ if(l.url && links.length < 400) links.push(Object.assign({from: page.url}, l)); }); });
+    };
+    let query = question + (timely && !/\b20\d\d\b/.test(question) ? ' ' + month : ''), provider = '';
+    step('Searching the web…');
+    const first = await o.search(query, 8);
+    provider = first.provider;
+    // the search engine's own answer boxes are sources too
+    (first.results || []).filter(r=>/^Google (answer|knowledge)/.test(r.title) && r.snippet).forEach(r=>add(r.title, r.url || 'google', r.snippet));
+    await readSome((first.results || []).filter(r=>!/^Google (answer|knowledge)/.test(r.title)), 5);
+    // the passages that matter, per source (numbered as the sources are)
+    const passagesOf = () => sources.map(src=>{
+      const best = bestSentences(question, [{title: src.title, url: src.url, text: src.text, rank: 0}], 8).map(x=>x.s);
+      return Object.assign({}, src, {passage: (best.length ? best.join(' ') : String(src.text).slice(0, 600)).slice(0, 1800)});
+    }).filter(x=>x.passage.trim().length > 40);
+    const relevantLinks = () => {
+      const qw = words(question).map(stem);
+      return links.filter(l=>!seen.has(l.url) && /^https?:/.test(l.url)).map(l=>({l, sc: qw.filter(w=>words(l.text).map(stem).includes(w)).length})).filter(x=>x.sc > 0)
+        .sort((a, b)=>b.sc - a.sc).slice(0, 12).map(x=>x.l);
+    };
+    if(!o.chat){
+      const ps = passagesOf();
+      if(!ps.length) return {kind: 'not-found', text: 'The pages found did not answer that.', sources: []};
+      const best = bestSentences(question, ps.map((p, i)=>({title: p.title, url: p.url, text: p.passage, rank: i})), 4);
+      return {kind: 'web', text: best.map(b=>b.s + ' [' + (ps.findIndex(p=>p.url === b.page.url) + 1) + ']').join(' '), sources: ps.map(p=>({title: p.title, url: p.url})), provider, by: 'Money Brain (no AI) · ' + provider};
+    }
+    for(let round = 0; round < 3; round++){
+      const ps = passagesOf();
+      const ls = relevantLinks();
+      const prompt = 'Question: ' + question + '\n\nSources:\n' + ps.map((p, i)=>`[${i + 1}] ${p.title} — ${p.url}\n${p.passage}`).join('\n\n') +
+        (ls.length && round < 2 ? '\n\nLinks found inside those pages:\n' + ls.map(l=>'- ' + l.text + ' — ' + l.url).join('\n') : '');
+      step(round ? 'Thinking again with more to read…' : 'Thinking over ' + ps.length + ' sources…');
+      const r = await o.chat(DEEP_SYSTEM(today), [{role: 'user', content: prompt}], {maxTokens: 900});
+      let j = null;
+      try{ j = JSON.parse(String(r.text).slice(String(r.text).indexOf('{'), String(r.text).lastIndexOf('}') + 1)); }catch(e){ j = {answer: String(r.text || '').trim()}; }
+      if(j.search && round < 2){ step('Searching again: ' + j.search); try{ const more = await o.search(j.search, 6); await readSome(more.results || [], 3); }catch(e){} continue; }
+      if(j.open && round < 2 && /^https?:/.test(j.open)){ step('Opening a linked page…'); await readSome([{url: j.open, title: j.open}], 1); continue; }
+      const text = String(j.answer || '').trim();
+      if(!text) break;
+      // every figure in the answer must be in what was read
+      const nums = t => (t.match(/\d[\d,.]*\d|\d/g) || []).map(x=>x.replace(/,/g, '').replace(/\.$/, '')).filter(x=>x.length >= 3);
+      const have = new Set(nums(ps.map(p=>p.passage + ' ' + p.title).join(' ')));
+      const foreign = nums(text.replace(/\[\d+\]/g, '')).filter(n=>!have.has(n) && !/^20\d\d$/.test(n));
+      const used = ps.map((p, i)=>({title: p.title, url: p.url, i: i + 1}));
+      if(foreign.length) return {kind: 'web', text: text + '\n\n⚠ Not found in the sources: ' + foreign.slice(0, 4).join(', ') + ' — check before relying on ' + (foreign.length === 1 ? 'it' : 'them') + '.', sources: used, provider, by: r.provider + ' · ' + r.model + ' · read ' + ps.length + ' pages via ' + provider};
+      return {kind: 'web', text, sources: used, provider, by: r.provider + ' · ' + r.model + ' · read ' + ps.length + ' pages via ' + provider};
+    }
+    const ps = passagesOf();
+    return {kind: 'web', text: 'The AI could not settle on an answer. The most relevant passages: ' + bestSentences(question, ps.map((p, i)=>({title: p.title, url: p.url, text: p.passage, rank: i})), 3).map(b=>b.s).join(' '), sources: ps.map(p=>({title: p.title, url: p.url})), provider};
+  }
+
+  /* The relay (a small Cloudflare Worker of yours) as search and read functions for deep(), in the browser. */
+  function relay(cfg){
+    if(!cfg || !cfg.url || !cfg.token) return null;
+    const base = String(cfg.url).replace(/\/+$/, '');
+    const call = async path => {
+      const r = await fetch(base + path, {headers: {'x-relay-token': cfg.token}});
+      const d = await r.json().catch(()=>({error: 'The relay answered ' + r.status}));
+      if(!r.ok || d.error) throw new Error(d.error || 'The relay answered ' + r.status);
+      return d;
+    };
+    return {search: (q, n) => call('/search?n=' + (n || 8) + '&q=' + encodeURIComponent(q)), read: (url, links) => call('/read?links=' + (links ? 1 : 0) + '&url=' + encodeURIComponent(url)),
+      health: () => fetch(base + '/health').then(r=>r.json())};
+  }
+
+  return {answer, rephrase, deep, relay, calc, arith, bestSentences, wikidata, currency, weather, define, localTime};
 })();
 if(typeof window !== 'undefined') window.MoneyWeb = MoneyWeb;
 if(typeof module !== 'undefined') module.exports = MoneyWeb;

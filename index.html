@@ -249,6 +249,18 @@ function bindAsk(){
     let web = null;
     if(typeof MoneyWeb !== 'undefined'){
       try{ web = await MoneyWeb.answer(text); }catch(e){ web = null; }
+      // a question for the whole web: your relay searches and reads, an AI thinks it through (sources shown)
+      const relay = MoneyWeb.relay((MoneyAI.aiLocal() || {}).relay);
+      if(relay && (!web || web.kind === 'read' || web.kind === 'not-found')){
+        try{
+          const chat = hasAi() ? (sys, turns, o) => MoneyAI.chat(sys, turns, o, ASK.ctl && ASK.ctl.signal) : null;
+          const out = await MoneyWeb.deep(text, {search: relay.search, read: relay.read, chat, onStep: t => { const e = document.querySelector('.convo'); if(e) e.dataset.step = t; }});
+          ASK.turns.push({role: 'assistant', content: out.text, sources: out.sources, by: out.by || ('Searched the web via ' + (out.provider || 'your relay'))});
+          ASK.busy = false; ASK.ctl = null; render();
+          setTimeout(() => { const c = $('convo'); if(c) c.lastElementChild.scrollIntoView({block: 'nearest'}); const i = $('askq'); if(i) i.focus(); }, 50);
+          return;
+        }catch(e){ if(e.code === 'cancelled'){ ASK.busy = false; render(); return; } /* the relay failed: carry on without it */ }
+      }
       if(web && web.kind !== 'not-found'){
         let out = web, by = 'Money Brain · ' + ({calculator: 'worked out exactly', currency: 'live rate', weather: 'live forecast', time: 'world clock', definition: 'dictionary', fact: 'Wikidata'}[web.kind] || 'read from the web') + ' (no AI)';
         if(web.passages && hasAi()){

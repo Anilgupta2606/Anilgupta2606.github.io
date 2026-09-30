@@ -118,6 +118,7 @@ ol.steps li{margin:3px 0}
 <div class="toast" id="toast"></div>
 <script src="/ai/ai.js"></script>
 <script src="/ai/brain.js"></script>
+<script src="/ai/web.js"></script>
 <script>
 "use strict";
 /* Setup: everything you set once for all the apps on this site - sync between devices, the sign-in, the AI keys.
@@ -245,7 +246,7 @@ function brainCard(){
   const groups = {};
   all.forEach(L=>{ const g = (APP_NAME[L.app] || L.app) + ' · ' + (TOPIC_NAME[L.topic] || L.topic); (groups[g] = groups[g] || []).push(L); });
   return `<section class="card" id="brain">
-    <h2><span class="n">4</span>What it has learned</h2>
+    <h2><span class="n">5</span>What it has learned</h2>
     <p class="cap">Your apps' own thinking (no AI model) learns from what you do: the places you keep, lock or remove in a plan, what you type in “Not happy with it?”, the times you set. A lesson grows with every repeat and fades when it stops happening; it is used only once it is clear. It travels between your devices inside the encrypted sync, nowhere else.</p>
     ${all.length ? Object.entries(groups).map(([g, list])=>`<h3 class="bgroup">${esc(g)}</h3>${list.map(L=>{
       const c = Math.round(MoneyBrain.confidenceOf(L) * 100);
@@ -270,6 +271,36 @@ function bindBrain(){
 }
 /* A second click confirms (no browser pop-up) */
 function confirmTwice(btn){ if(btn.dataset.sure){ return true; } btn.dataset.sure = '1'; btn.textContent = 'Click again to forget everything'; setTimeout(()=>{ delete btn.dataset.sure; btn.textContent = 'Forget everything'; }, 4000); return false; }
+
+/* Web search: your relay (a small Cloudflare Worker) that searches (Tavily, SerpApi, Google) and reads pages for the apps. */
+let WEBTEST = null;
+function webCard(){
+  const r = MoneyAI.aiLocal().relay || {};
+  return `<section class="card" id="web">
+    <h2><span class="n">4</span>Web search — so Ask can search the whole web</h2>
+    <p class="cap">Your relay searches the web and reads the pages for the apps (the search keys stay on Cloudflare, never in the browser). Set it up once with the steps in the AI project's README; then paste its address and your relay token here.</p>
+    <div class="two"><label>Relay address<input id="rl-url" value="${esc(r.url || '')}" placeholder="https://money-relay.<you>.workers.dev" autocomplete="off" spellcheck="false"></label>
+      <label>Relay token<input id="rl-tok" type="password" value="${esc(r.token || '')}" autocomplete="off"></label></div>
+    <div class="row end"><button class="btn primary" id="rl-save">Save and test</button>${r.url ? '<button class="btn" id="rl-off">Remove</button>' : ''}<span class="note" id="rl-res">${WEBTEST ? esc(WEBTEST) : r.url ? 'Saved.' : ''}</span></div>
+  </section>`;
+}
+function bindWeb(){
+  const save = $('rl-save');
+  if(save) save.onclick = async ()=>{
+    const url = $('rl-url').value.trim().replace(/\/+$/, ''), token = $('rl-tok').value.trim();
+    if(!url || !token){ $('rl-res').textContent = 'Enter both.'; return; }
+    const h = MoneyAI.aiLocal(); h.relay = {url, token}; MoneyAI.saveAiLocal(h); if(typeof MoneyShared !== 'undefined') MoneyShared.markChanged();
+    $('rl-res').textContent = 'Testing…';
+    try{
+      const R = MoneyWeb.relay({url, token}), hl = await R.health();
+      const s = await R.search('Reserve Bank of India repo rate', 3);
+      WEBTEST = '✓ Working — search by ' + s.provider + ' (' + s.results.length + ' results). Set up: ' + [hl.search.tavily ? 'Tavily ×' + hl.search.tavily : '', hl.search.serpapi ? 'SerpApi' : '', hl.search.google ? 'Google' : ''].filter(Boolean).join(', ') + '; reading by ' + hl.reader + '.';
+    }catch(e){ WEBTEST = '✗ ' + e.message; }
+    render();
+  };
+  const off = $('rl-off');
+  if(off) off.onclick = ()=>{ const h = MoneyAI.aiLocal(); delete h.relay; MoneyAI.saveAiLocal(h); WEBTEST = null; render(); };
+}
 
 function aiCard(){
   const s = MoneyAI.aiSettings(), hub = MoneyAI.aiLocal(), status = MoneyAI.aiStatus();
@@ -312,7 +343,7 @@ function render(){
     <h1>Setup</h1>
     <p>Set things once for all your apps — Money Home, Trip Vault, the 16-Year Ledger and the Expense Tracker: sync between your phone and laptop, one sign-in, and one set of AI keys.</p>
   </div></header>
-  <main class="in">${deviceCard()}${syncCard()}${signinCard()}${aiCard()}${brainCard()}</main>`;
+  <main class="in">${deviceCard()}${syncCard()}${signinCard()}${aiCard()}${webCard()}${brainCard()}</main>`;
   bind();
 }
 
@@ -325,6 +356,7 @@ const setupText = r => `Done. ${r.pulled ? 'Brought in the settings from your ot
 
 function bind(){
   if(typeof MoneyBrain !== 'undefined') bindBrain();
+  bindWeb();
   const on = (id, fn) => { const e = $(id); if(e) e.onclick = fn; };
   on('setup', ()=>{ const tok = $('tok').value.trim(), pass = $('pass').value;       // read before the page redraws
     run(async ()=>setupText(await MoneyShared.setUp(tok, pass))); });

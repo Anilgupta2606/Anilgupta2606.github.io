@@ -626,7 +626,7 @@ const MoneyShared = (function(){
   /* What travels: the AI hub's keys and choices (not Ollama: it is this computer's) and the sign-in. */
   async function mine(){
     const hub = MoneyAI.aiLocal(), shared = MoneyAI.shareableAi();
-    return {ai: {keys: shared.keys, first: hub.first || 'auto', fallback: hub.fallback !== false, model: hub.model || {}, off: hub.off || []},
+    return {ai: {keys: shared.keys, first: hub.first || 'auto', fallback: hub.fallback !== false, model: hub.model || {}, off: hub.off || [], relay: hub.relay || null},
             auth: (await etAuth()) || lsGet(AUTH, null), updatedAt: lsGet(CFG + '-changed', 0),
             brain: typeof MoneyBrain !== 'undefined' ? MoneyBrain.exportAll() : (lsGet('money-brain', null) ? {lessons: lsGet('money-brain', {}).lessons || {}, forgotten: lsGet('money-brain', {}).forgotten || {}} : undefined)};
   }
@@ -664,6 +664,7 @@ const MoneyShared = (function(){
       const hub = MoneyAI.aiLocal();
       hub.keys = Object.assign({}, out.ai.keys, Object.fromEntries(['ollama', 'webllm'].filter(k=>(hub.keys || {})[k]).map(k=>[k, hub.keys[k]])));   // this device's own stay
       hub.first = out.ai.first; hub.fallback = out.ai.fallback; hub.model = out.ai.model; hub.off = out.ai.off;
+      if(out.ai.relay && out.ai.relay.url) hub.relay = out.ai.relay;                  // web search: the same relay on every device
       MoneyAI.saveAiLocal(hub);
       if(out.auth && !hasEt) lsSet(AUTH, out.auth);
     }
