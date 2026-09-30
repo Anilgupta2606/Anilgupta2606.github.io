@@ -144,11 +144,32 @@ main{max-width:1120px;margin:0 auto;padding-inline:20px;padding-block:0 60px}
 .gate button{margin-top:12px;padding:12px;border:0;border-radius:11px;background:var(--hero);color:var(--gold);font:700 14.5px var(--body);cursor:pointer}
 .gate .err{color:var(--dn);font-size:13px}
 .skel{opacity:.55}
+/* ---------- Ask AI ---------- */
+.ask{margin-top:16px}
+.ask .top{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.ask .top h3{margin-right:auto}
+.ask .hub{font-size:12.5px;color:var(--mut);text-decoration:none;border:1px solid var(--line);border-radius:999px;padding:4px 10px}
+.ask .hub:hover{color:var(--ink)}
+.ask form{display:flex;gap:8px}
+.ask textarea{flex:1;min-width:0;resize:vertical;min-height:46px;font:14.5px/1.45 var(--body);color:var(--ink);background:var(--card2);border:1px solid var(--line);border-radius:12px;padding:11px 13px}
+.ask textarea:focus{outline:2px solid var(--gold);outline-offset:1px}
+.ask button.go{border:0;border-radius:12px;background:var(--hero);color:var(--gold);font:700 14px var(--body);padding:0 18px;cursor:pointer}
+.ask button.go:disabled{opacity:.6}
+.sugg{display:flex;flex-wrap:wrap;gap:6px}
+.sugg button{font:500 12.5px var(--body);border:1px solid var(--line);background:var(--card);color:var(--ink2);border-radius:999px;padding:5px 11px;cursor:pointer}
+.sugg button:hover{color:var(--ink);border-color:var(--gold)}
+.convo{display:flex;flex-direction:column;gap:10px}
+.convo .q{align-self:flex-end;background:var(--card2);border-radius:14px 14px 4px 14px;padding:8px 12px;max-width:85%;font-weight:600;font-size:14px}
+.convo .a{background:color-mix(in srgb,var(--gold) 9%,var(--card));border:1px solid var(--line);border-radius:14px 14px 14px 4px;padding:10px 13px;font-size:14px;white-space:pre-wrap;overflow-wrap:anywhere}
+.convo .by{display:block;margin-top:6px;font-size:11.5px;color:var(--mut)}
+.convo .err{color:var(--dn)}
+@media (max-width:600px){.ask form{flex-direction:column}.ask button.go{padding:12px}}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 </head>
 <body>
 <div id="app"></div>
+<script src="/ai/ai.js"></script>
 <script src="/InvestmentPlan/cloud.js"></script>
 <script>
 "use strict";
@@ -175,6 +196,46 @@ const PAL = ['--a1','--a2','--a3','--a4','--a5','--a6','--a7','--a8'];
 
 const signedIn = () => { try{ return sessionStorage.getItem(SESSION) === 'yes'; }catch(e){ return false; } };
 function ledger(){ try{ return JSON.parse(localStorage.getItem('ledger-draft-v2') || localStorage.getItem('ledger-state-v2') || 'null'); }catch(e){ return null; } }
+
+/* ---------- Ask AI: one assistant for all the apps, through the site's central AI (the AI hub, /ai/) */
+const ASK = {turns: [], busy: false, ctl: null, ctx: ''};
+const hasAi = () => typeof MoneyAI !== 'undefined' && MoneyAI.aiAvailable();
+function askCard(){
+  const conv = ASK.turns.map(t => t.role === 'user' ? `<div class="q">${esc(t.content)}</div>`
+    : `<div class="a ${t.error ? 'err' : ''}">${esc(t.content)}${t.by ? `<span class="by">${esc(t.by)}</span>` : ''}</div>`).join('');
+  const sugg = ['How much did I spend last month, and on what?', 'Am I on track for my retirement target?', 'What is next on my trip?', 'Where can I save money this month?'];
+  return `<section class="card ask"><div class="top"><h3>Ask AI</h3><a class="hub" href="/ai/">AI hub · ${hasAi() ? esc(MoneyAI.aiNames()[0]) + ' first' : 'add a key'}</a></div>
+    <p class="cap">One assistant for all your apps — it sees the numbers on this page: your plan, spending, trips${ASK.ctx && /ATS/.test(ASK.ctx) ? ' and ATS holdings' : ''}.</p>
+    ${conv ? `<div class="convo" id="convo">${conv}</div>` : ''}
+    ${hasAi() ? `<form id="askf"><textarea id="askq" rows="1" placeholder="Ask about your money, plan or trips…"></textarea><button class="go" id="askgo">${ASK.busy ? 'Stop' : 'Ask'}</button></form>
+      ${ASK.turns.length ? '' : `<div class="sugg">${sugg.map(q => `<button type="button" data-q="${esc(q)}">${esc(q)}</button>`).join('')}</div>`}`
+    : `<div class="empty">Add a free AI key in the <a href="/ai/">AI hub</a> (Google Gemini is the most useful) — every app then uses it.</div>`}</section>`;
+}
+function bindAsk(){
+  const f = $('askf');
+  if(!f) return;
+  const q = $('askq');
+  q.onkeydown = e => { if(e.key === 'Enter' && !e.shiftKey){ e.preventDefault(); f.requestSubmit(); } };
+  document.querySelectorAll('.sugg [data-q]').forEach(b => b.onclick = () => { q.value = b.dataset.q; f.requestSubmit(); });
+  f.onsubmit = async e => {
+    e.preventDefault();
+    if(ASK.busy){ if(ASK.ctl) ASK.ctl.abort(); return; }
+    const text = q.value.trim();
+    if(!text) return;
+    ASK.turns.push({role: 'user', content: text});
+    ASK.busy = true; ASK.ctl = new AbortController();
+    render();
+    const system = `You are the assistant on "Money Home", the start page of the owner's personal apps: the 16-Year Ledger (investment plan), the Expense Tracker (bank statements), Trip Vault (trips) and ATS (trading dashboard). Answer in plain, short sentences (Indian rupees, ₹, lakh/crore), using only the figures below; say so when something is not in them, and which app to open to see it. You explain and help plan; you do not give licensed investment advice or tell them to buy or sell a specific security.
+Today is ${new Date().toISOString().slice(0, 10)}.
+${ASK.ctx || 'No data from the apps in this browser yet.'}`;
+    try{
+      const r = await MoneyAI.chat(system, ASK.turns.filter(t => !t.error).map(t => ({role: t.role, content: t.content})).slice(-10), {}, ASK.ctl.signal);
+      ASK.turns.push({role: 'assistant', content: r.text.trim(), by: r.provider + ' · ' + r.model});
+    }catch(err){
+      if(err.code !== 'cancelled') ASK.turns.push({role: 'assistant', content: err.message, error: true});
+    }finally{ ASK.busy = false; ASK.ctl = null; render(); setTimeout(() => { const c = $('convo'); if(c) c.lastElementChild.scrollIntoView({block: 'nearest'}); const i = $('askq'); if(i) i.focus(); }, 50); }
+  };
+}
 
 /* ---------- Trip Vault's trips, as that app keeps them in this browser (read only; a missing database is not created) */
 async function tripVault(){
@@ -253,6 +314,7 @@ async function render(){
   const run = ++RUN;
   const et = await Cloud.expenseTracker(true);
   const tv = await tripVault();
+  if(typeof MoneyAI !== 'undefined') await MoneyAI.loadAi();      // keys kept in the Expense Tracker count too
   const linked = !!Cloud.atsLink();
   draw(et, linked ? 'checking' : null, tv);
   if(!linked) return;
@@ -291,10 +353,37 @@ function draw(et, ats, tv){
   const allocTop = allocList.slice(0, 7), rest = allocList.slice(7).reduce((s, [, v]) => s + v, 0);
   if(rest > 0) allocTop.push(['Other', rest]);
 
+  /* What Ask AI knows: the numbers this page shows, from each app in this browser (nothing else is sent). */
+  const ctx = [];
+  if(real){
+    ctx.push(`16-Year Ledger (investment plan): net worth ${cr(netWorth)}; retirement corpus ${cr(corpus)}${tHi ? ` against a target of ₹${tLo ? tLo + '–' : ''}${tHi} Cr` : ''}${yearsLeft !== null ? `; ${yearsLeft.toFixed(1)} years to retirement at ${retire}` : ''}; monthly SIPs ${inr(sip)}.`);
+    if(allocList.length) ctx.push('Holdings by type: ' + allocList.slice(0, 10).map(([k, v]) => k + ' ' + cr(v)).join(', ') + '.');
+    const open = (plan.calendar || []).filter(c => !c.done).sort((a, b) => (a.year - b.year) || (a.age - b.age)).slice(0, 5);
+    if(open.length) ctx.push('Next on the plan: ' + open.map(c => c.year + ': ' + c.action + (c.fund ? ' (' + c.fund + ')' : '')).join('; ') + '.');
+  }
+  if(atsOk) ctx.push(`ATS live holdings: ${Object.entries(T).filter(([, v]) => typeof v === 'number').map(([k, v]) => k.replace(/_/g, ' ') + ' ' + (Math.abs(v) > 1000 ? cr(v) : v)).join(', ')}.`);
+  if(et && et.txns && et.txns.length){
+    const last = et.txns.map(t => t.date).sort().slice(-1)[0].slice(0, 7);
+    ctx.push('Expense Tracker, by month (spent / income / invested): ' + [0, -1, -2, -3, -4, -5].map(k => { const m = shiftM(last, k), A = month(et.txns, m); return ymLabel(m, 'short') + ' ' + inr(A.spend) + ' / ' + inr(A.income) + ' / ' + inr(A.invested); }).join('; ') + '.');
+    const byCat = {}; et.txns.forEach(t => { if(t.date.startsWith(last) && t.kind === 'spend' && t.direction === 'debit' && !t.excluded) byCat[t.category || 'Other'] = (byCat[t.category || 'Other'] || 0) + t.amount; });
+    const top = Object.entries(byCat).sort((a, b) => b[1] - a[1]).slice(0, 8);
+    if(top.length) ctx.push('Spending by category in ' + ymLabel(last, 'short') + ': ' + top.map(([k, v]) => k + ' ' + inr(v)).join(', ') + '.');
+  }
+  if(tv && (tv.trips || []).length){
+    const today = new Date().toISOString().slice(0, 10);
+    const trips = tv.trips.map(t => { const docs = (tv.docs || []).filter(d => d.tripId === t.id);
+      const fl = [].concat(...docs.map(d => ((d.fields || {}).segments || []))).filter(x => x.flight).map(x => `${x.flight} ${x.from}→${x.to} ${x.date || ''} ${x.dep || ''}`.trim());
+      const hotels = docs.filter(d => d.type === 'hotel').map(d => (d.fields || {}).hotelName || d.title);
+      return {t, fl, hotels, n: docs.length}; }).filter(x => !x.t.end || x.t.end >= today).slice(0, 4);
+    if(trips.length) ctx.push('Trip Vault, upcoming trips: ' + trips.map(x => `${x.t.name} (${[x.t.city, x.t.start && x.t.start + ' to ' + (x.t.end || '?')].filter(Boolean).join(', ')}; ${x.n} documents${x.fl.length ? '; flights ' + x.fl.join(', ') : ''}${x.hotels.length ? '; staying at ' + x.hotels.join(', ') : ''})`).join('; ') + '.');
+  }
+  ASK.ctx = ctx.join('\n');
+
   const hero = `<header class="hero"><div class="hero-in">
     <div class="topline"><div class="brand">${logo()}Money Home</div>
       <div class="chips"><span class="chip ${mk.on ? 'on' : ''}"><i></i>${esc(mk.text)}</span>
-        <span class="chip">${esc(new Date().toLocaleDateString('en-IN', {weekday:'long', day:'numeric', month:'long'}))}</span></div></div>
+        <span class="chip">${esc(new Date().toLocaleDateString('en-IN', {weekday:'long', day:'numeric', month:'long'}))}</span>
+        <a class="chip" href="/ai/" style="text-decoration:none">✦ AI hub</a></div></div>
     <div class="hero-grid"><div>
       <div class="hello">${hello}. Here is where you stand.</div>
       ${netWorth ? `<div class="big"><span class="num">${cr(netWorth)}</span></div>
@@ -414,10 +503,12 @@ function draw(et, ats, tv){
       ${card('led', '16-Year Ledger', 'Investment plan', real && plan.plan && plan.plan.dob ? '' : '', ledBody, 'Open the Ledger')}
       ${card('trip', 'Trip Vault', 'Trips, tickets and plans', '', tripBody, 'Open Trip Vault')}
     </div>
+    ${askCard()}
     ${monthCard || nextCard ? `<div class="row2">${monthCard || '<div></div>'}${nextCard}</div>` : ''}
     <div class="foot"><span>Read in this browser from the Expense Tracker, the Ledger and Trip Vault${atsOk ? ', and live from ATS on this Mac' : ''}. Nothing is sent anywhere.</span>
       <span style="display:flex;gap:8px"><button class="btn" id="re">Refresh</button><button class="btn" id="out">Sign out</button></span></div>
   </main>`;
+  bindAsk();
   $('re').onclick = render;
   $('out').onclick = () => { try{ sessionStorage.removeItem(SESSION); }catch(_){} showLogin(); };
 }
