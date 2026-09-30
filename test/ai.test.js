@@ -116,3 +116,15 @@ test('an answer that never finishes is dropped after the time limit', async ()=>
   ctx.setTimeout = (fn)=>setTimeout(fn, 20);          // the 90 s limit, fast
   await assert.rejects(AI.chat('s', [{role: 'user', content: 'x'}], {}), /in time|could answer/);
 });
+
+test('json: almost-right answers are repaired', ()=>{
+  const {AI} = load();
+  const J = t => JSON.parse(JSON.stringify(AI.json(t)));
+  assert.deepEqual(J('{"a": 1, "b": [1, 2,],}'), {a: 1, b: [1, 2]});                          // trailing commas
+  assert.deepEqual(J("{'type': 'pan', 'number': 'ABCPG1234K'}"), {type: 'pan', number: 'ABCPG1234K'});   // single quotes
+  assert.deepEqual(J('{type: "pan", ok: True, x: None}'), {type: 'pan', ok: true, x: null});     // keys without quotes, Python words
+  assert.deepEqual(J('Sure! Here it is:\n```json\n{"items": [{"title": "Lunch"}, {"title": "Din'), {items: [{title: 'Lunch'}, {title: 'Din'}]});   // cut off
+  assert.deepEqual(J('{"a": "x", // a comment\n "b": 2}'), {a: 'x', b: 2});
+  assert.deepEqual(J('<think>let me see { not this }</think>{"ok": 1}'), {ok: 1});
+  assert.deepEqual(J('{“name”: “Anil”}'), {name: 'Anil'});
+});

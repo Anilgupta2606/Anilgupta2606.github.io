@@ -406,8 +406,66 @@ const MoneyBrain = (function(){
     return acts.filter(a=>{ const k = JSON.stringify(a); if(seen.has(k)) return false; seen.add(k); return true; });
   }
 
+  /* ================================================================ checking what was read (by any reader or AI)
+     Exact rules for the numbers on Indian documents and tickets. verify(kind, value, o) ->
+       {ok, value (the corrected one, when a common misread fixes it), fixed: 'what was corrected' | '', level: 'ok'|'warn'|'error', text}
+     find(kind, text) -> the values in a text that pass the check (to recover the right number when a reader got it wrong). */
+  const V_D = [[0,1,2,3,4,5,6,7,8,9],[1,2,3,4,0,6,7,8,9,5],[2,3,4,0,1,7,8,9,5,6],[3,4,0,1,2,8,9,5,6,7],[4,0,1,2,3,9,5,6,7,8],[5,9,8,7,6,0,4,3,2,1],[6,5,9,8,7,1,0,4,3,2],[7,6,5,9,8,2,1,0,4,3],[8,7,6,5,9,3,2,1,0,4],[9,8,7,6,5,4,3,2,1,0]];
+  const V_P = [[0,1,2,3,4,5,6,7,8,9],[1,5,7,6,2,8,3,0,9,4],[5,8,0,3,7,9,6,1,4,2],[8,9,1,6,0,4,3,5,2,7],[9,4,5,3,1,2,6,8,7,0],[4,2,8,6,5,7,3,9,0,1],[2,7,9,3,8,0,6,4,1,5],[7,0,4,6,9,1,3,2,5,8]];
+  const verhoeff = num => { let c = 0; String(num).split('').reverse().forEach((d, i)=>{ c = V_D[c][V_P[i % 8][+d]]; }); return c === 0; };
+  // what scanners and readers commonly confuse: letters read in a digit's place, digits in a letter's place
+  const toDigit = s => s.replace(/[Oo]/g, '0').replace(/[IlL|]/g, '1').replace(/[Ss]/g, '5').replace(/[B]/g, '8').replace(/[Z]/g, '2').replace(/[G]/g, '6').replace(/[T]/g, '7');
+  const toLetter = s => s.replace(/0/g, 'O').replace(/1/g, 'I').replace(/5/g, 'S').replace(/8/g, 'B').replace(/2/g, 'Z').replace(/6/g, 'G');
+  const clean = s => String(s == null ? '' : s).toUpperCase().replace(/[\s\-.]/g, '');
+  const PAN_TYPE = {P: 'a person', C: 'a company', H: 'a Hindu undivided family', F: 'a firm', A: 'an association of persons', T: 'a trust', B: 'a body of individuals', L: 'a local authority', J: 'an artificial juridical person', G: 'the government'};
+  const CHECKS = {
+    aadhaar: {re: /(?<!\d\s?)\b[2-9]\d{3}\s?\d{4}\s?\d{4}\b(?!\s?\d)/g, name: 'Aadhaar number',     // not 12 digits out of a 16-digit VID
+      test: v => /^[2-9]\d{11}$/.test(v) && verhoeff(v), fix: v => toDigit(v),
+      why: v => !/^\d{12}$/.test(v) ? 'should be 12 digits' : /^[01]/.test(v) ? 'cannot start with 0 or 1' : 'fails its check digit (a digit is misread)'},
+    pan: {re: /\b[A-Z]{5}\d{4}[A-Z]\b/g, name: 'PAN',
+      test: v => /^[A-Z]{3}[PCHFATBLJG][A-Z]\d{4}[A-Z]$/.test(v),
+      fix: v => v.length === 10 ? toLetter(v.slice(0, 5)) + toDigit(v.slice(5, 9)) + toLetter(v.slice(9)) : v,
+      why: v => v.length !== 10 ? 'should be 10 characters (5 letters, 4 digits, 1 letter)' : !/^[A-Z]{5}\d{4}[A-Z]$/.test(v) ? 'should be 5 letters, 4 digits, 1 letter' : 'its 4th letter is not a known holder type'},
+    passport: {re: /\b[A-Z]\d{7}\b/g, name: 'Passport number', test: v => /^[A-Z][1-9]\d{6}$/.test(v) || /^[A-Z0-9]{6,9}$/.test(v) && !/^\d+$/.test(v),
+      fix: v => v.length === 8 ? toLetter(v[0]) + toDigit(v.slice(1)) : v, why: () => 'an Indian passport number is a letter and 7 digits'},
+    licence: {re: /\b[A-Z]{2}[-\s]?\d{2}[-\s]?(?:19|20)\d{2}\s?\d{7}\b/g, name: 'Driving licence number',
+      test: v => /^[A-Z]{2}\d{2}(19|20)\d{2}\d{7}$/.test(v) || /^[A-Z]{2}\d{2}\d{11}$/.test(v) || /^[A-Z]{2}-?\d{2}\/?\d{4,11}\/?\d{0,4}$/.test(v),
+      fix: v => v.length >= 15 ? toLetter(v.slice(0, 2)) + toDigit(v.slice(2)) : v, why: () => 'usually the state code, 2 digits, the year and 7 digits (e.g. MH12 20150012345)'},
+    'voter-id': {re: /\b[A-Z]{3}\d{7}\b/g, name: 'Voter ID (EPIC)', test: v => /^[A-Z]{3}\d{7}$/.test(v),
+      fix: v => v.length === 10 ? toLetter(v.slice(0, 3)) + toDigit(v.slice(3)) : v, why: () => 'should be 3 letters and 7 digits'},
+    ifsc: {re: /\b[A-Z]{4}0[A-Z0-9]{6}\b/g, name: 'IFSC', test: v => /^[A-Z]{4}0[A-Z0-9]{6}$/.test(v),
+      fix: v => v.length === 11 ? toLetter(v.slice(0, 4)) + '0' + v.slice(5) : v, why: () => 'should be 4 letters, a zero, then 6 letters or digits'},
+    pnr: {re: /\b[A-Z0-9]{6}\b/g, name: 'Booking reference (PNR)', test: v => /^[A-Z0-9]{6}$/.test(v) && /[A-Z]/.test(v) || /^\d{10}$/.test(v), fix: v => v, why: () => 'an airline PNR is 6 letters/digits; a train PNR is 10 digits'},
+    flight: {re: /\b(?:[A-Z]\d|\d[A-Z]|[A-Z]{2})\s?\d{1,4}\b/g, name: 'Flight number', test: v => /^([A-Z]\d|\d[A-Z]|[A-Z]{2})\d{1,4}$/.test(v), fix: v => v.slice(0, 2) + toDigit(v.slice(2)), why: () => 'an airline code (2 characters) and up to 4 digits, e.g. 6E2134'},
+  };
+  function verify(kind, value, o){
+    const C = CHECKS[kind];
+    if(!C || value == null || value === '') return {ok: true, value, fixed: '', level: 'ok', text: ''};
+    const raw = clean(value);
+    if(/[X*•]{3,}/.test(raw)) return {ok: true, value, fixed: '', level: 'ok', text: 'masked on the document'};     // "XXXX XXXX 1234": printed masked
+    if(C.test(raw)){
+      let text = '';
+      if(kind === 'pan' && o && o.person){ const sur = String(o.person).trim().split(/\s+/).pop(); if(raw[3] === 'P' && sur && raw[4] !== sur[0].toUpperCase()) text = 'Its 5th letter (' + raw[4] + ') is usually the first letter of the surname (' + sur + ') — check the name or the number'; }
+      if(kind === 'pan' && raw[3] !== 'P') text = text || 'This PAN belongs to ' + PAN_TYPE[raw[3]] + ', not a person';
+      return {ok: true, value: raw, fixed: '', level: text ? 'warn' : 'ok', text};
+    }
+    const fixedV = clean(C.fix(raw));
+    if(fixedV !== raw && C.test(fixedV)) return {ok: true, value: fixedV, fixed: raw + ' → ' + fixedV, level: 'ok', text: 'Corrected a misread: ' + raw + ' → ' + fixedV};
+    return {ok: false, value: raw, fixed: '', level: 'error', text: C.name + ' “' + String(value).trim() + '” ' + C.why(raw)};
+  }
+  /* The values in a text that pass the check, most likely first (to recover a number a reader misread). */
+  function find(kind, text){
+    const C = CHECKS[kind];
+    if(!C || !text) return [];
+    const out = [];
+    (String(text).toUpperCase().match(C.re) || []).forEach(m=>{ const v = clean(m); if(C.test(v) && out.indexOf(v) < 0) out.push(v); });
+    return out;
+  }
+  /* Is this a real calendar date (YYYY-MM-DD)? */
+  const realDate = d => { if(!/^\d{4}-\d{2}-\d{2}$/.test(String(d || ''))) return false; const x = new Date(d + 'T00:00:00Z'); return !isNaN(x) && x.toISOString().slice(0, 10) === d; };
+
   return {learn, recall, lessons, forget, forgetAll, switchOff, pin, merge, exportAll, describe, confidenceOf,
-    fact, km, travelMin, parseHours, openDuring, planDay, categoryOf, categoryName, CATEGORIES, understand, rememberPhrase, phraseKey,
+    fact, km, travelMin, parseHours, openDuring, planDay, categoryOf, categoryName, CATEGORIES, understand, rememberPhrase, phraseKey, verify, find, realDate, verhoeff,
     _reset: ()=>{ mem = {v: 1, lessons: {}}; }};
 })();
 if(typeof window !== 'undefined') window.MoneyBrain = MoneyBrain;

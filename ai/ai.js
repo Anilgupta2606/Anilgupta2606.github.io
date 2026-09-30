@@ -475,8 +475,32 @@ const MoneyAI = (function(){
     return {data: json(r.text), id: r.id, provider: r.provider, model: r.model};
   }
   /* The JSON inside an AI answer (it may wrap it in prose or ``` fences). */
+  /* An almost-right answer made right: trailing commas, single quotes, keys without quotes, // comments,
+     smart quotes, Python's True/None, and an answer cut off in the middle (closed where it stopped). */
+  function repairJson(t){
+    let s = t.replace(/[“”]/g, '"').replace(/[‘’]/g, "'").replace(/\/\/[^\n"]*$/gm, '').replace(/\/\*[\s\S]*?\*\//g, '');
+    s = s.replace(/\bTrue\b/g, 'true').replace(/\bFalse\b/g, 'false').replace(/\bNone\b/g, 'null');
+    // single-quoted strings -> double-quoted (outside double-quoted strings)
+    let out = '', inD = false, inS = false;
+    for(let i = 0; i < s.length; i++){
+      const c = s[i], prev = s[i - 1];
+      if(inD){ out += c; if(c === '"' && prev !== '\\') inD = false; continue; }
+      if(inS){ if(c === "'" && prev !== '\\'){ out += '"'; inS = false; } else out += c === '"' ? '\\"' : c; continue; }
+      if(c === '"'){ inD = true; out += c; continue; }
+      if(c === "'" && /[\s,:\[{]/.test(out.trim().slice(-1) || '{')){ inS = true; out += '"'; continue; }
+      out += c;
+    }
+    s = out.replace(/([{,]\s*)([A-Za-z_][\w-]*)\s*:/g, '$1"$2":')          // keys without quotes
+      .replace(/,\s*([}\]])/g, '$1');                                      // trailing commas
+    // cut off: close the open string, drop a dangling key or comma, close every open bracket
+    let depth = [], str = false, esc2 = false;
+    for(const c of s){ if(str){ if(esc2) esc2 = false; else if(c === '\\') esc2 = true; else if(c === '"') str = false; continue; } if(c === '"') str = true; else if(c === '{' || c === '[') depth.push(c); else if(c === '}' || c === ']') depth.pop(); }
+    if(str) s += '"';
+    if(depth.length){ s = s.replace(/,\s*"[^"]*"\s*:?\s*$/, '').replace(/[,:]\s*$/, ''); while(depth.length) s += depth.pop() === '{' ? '}' : ']'; }
+    return s;
+  }
   function json(text){
-    const t = String(text || '').replace(/```(?:json)?/gi, '');
+    const t = String(text || '').replace(/```(?:json)?/gi, '').replace(/<think>[\s\S]*?<\/think>/g, '');
     const s = t.search(/[\[{]/);
     if(s < 0) throw new Error('The AI did not answer in the expected form.');
     const open = t[s], close = open === '{' ? '}' : ']';
@@ -486,8 +510,13 @@ const MoneyAI = (function(){
       if(inStr){ if(esc) esc = false; else if(c === '\\') esc = true; else if(c === '"') inStr = false; continue; }
       if(c === '"') inStr = true;
       else if(c === open) depth++;
-      else if(c === close && --depth === 0) return JSON.parse(t.slice(s, i + 1));
+      else if(c === close && --depth === 0){
+        const piece = t.slice(s, i + 1);
+        try{ return JSON.parse(piece); }catch(e){ try{ return JSON.parse(repairJson(piece)); }catch(e2){ break; } }
+      }
     }
+    // not closed (cut off) or still not valid: repair what there is
+    try{ return JSON.parse(repairJson(t.slice(s))); }catch(e){}
     throw new Error('The AI answer was cut off. Try again.');
   }
 
