@@ -288,67 +288,126 @@ const MoneyBrain = (function(){
   const CATEGORIES = CATS.map(([id, , name])=>({id, name}));
 
   /* ================================================================ understanding plain requests
-     understand(text) -> [{do, ...}] actions an app can apply, and what was not understood.
-     Handles the usual things people ask about a plan; anything else is left to an AI (and then learned). */
-  const NUM = {one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, first: 1, second: 2, third: 3, fourth: 4, fifth: 5, sixth: 6, last: -1};
+     understand(text) -> [{do, ...}] actions an app can apply. It reads a request the way a person would:
+     split into clauses ("no temples, more food places" = two wishes), and in each clause finds which way it
+     leans (less / more), what it is about (a kind of place, food, the pace, a time, a day, who is coming).
+     Hinglish is read too ("thoda relax plan karo", "veg khana chahiye", "mandir nahi"). Checked by
+     test/exam (the understanding exam). Anything it cannot read is left to an AI. */
+  const NUM = {one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10,
+    first: 1, second: 2, third: 3, fourth: 4, fifth: 5, sixth: 6, seventh: 7, last: -1, final: -1};
+  // Hinglish (and other shorthand) -> plain English, word by word
+  const HINGLISH = [[/\bthoda\b/g, 'a bit'], [/\bbahut zyada\b|\bbohot zyada\b|\bzyada\b/g, 'too much'], [/\bkam karo\b|\bkam kar do\b/g, 'fewer please'],
+    [/\bnahi\b|\bnahin\b|\bmat\b/g, 'no'], [/\bchahiye\b/g, 'want'], [/\bmandir\b/g, 'temple'], [/\bmasjid\b/g, 'mosque'], [/\bkhana\b/g, 'food'],
+    [/\bjaana\b|\bjana\b/g, 'go'], [/\bghumna\b/g, 'sightseeing'], [/\baaram se\b/g, 'relaxed'], [/\baaram\b/g, 'rest'], [/\bjaldi\b/g, 'early'], [/\bder se\b/g, 'later'], [/\bbacche\b|\bbachche\b/g, 'kids'], [/\bghoomna\b/g, 'sightseeing'], [/\bsubah\b/g, 'morning'], [/\bshaam\b/g, 'evening'], [/\bkal\b/g, 'tomorrow'],
+    [/\bho gaya\b/g, ''], [/\bkaro\b|\bkar do\b/g, 'please'], [/\bplan\b/g, 'plan']];
+  // words that stand for several kinds of places
+  const GROUPS = [[/\breligious (places|sites|stuff|spots)?|places of worship\b/g, ' temples mosques churches '], [/\bshopping\b/g, ' malls markets '],
+    [/\bhistory\b|\bhistorical\b|\bheritage\b/g, ' museums forts '], [/\bnature\b|\bgreenery\b/g, ' parks '], [/\bart\b/g, ' galleries '],
+    [/\bcity from above\b|\bskyline\b|\bgreat views?\b|\brooftops?\b|\bviewpoints?\b|\bobservation deck\b/g, ' views '], [/\bboat rides?\b|\bcruises?\b/g, ' boats ']];
   function catWords(t){
     const out = [];
-    t = t.replace(/galleries/g, 'gallery').replace(/\b(\w{3,}?)(es|s)\b/g, (m, w, e)=>/(souq|souk|mosque|temple|church|museum|market|mall|park|garden|beach|tower|fort|palace|zoo|aquarium|cruise|bazaar|lake|island|dune|boat|dhow)$/.test(w + (e === 'es' ? 'e' : '')) ? w + (e === 'es' ? 'e' : '') : /(souq|souk|mosque|temple|church|museum|market|mall|park|garden|beach|tower|fort|palace|zoo|aquarium|bazaar|lake|island|dune|boat|dhow)$/.test(w) ? w : m);
+    t = t.replace(/galleries/g, 'gallery').replace(/\b(\w{3,}?)(es|s)\b/g, (m, w, e)=>/(souq|souk|mosque|temple|church|museum|market|mall|park|garden|beach|tower|fort|palace|zoo|aquarium|cruise|bazaar|lake|island|dune|boat|dhow|view|gallery)$/.test(w + (e === 'es' ? 'e' : '')) ? w + (e === 'es' ? 'e' : '') : /(souq|souk|mosque|temple|church|museum|market|mall|park|garden|beach|tower|fort|palace|zoo|aquarium|bazaar|lake|island|dune|boat|dhow|view)$/.test(w) ? w : m);
     CATS.forEach(([id, re, name])=>{ if(re.test(t) || new RegExp('\\b' + name.split(' ')[0].replace(/s$/, '') + 's?\\b', 'i').test(t)) out.push(id); });
+    if(/\bviews?\b/.test(t) && out.indexOf('view') < 0) out.push('view');
+    if(/\bzoo\b|\banimals?\b|\bdolphins?\b|\bpenguins?\b|\bwildlife\b|\bsafari park\b/.test(t) && out.indexOf('animals') < 0) out.push('animals');
     return out;
   }
-  function understand(text, ctx){
-    const t = ' ' + String(text || '').toLowerCase().replace(/[’']/g, "'") + ' ', acts = [];
-    const dayRef = () => {
-      const m = /\bday\s*(\d+)\b/.exec(t) || /\b(first|second|third|fourth|fifth|sixth|last)\s+day\b/.exec(t);
+  const NEG = /\b(no|not|skip|avoid|without|less|fewer|don't|dont|do not|hate|dislike|remove|drop|too many|enough|not into|not interested|no more|cut|cancel|bored|boring|minimum|minimi[sz]e|not needed|no need|not necessary|not a fan|never|tired of|sick of|delete)\b/;
+  const POS = /\b(more|love|loves|like|add|include|prefer|want|wants|interested|keen|enjoy|must|would be nice|would love|please|try|some|maximum|maximi[sz]e|see|visit|put in|lots of)\b/;
+  /* A request it could not read, explained once (by an AI or by you): remembered, so the same words work next time. */
+  const phraseKey = text => String(text || '').toLowerCase().replace(/[^a-z0-9 ]+/g, ' ').replace(/\b(please|pls|plz|kindly|the|a|an|can|you|could|we|i)\b/g, ' ').replace(/\s+/g, ' ').trim();
+  function rememberPhrase(app, text, acts){
+    const k = phraseKey(text);
+    if(!k || !acts || !acts.length) return;
+    learn(app || 'home', 'phrase', k, JSON.stringify(acts), {weight: 3, label: '“' + String(text).slice(0, 60) + '” means: ' + acts.map(a=>a.do + (a.value ? ' ' + a.value : a.category ? ' ' + a.category : '')).join(', '), why: 'Explained once, remembered'});
+  }
+  function understand(text, o){
+    const known = recall((o && o.app) || 'trip', 'phrase', phraseKey(text), {min: 0.5});
+    if(known){ try{ return JSON.parse(known.value); }catch(e){} }
+    let t = ' ' + String(text || '').toLowerCase().replace(/[’']/g, "'").replace(/\s+/g, ' ') + ' ';
+    HINGLISH.forEach(([re, w])=>{ t = t.replace(re, w); });
+    t = t.replace(/\bday (one|two|three|four|five|six|seven|eight|nine|ten)\b/g, (m, w)=>'day ' + NUM[w]);
+    const acts = [];
+    const timeOf = (h, mm, ap, pmIfBare) => { h = +h; mm = +(mm || 0); if(ap === 'pm' && h < 12) h += 12; if(ap === 'am' && h === 12) h = 0; if(!ap && pmIfBare && h < 12 && h >= 1) h += 12; return h * 60 + mm; };
+    const dayRef = s => {
+      const m = /\bday\s*(\d+)\b/.exec(s) || /\b(first|second|third|fourth|fifth|sixth|seventh|last|final)\s+(day|morning|afternoon|evening|night)\b/.exec(s) || /\bthe (last|final) day\b/.exec(s);
       if(m) return {day: NUM[m[1]] || +m[1]};
-      const dm = /\b(\d{1,2})(?:st|nd|rd|th)?\s*(?:of\s*)?(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)?/.exec(t.replace(/\bday\s*\d+/, ''));
-      if(dm && (dm[2] || /\bon the\s+\d/.test(t))) return {date: +dm[1], month: dm[2] || ''};
+      const dm = /\b(?:on\s+)?(?:the\s+)?(\d{1,2})(?:st|nd|rd|th)\b|\b(\d{1,2})\s*(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\w*\b|\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\w*\s+(\d{1,2})\b/.exec(s);
+      if(dm) return {date: +(dm[1] || dm[2] || dm[5]), month: dm[3] || dm[4] || ''};
       return null;
     };
-    const timeRef = s => { const m = /\b(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b/.exec(s) || /\bat\s+(\d{1,2}):(\d{2})\b/.exec(s); if(!m) return null;
-      let h = +m[1]; if(m[3] === 'pm' && h < 12) h += 12; if(m[3] === 'am' && h === 12) h = 0; return h * 60 + +(m[2] || 0); };
-    // pace
-    if(/too (packed|much|busy|tiring|hectic)|less (packed|rushed|busy)|slow(er)? down|more (relaxed|rest|free time)|relax(ed)? pace|tired/.test(t)) acts.push({do: 'pace', value: 'relaxed', day: dayRef()});
-    else if(/too (empty|light|slow|little)|more (things|places|sights|activities)|pack (it|more)|packed pace|busier/.test(t)) acts.push({do: 'pace', value: 'packed', day: dayRef()});
-    // food
-    if(/\b(pure )?veg(etarian|gie)?\b|no (meat|non[- ]?veg)|we don't eat meat/.test(t) && !/non[- ]?veg(etarian)? (is )?(ok|fine)/.test(t)) acts.push({do: 'food', value: 'vegetarian'});
+    const whole = dayRef(t);
+    // ---- clauses: at punctuation and "but"/"then", and before a new "more / less / no …" in the middle of a sentence
+    const clauses = t.split(/[,.;!?]|\bbut\b|\bthen\b|\bwhile\b/).flatMap(c=>c.split(/(?<!\b(?:no|any|some|a few|much))\s(?=(?:more|less|fewer|no|skip|add|avoid|include)\b)/)).map(c=>' ' + c.trim() + ' ').filter(c=>c.trim());
+    let paceDone = false;
+    clauses.forEach((c, ci)=>{
+      let g = c; GROUPS.forEach(([re, w])=>{ g = g.replace(re, w); });
+      const cats = catWords(g);
+      // Hindi puts the "no" after the thing ("mandir nahi jaana" -> "temple" + "no go"): a bare clause takes the next one's lean
+      const nextBare = clauses[ci + 1] && !catWords(clauses[ci + 1]).length ? clauses[ci + 1] : '';
+      const neg = NEG.test(c) || (!POS.test(c) && NEG.test(nextBare)), pos = POS.test(c);
+      const walking = /walk/.test(c);
+      // food places: "more food places", "foodies", "street food", "local food"
+      const foodLike = /\bfoodies?\b|\bstreet food\b|\blocal (food|cuisine|dishes)\b|\b(more|some|good|maximum|lots of|best) (local )?(food|restaurants|places to eat|eating)\b|\bfood (places|spots|tour)\b|\beat the best\b|\btry the food\b/.test(c);
+      if(cats.length){
+        cats.forEach(cat=>acts.push({do: neg && !/\b(must|love|add)\b/.test(c.replace(/\bno more\b/, '')) ? 'dislike' : (pos || /\bday\b/.test(c) || /^\s*(a|some)\b/.test(c)) ? 'like' : 'like', category: cat}));
+      }
+      if(foodLike && !neg && !/veg|vegan|jain|halal/.test(c)) acts.push({do: 'like', category: 'food'});
+      // pace, unless the clause was about a kind of place ("too many museums") or walking
+      if(!cats.length && !walking && !paceDone){
+        const relaxed = /too (packed|much|busy|tiring|hectic|full|ambitious|many (things|places|stops|sights))|overloaded|over ?packed|overwhelm|ambitious|exhaust|tired|tiring|rush|hectic|crazy|insane|intense|slow|relax|chill|easy ?going|take it easy|keep it light|lighter|fewer (places|stops|things|sights)?|not so many|cut down|(do|see) less|less (each|every|per) day|less (sightseeing|rushed|packed|busy)|running around|jet ?lag|breathing room|downtime|leisure|more (free|spare|down) ?time|more time to|more breaks|we are old|lazy trip/.test(c);
+        const packed = /too (empty|light|slow|little)|looks empty|boring|nothing to do|as much as possible|more (things|places|sights|sightseeing|activities|stops)|add (more|something|anything)|fit (more|in more)|pack (it|more)|busier|energetic|lots of energy|full of energy|fill (it|the day)|handle a busy|(busy|packed|full) (schedule |days? )?(is|are) (fine|ok)|don't mind (a )?(busy|packed)|see everything/.test(c);
+        if(relaxed){ acts.push({do: 'pace', value: 'relaxed', day: dayRef(c) || whole}); paceDone = true; }
+        else if(packed){ acts.push({do: 'pace', value: 'packed', day: dayRef(c) || whole}); paceDone = true; }
+      }
+    });
+    // a pace said in words the clauses split apart ("pack more in")
+    if(!paceDone && !acts.some(a=>a.do === 'like' || a.do === 'dislike') && !/walk/.test(t)){
+      if(/\bpack (it |more |them )?(in|more)\b|\bcram\b/.test(t)) acts.push({do: 'pace', value: 'packed', day: whole});
+    }
+    // ---- food
+    if(/\bjain\b|no onion|no garlic/.test(t)) acts.push({do: 'food', value: 'jain vegetarian'});
     else if(/\bvegan\b/.test(t)) acts.push({do: 'food', value: 'vegan'});
-    else if(/\b(jain)\b/.test(t)) acts.push({do: 'food', value: 'jain vegetarian'});
     else if(/\bhalal\b/.test(t)) acts.push({do: 'food', value: 'halal'});
-    // likes and dislikes of kinds of places
-    // one request ends at a full stop, "but", or a comma that starts the next one ("no mosques, we are vegetarian, day 2 …")
-    const END = '(?=[.!;?]|,\\s*(?:we|i|day|but|more|less|no|not|please|start|keep|add|also|and|plus|our|my|the kids)\\b|\\bbut\\b|\\bplease\\b|$)';
-    const neg = new RegExp("\\b(no|not|skip|avoid|without|less|fewer|don't want|dont want|hate|dislike|remove|drop)\\b\\s+(?:(?:any|more|the|so many|too many)\\s+)?([a-z0-9 ,&'-]+?)" + END, 'g');
-    const pos = new RegExp('\\b(more|love|like|add|include|prefer|want|interested in|keen on|we enjoy|enjoy)\\b\\s+(?:(?:some|a few|a|more|the)\\s+)?([a-z0-9 ,&\'-]+?)' + END, 'g');
-    let m;
-    while((m = neg.exec(t))){ catWords(m[2]).forEach(c=>acts.push({do: 'dislike', category: c})); if(!catWords(m[2]).length && m[1] === 'avoid' && m[2].trim().length > 3) acts.push({do: 'avoid', words: m[2].trim()}); }
-    while((m = pos.exec(t))){ const cs = catWords(m[2]); cs.forEach(c=>{ if(!acts.some(a=>a.do === 'dislike' && a.category === c)) acts.push({do: 'like', category: c}); });
-      if(!cs.length && /food|eat|restaurant|street food|cafe/.test(m[2])) acts.push({do: 'like', category: 'food'}); }
-    // start later / earlier, back earlier
-    const late = /start (the day )?(later|late)|sleep in|late start|lazy morning/.test(t), early = /start (the day )?(earlier|early)|early start/.test(t);
-    const st = /(?:start|begin|leave the hotel)(?: the day| days)?(?: at| by| from| after)?\s+(\d{1,2}(?::\d{2})?\s*(?:am|pm)?)/.exec(t);
-    if(st && timeRef(st[1] + (/(am|pm)/.test(st[1]) ? '' : (+st[1].split(':')[0] < 7 ? 'pm' : 'am')))) acts.push({do: 'dayStart', min: timeRef(st[1] + (/(am|pm)/.test(st[1]) ? '' : (+st[1].split(':')[0] < 7 ? 'pm' : 'am')))});
-    else if(late) acts.push({do: 'dayStart', shift: 60}); else if(early) acts.push({do: 'dayStart', shift: -60});
-    const back = /(?:back|return|at the hotel|home)(?: at the hotel)? (?:by|before)\s+(\d{1,2}(?::\d{2})?\s*(?:am|pm)?)/.exec(t);
-    if(back){ const s = back[1] + (/(am|pm)/.test(back[1]) ? '' : 'pm'); acts.push({do: 'dayEnd', min: timeRef(s)}); }
-    // a fixed appointment: "meeting on the 14th at 3 pm", "dinner with friends on day 3 at 8pm"
-    const appt = /(meeting|call|appointment|dinner with|lunch with|visit(?:ing)? (?:my |our )?\w+|wedding|conference|event|show|match|concert)\b([^.;]*?)\b(?:at|@)\s*(\d{1,2}(?::\d{2})?\s*(?:am|pm))/.exec(t);
-    if(appt){ const d = dayRef(); acts.push({do: 'fixed', title: (appt[1] + appt[2]).replace(/\s+on\s+.*$/, '').replace(/\s+/g, ' ').trim(), min: timeRef(appt[3]), day: d, minutes: /dinner|lunch/.test(appt[1]) ? 90 : 60}); }
-    // a free evening / morning / day
-    const fr = /(morning|afternoon|evening) (free|off)/.exec(t) || /(free|nothing planned|keep (it )?free|rest)\s+(?:on\s+)?(?:the\s+)?(morning|afternoon|evening|day)/.exec(t);
-    if(fr){ const part = [fr[2], fr[3], fr[1]].find(x=>/morning|afternoon|evening|day/.test(x || '')); acts.push({do: 'free', part, day: dayRef()}); }
-    // shopping / beach day etc. = like
-    if(/shopping day|go shopping|more shopping/.test(t) && !acts.some(a=>a.category === 'mall')) acts.push({do: 'like', category: 'mall'}, {do: 'like', category: 'market'});
-    // kids, elders
-    if(/\bkids?\b|\bchild(ren)?\b|toddler|baby/.test(t)) acts.push({do: 'travellers', value: 'with children'});
-    if(/elder|parents|grand(ma|pa|mother|father)|senior|wheelchair|can't walk|cannot walk|less walking|walk less/.test(t)) acts.push({do: 'walking', value: 'less'});
+    else if((/\b(pure )?veg(etarian|gie)?\b|no meat|don't eat (meat|non[- ]?veg)|dont eat (meat|non[- ]?veg)|no non[- ]?veg|(no|don't eat|dont eat|without) (chicken|fish|mutton|beef|pork|seafood|lamb|eggs?|meat)\b/.test(t)) && !/non[- ]?veg(etarian)? (is |are )?(ok|fine|allowed)|we eat (meat|non[- ]?veg)/.test(t)) acts.push({do: 'food', value: 'vegetarian'});
+    // ---- times: start / end of the day
+    const st = /\b(?:start|begin|leave the hotel|leave|head out|go out)(?: the day| days| our day)?(?: at| by| from| after| around| before)?\s+(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\b/.exec(t) || /\bbegin at (\d{1,2})(?::(\d{2}))?\s*(am|pm)?/.exec(t) || /\bnothing before (\d{1,2})(?::(\d{2}))?\s*(am|pm)?/.exec(t);
+    if(st) acts.push({do: 'dayStart', min: timeOf(st[1], st[2], st[3], +st[1] < 6)});
+    else if(/start (the day )?(later|late)|sleep in|late (start|mornings?)|lazy mornings?|not too early|no early (starts|mornings?)|late risers?|night owls?|not (a )?morning (people|person)|wake up late/.test(t)) acts.push({do: 'dayStart', shift: 60});
+    else if(/start (the day )?(earlier|early)|early starts?|early mornings? (are|is) (fine|ok)|early (risers?|birds?)/.test(t)) acts.push({do: 'dayStart', shift: -60});
+    const back = /\b(?:back|return|at the hotel|in the hotel|home|finish(?: the day)?|done|wrap up|end the day)(?: at the hotel| to the hotel| in the hotel)? (?:by|before|at)\s+(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\b/.exec(t);
+    if(back) acts.push({do: 'dayEnd', min: timeOf(back[1], back[2], back[3], true)});
+    else if(/no late nights|early nights?|early to bed|not too late/.test(t)) acts.push({do: 'dayEnd', shift: -60});
+    // ---- a fixed appointment: "meeting on the 14th at 3 pm", "dinner with friends on day 3 at 8pm"
+    const appt = /\b(meeting|work call|call|appointment|dinner with|lunch with|breakfast with|visit(?:ing)? (?:my |our )?\w+|wedding|conference|event|show|match|concert|interview|tickets for a \w+)\b([^.;]*?)\b(?:at|@)\s*(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\b/.exec(t);
+    if(appt && (appt[5] || appt[4] || /\bat\s+\d/.test(appt[0]))){
+      acts.push({do: 'fixed', title: (appt[1] + appt[2]).replace(/\s+on\s+.*$/, '').replace(/\s+(on|at)$/, '').replace(/^tickets for an? /, '').replace(/\s+/g, ' ').trim(),
+        min: timeOf(appt[3], appt[4], appt[5], +appt[3] < 8), day: dayRef(t), minutes: /dinner|lunch|wedding|show|match|concert/.test(appt[1]) ? 120 : 60});
+    }
+    // any other "<something> on <day> at <time>" (or "at <time> on <day>") with a clear time is a fixed appointment
+    if(!acts.some(a=>a.do === 'fixed') && !/\b(start|begin|back|return|finish|leave|end the day)\b/.test(t)){
+      const g2 = /\b(?:(?:i|we) (?:have|got) (?:an? |the |our |my )?|there is (?:an? )?)?([a-z][a-z ]{2,40}?)\s+(?:on\s+(?:the\s+)?(?:day\s*\d+|\d{1,2}(?:st|nd|rd|th)?|(?:first|second|third|fourth|last) day)[a-z ]*?\s+)?at\s+(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b/.exec(t);
+      if(g2 && dayRef(t) && !/^(start|back|free|keep)/.test(g2[1])) acts.push({do: 'fixed', title: g2[1].replace(/^(a|an|the|my|our)\s+/, '').trim(), min: timeOf(g2[2], g2[3], g2[4], false), day: dayRef(t), minutes: /dinner|lunch|party|birthday|show/.test(g2[1]) ? 120 : 60});
+    }
+    // ---- free time
+    const partOf = s => (/(morning|afternoon|evening)/.exec(s) || [])[1] || (/after lunch/.test(s) ? 'afternoon' : /after dinner|night/.test(s) ? 'evening' : /before lunch/.test(s) ? 'morning' : undefined);
+    const freeish = /\bfree\b|\boff\b|\bopen\b|nothing planned|no plans|nothing (on|in|for)\b|rest in the|keep (it|the)?\s*\w* ?free|leave .* free|day off|lazy day|rest day|empty (morning|afternoon|evening|day)/;
+    const fc = clauses.find(c=>freeish.test(c)) || (freeish.test(t) ? t : null);
+    if(fc){
+      const part = partOf(fc) || (/\bday\b|\bday\s*\d/.test(fc) ? 'day' : null);
+      if(part) acts.push({do: 'free', part, day: dayRef(fc) || (part !== 'day' ? whole : null) || (/day\s*\d|\b(first|second|third|last)\b/.test(fc) ? dayRef(fc) : null)});
+    }
+    // ---- who is coming
+    if(/\bkids?\b|\bchild(ren)?\b|toddler|\bbaby\b|infant|\bson\b.*\d|\bdaughter\b.*\d|aged \d|\d+[ -]?(year|yr)s?[ -]?old/.test(t)) acts.push({do: 'travellers', value: 'with children'});
+    if(/elderly|\belders?\b|senior|grand(ma|pa|mother|father)|wheelchair|can'?t walk|cannot walk|walk (much|a lot|far)|less walking|walk less|too much walking|(limit|minimi[sz]e|reduce|cut|less) (the )?walking|knee|stick|walker|mobility/.test(t)) acts.push({do: 'walking', value: 'less', day: whole || undefined});
+    // a day mentioned once belongs to the wish it came with
+    acts.forEach(a=>{ if(a.day === undefined && (a.do === 'pace')) a.day = whole; });
     const seen = new Set();
     return acts.filter(a=>{ const k = JSON.stringify(a); if(seen.has(k)) return false; seen.add(k); return true; });
   }
 
   return {learn, recall, lessons, forget, forgetAll, switchOff, pin, merge, exportAll, describe, confidenceOf,
-    fact, km, travelMin, parseHours, openDuring, planDay, categoryOf, categoryName, CATEGORIES, understand,
+    fact, km, travelMin, parseHours, openDuring, planDay, categoryOf, categoryName, CATEGORIES, understand, rememberPhrase, phraseKey,
     _reset: ()=>{ mem = {v: 1, lessons: {}}; }};
 })();
 if(typeof window !== 'undefined') window.MoneyBrain = MoneyBrain;
