@@ -145,13 +145,6 @@ main{max-width:1120px;margin:0 auto;padding-inline:20px;padding-block:0 60px}
 .gate .err{color:var(--dn);font-size:13px}
 .skel{opacity:.55}
 /* ---------- Ask AI ---------- */
-.docs-card{margin-top:16px}
-.docs-card .top{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between}
-.docs-card .open{margin-top:0}
-.docs-card .renew{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
-.docs-card .renew li{font-size:14px;display:flex;flex-wrap:wrap;gap:6px;align-items:baseline}
-.docs-card .lim{color:var(--exp);font-weight:600}
-.docs-card .dn{font-weight:600}
 .ask{margin-top:16px}
 .ask .top{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .ask .top h3{margin-right:auto}
@@ -195,18 +188,6 @@ const TRAVEL_DOC = ['boarding-pass', 'flight', 'hotel', 'train', 'bus', 'visa', 
 const DOC_LABEL = {passport: 'Passport', aadhaar: 'Aadhaar', pan: 'PAN card', licence: 'Driving licence', 'voter-id': 'Voter ID', tax: 'Tax papers', bank: 'Bank statement',
   investment: 'Investment statement', insurance: 'Insurance', property: 'Property / rent', vehicle: 'Vehicle papers', medical: 'Medical', education: 'Education', employment: 'Employment', bill: 'Bill / warranty', other: 'Other'};
 function personalDocs(tv){ return ((tv && tv.docs) || []).filter(d=>TRAVEL_DOC.indexOf(d.type) < 0); }
-function docsCard(tv){
-  const docs = personalDocs(tv);
-  const today = new Date().toISOString().slice(0, 10), soon = new Date(Date.now() + 90 * 864e5).toISOString().slice(0, 10);
-  const renew = docs.filter(d=>d.fields && d.fields.validUntil && d.fields.validUntil <= soon).sort((a, b)=>a.fields.validUntil.localeCompare(b.fields.validUntil));
-  const byType = {}; docs.forEach(d=>{ const k = DOC_LABEL[d.type] || 'Other'; byType[k] = (byType[k] || 0) + 1; });
-  const fmt = d => new Date(d + 'T00:00:00').toLocaleDateString('en-IN', {day: 'numeric', month: 'short', year: 'numeric'});
-  return `<section class="card docs-card" style="--c:var(--trip)"><div class="top"><h3>Personal documents</h3><a class="open" href="/tripManangement/#docs/personal">Open personal documents <span aria-hidden="true">→</span></a></div>
-    ${docs.length ? `<p class="cap">${docs.length} kept in Trip Vault — ${Object.entries(byType).map(([k, n])=>esc(k) + (n > 1 ? ' ×' + n : '')).join(', ')}</p>
-      ${renew.length ? `<ul class="renew">${renew.map(d=>`<li><b>${esc(DOC_LABEL[d.type] || d.title)}</b> — ${esc(d.person || '')} <span class="${d.fields.validUntil < today ? 'dn' : 'lim'}">${d.fields.validUntil < today ? 'expired' : 'renew by'} ${esc(fmt(d.fields.validUntil))}</span></li>`).join('')}</ul>` : '<p class="cap">Nothing to renew in the next three months.</p>'}`
-      : `<div class="empty">Keep Aadhaar, PAN, passport, licence, tax papers, statements, policies and bills in one place — the reader sorts them, and they open on your phone too.</div>`}
-  </section>`;
-}
 const SESSION = 'money-home-session';
 const ICON = {
   ats:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19V9M10 19V5M16 19v-7M22 19H2"/></svg>',
@@ -532,7 +513,6 @@ function draw(et, ats, tv){
       ${card('led', '16-Year Ledger', 'Investment plan', real && plan.plan && plan.plan.dob ? '' : '', ledBody, 'Open the Ledger')}
       ${card('trip', 'Trip Vault', 'Trips, tickets and plans', '', tripBody, 'Open Trip Vault')}
     </div>
-    ${docsCard(tv)}
     ${askCard()}
     ${monthCard || nextCard ? `<div class="row2">${monthCard || '<div></div>'}${nextCard}</div>` : ''}
     <div class="foot"><span>Read in this browser from the Expense Tracker, the Ledger and Trip Vault (with your personal documents)${atsOk ? ', and live from ATS on this Mac' : ''}. Nothing is sent anywhere.</span>
