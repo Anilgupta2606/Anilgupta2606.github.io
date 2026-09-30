@@ -1,0 +1,268 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#0c2620">
+<title>Setup · Money Home</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%230c2620'/%3E%3Cpath d='M32 12l5 13 13 5-13 5-5 13-5-13-13-5 13-5z' fill='%23e2b04a'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap">
+<style>
+:root{
+  color-scheme:light;
+  --page:#eef1ec; --card:#ffffff; --card2:#f6f8f5; --ink:#132019; --ink2:#3b4a42; --mut:#6b7a72; --line:#dfe5df;
+  --hero:#0c2620; --hero2:#12372e; --hero-ink:#f3f1e8; --hero-mut:#a9bcb2; --gold:#e2b04a;
+  --up:#16804a; --dn:#c2412d; --warn:#b36b00;
+  --shadow:0 1px 2px rgb(15 30 25 / .05), 0 8px 24px -12px rgb(15 30 25 / .14);
+  --display:'Bricolage Grotesque', 'Avenir Next', system-ui, sans-serif;
+  --body:'Plus Jakarta Sans', -apple-system, 'Segoe UI', sans-serif;
+  --mono:'JetBrains Mono', ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){ color-scheme:dark;
+    --page:#0b110f; --card:#131b18; --card2:#18221e; --ink:#e7ede9; --ink2:#c1cdc6; --mut:#8d9c94; --line:#24302b;
+    --hero:#0a1f1a; --hero2:#0f2d25; --up:#4cc38a; --dn:#ef7a66; --warn:#f0b551; --shadow:none; }
+}
+:root[data-theme="dark"]{ color-scheme:dark;
+  --page:#0b110f; --card:#131b18; --card2:#18221e; --ink:#e7ede9; --ink2:#c1cdc6; --mut:#8d9c94; --line:#24302b;
+  --hero:#0a1f1a; --hero2:#0f2d25; --up:#4cc38a; --dn:#ef7a66; --warn:#f0b551; --shadow:none; }
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--page);color:var(--ink);font:15px/1.5 var(--body);-webkit-font-smoothing:antialiased}
+a{color:inherit}
+.hero{background:linear-gradient(160deg,var(--hero2),var(--hero));color:var(--hero-ink);padding-top:env(safe-area-inset-top,0px)}
+.in{max-width:980px;margin:0 auto;padding-inline:16px}
+.hero .in{padding-block:20px 30px}
+.back{color:var(--hero-mut);text-decoration:none;font-size:13px}
+.back:hover{color:var(--hero-ink)}
+h1{font:800 clamp(28px,5vw,40px)/1.1 var(--display);margin:10px 0 6px;letter-spacing:-.02em}
+.hero p{color:var(--hero-mut);margin:0;max-width:660px}
+main{display:flex;flex-direction:column;gap:16px;margin-top:-14px;padding-bottom:40px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow);padding:18px;scroll-margin-top:12px}
+.card h2{margin:0 0 4px;font:700 18px var(--display);display:flex;align-items:center;gap:10px}
+.card h2 .n{display:grid;place-items:center;width:26px;height:26px;border-radius:50%;background:var(--hero);color:var(--gold);font:700 13px var(--body);flex:none}
+.cap{margin:0 0 12px;font-size:13px;color:var(--mut)}
+.grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.tile{background:var(--card2);border-radius:12px;padding:10px 12px;min-width:0}
+.tile b{display:block;font-size:13.5px}
+.tile span{font-size:12.5px;color:var(--mut)}
+.tile .ok{color:var(--up)} .tile .no{color:var(--dn)}
+.tile a{font-size:12.5px}
+.prov{display:grid;grid-template-columns:minmax(150px,1.1fr) 90px minmax(160px,1.4fr) auto;gap:10px;align-items:center;padding:12px 0;border-top:1px solid var(--line)}
+.prov:first-of-type{border-top:0}
+.pname b{display:block}
+.pname small{color:var(--mut);font-size:12px}
+.pname a{color:var(--mut)}
+.st{font-size:11.5px;font-weight:700;padding:3px 9px;border-radius:999px;background:var(--card2);color:var(--mut);text-align:center;white-space:nowrap}
+.st.ready{background:color-mix(in srgb,var(--up) 14%,var(--card));color:var(--up)}
+.st.rest{background:color-mix(in srgb,var(--warn) 16%,var(--card));color:var(--warn)}
+input,select{font:14px var(--body);color:var(--ink);background:var(--card2);border:1px solid var(--line);border-radius:10px;padding:9px 11px;width:100%;min-width:0}
+input:focus,select:focus{outline:2px solid var(--gold);outline-offset:1px}
+.tools{display:flex;gap:6px;align-items:center}
+.btn{font:600 13px var(--body);border:1px solid var(--line);background:var(--card);color:var(--ink2);border-radius:10px;padding:8px 12px;cursor:pointer;white-space:nowrap;text-decoration:none;display:inline-flex;align-items:center}
+.btn:hover{color:var(--ink)}
+.btn.primary{background:var(--hero);color:var(--gold);border-color:transparent}
+.btn:disabled{opacity:.5}
+.res{grid-column:1/-1;font-size:12.5px;color:var(--mut);margin-top:-4px}
+.res.ok{color:var(--up)} .res.bad{color:var(--dn)}
+.model{grid-column:1/-1;display:flex;gap:8px;align-items:center;font-size:12.5px;color:var(--mut)}
+.model select{width:auto;max-width:100%;padding:5px 8px;font-size:12.5px}
+.row{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.row.end{justify-content:flex-start;margin-top:12px}
+label{display:flex;flex-direction:column;gap:5px;font-size:12px;font-weight:600;color:var(--ink2)}
+label.check{flex-direction:row;align-items:center;gap:8px;font-weight:500;font-size:14px}
+label.check input{width:18px;height:18px}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.chain{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:13px}
+.chain span{padding:5px 10px;border-radius:9px;background:var(--card2)}
+.chain span.first{background:color-mix(in srgb,var(--gold) 25%,var(--card));font-weight:700}
+.chain em{color:var(--mut);font-style:normal;font-family:var(--mono);font-size:11.5px}
+.note{font-size:12.5px;color:var(--mut)}
+.msg{font-size:13px}
+.msg.ok{color:var(--up)} .msg.bad{color:var(--dn)}
+ol.steps{margin:6px 0 0;padding-left:20px;font-size:14px;color:var(--ink2)}
+ol.steps li{margin:3px 0}
+.toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:var(--ink);color:var(--page);padding:10px 16px;border-radius:12px;font-weight:600;opacity:0;transition:.2s;pointer-events:none;max-width:90vw}
+.toast.on{opacity:1}
+.gate{min-height:100vh;display:grid;place-items:center;padding:20px;text-align:center}
+@media (max-width:760px){
+  .grid{grid-template-columns:1fr 1fr}
+  .two{grid-template-columns:1fr}
+  .prov{grid-template-columns:1fr auto;}
+  .prov .keyin{grid-column:1/-1}
+  .prov .tools{grid-column:1/-1}
+}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div class="toast" id="toast"></div>
+<script src="/ai/ai.js"></script>
+<script>
+"use strict";
+/* Setup: everything you set once for all the apps on this site - sync between devices, the sign-in, the AI keys.
+   On a new phone: sign in on Money Home, open this page, enter the GitHub token and passphrase once. */
+const $ = id => document.getElementById(id);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const toast = m => { const t = $('toast'); t.textContent = m; t.classList.add('on'); clearTimeout(toast.t); toast.t = setTimeout(()=>t.classList.remove('on'), 3200); };
+const ago = ms => { const s = (Date.now() - ms) / 1000; return s < 90 ? 'just now' : s < 3600 ? Math.round(s / 60) + ' min ago' : s < 86400 ? Math.round(s / 3600) + ' h ago' : Math.round(s / 86400) + ' d ago'; };
+try{ const t = localStorage.getItem('ledger-theme'); if(t === 'light' || t === 'dark') document.documentElement.dataset.theme = t; }catch(e){}
+const signedIn = () => { try{ return ['money-home-session', 'tripvault-session'].some(k => sessionStorage.getItem(k) === 'yes' || localStorage.getItem(k) === 'yes'); }catch(e){ return false; } };
+
+const FROM = {hub: 'saved here', 'trip-vault': 'found in Trip Vault', 'expense-tracker': 'found in the Expense Tracker', ledger: 'found in the Ledger', synced: 'from your other device'};
+const LOGIN = {'expense-tracker': 'your Expense Tracker username and password', carried: 'the username and password from your other device', ledger: 'the Ledger’s username and password', default: 'admin / admin (nothing set up on this device yet)'};
+const results = {};
+const models = {};
+let busy = false, message = null, source = 'default';
+
+const changed = () => MoneyShared.markChanged();
+
+function deviceCard(){
+  const st = MoneyShared.status(), ai = MoneyAI.aiStatus();
+  const tile = (name, ok, text, link) => `<div class="tile"><b>${name}</b><span class="${ok ? 'ok' : 'no'}">${ok ? '✓' : '○'}</span> <span>${text}</span>${link ? `<div><a href="${link}">open</a></div>` : ''}</div>`;
+  return `<section class="card" id="device">
+    <h2>This device</h2>
+    <p class="cap">What is set up in this browser. Every app on the site reads the same settings.</p>
+    <div class="grid">
+      ${tile('Sign-in', source !== 'default', source === 'default' ? 'admin / admin — set up below' : 'the same for every app')}
+      ${tile('AI', ai.length > 0, ai.length ? ai.map(x=>x.name.replace(/ \(.*\)/, '')).slice(0, 3).join(' → ') : 'no key yet', '#ai')}
+      ${st.apps.map(a=>tile(a.name, a.on, a.on ? (a.lastError ? 'sync problem' : a.syncedAt ? 'synced ' + ago(a.syncedAt) : 'sync on — open it once') : 'sync off', a.url)).join('')}
+      ${tile('Settings sync', !!st.setup, st.setup ? (st.setup.lastError ? esc(st.setup.lastError) : 'synced ' + (st.setup.syncedAt ? ago(st.setup.syncedAt) : '')) : 'not set up')}
+    </div></section>`;
+}
+
+function syncCard(){
+  const st = MoneyShared.status(), have = MoneyShared.existing();
+  return `<section class="card" id="sync">
+    <h2><span class="n">1</span>Set up once: sync between your devices</h2>
+    ${st.setup ? `<p class="cap">Done on this device. Your AI keys and sign-in travel between devices (encrypted), and every app below syncs its own data.</p>
+        <div class="row"><button class="btn primary" id="syncnow"${busy ? ' disabled' : ''}>${busy ? 'Syncing…' : 'Sync settings now'}</button><button class="btn" id="forget">Stop on this device</button></div>`
+      : `<p class="cap">Enter a GitHub token and a passphrase <b>once</b> — use the same two on the phone and the laptop. This turns on sync for Trip Vault, the Ledger and the Expense Tracker, and brings your AI keys and sign-in from your other device. Everything is encrypted with the passphrase before it leaves the browser; GitHub only holds unreadable data.</p>
+        ${have ? `<div class="row" style="margin-bottom:12px"><button class="btn primary" id="reuse"${busy ? ' disabled' : ''}>Use the sync already set up in one of my apps</button><span class="note">or enter them:</span></div>` : ''}
+        <div class="two">
+          <label>GitHub token (“Gists: read and write”) <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener" class="note">create one</a><input id="tok" type="password" autocomplete="off" spellcheck="false" placeholder="github_pat_…"></label>
+          <label>Passphrase (8+ characters, the same on every device)<input id="pass" type="password" autocomplete="new-password"></label>
+        </div>
+        <div class="row end"><button class="btn primary" id="setup"${busy ? ' disabled' : ''}>${busy ? 'Setting up…' : 'Set up this device'}</button></div>`}
+    ${message ? `<p class="msg ${message.ok ? 'ok' : 'bad'}">${esc(message.text)}</p>` : ''}
+    <details style="margin-top:10px"><summary class="note">How to get a token (2 minutes)</summary>
+      <ol class="steps"><li>Open <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">GitHub → new fine-grained token</a> (sign in to GitHub).</li>
+      <li>Name it “Money Home”, pick an expiry (for example 1 year).</li><li>Under <b>Account permissions</b> set <b>Gists</b> to <b>Read and write</b>. Nothing else.</li>
+      <li>Generate, copy it, paste it here. Keep it with your passphrase in your password manager.</li></ol></details>
+  </section>`;
+}
+
+function signinCard(){
+  return `<section class="card" id="signin">
+    <h2><span class="n">2</span>One sign-in for every app</h2>
+    <p class="cap">Money Home, Trip Vault, the Ledger and this page open with <b>${esc(LOGIN[source])}</b>.
+      ${source === 'expense-tracker' ? 'Change it in the Expense Tracker (Settings → Sign-in); the new password reaches your other devices on the next sync.' :
+        source === 'carried' ? 'It came from your other device. To change it, change it in the Expense Tracker there.' :
+        'Set up sync above: your laptop’s sign-in then comes to this device, and admin / admin stops working.'}</p>
+    <p class="note">The Expense Tracker itself asks for its own sign-in until its data has synced to this device once.</p>
+  </section>`;
+}
+
+function aiCard(){
+  const s = MoneyAI.aiSettings(), hub = MoneyAI.aiLocal(), status = MoneyAI.aiStatus();
+  const rows = MoneyAI.PROVIDERS.map(p=>{
+    const k = s.keys[p.id], r = MoneyAI.resting(p.id), on = s.off.indexOf(p.id) < 0;
+    const st = !k ? ['no key', ''] : !on ? ['off', ''] : r ? ['resting', 'rest'] : ['ready', 'ready'];
+    const res = results[p.id], pinned = (hub.model || {})[p.id] || 'auto', list = models[p.id];
+    const now = status.find(x=>x.id === p.id && x.model);
+    return `<div class="prov">
+      <div class="pname"><b>${esc(p.name)}</b><small>${k ? esc(FROM[s.from[p.id]] || '') : `<a href="${p.signupUrl}" target="_blank" rel="noopener">get a free key</a>`}${p.id === 'ollama' ? ' · this computer only' : ''}</small></div>
+      <span class="st ${st[1]}" title="${r ? esc(r.why) : ''}">${st[0]}</span>
+      <div class="keyin"><input type="password" data-key="${p.id}" autocomplete="off" spellcheck="false" placeholder="${esc(k ? (p.keyless ? k : '•••••• ' + k.slice(-4)) : p.placeholder)}" aria-label="${esc(p.name)} key"></div>
+      <div class="tools"><button class="btn" data-test="${p.id}" ${k ? '' : 'disabled'}>Test</button><label class="check" title="Use this service"><input type="checkbox" data-on="${p.id}" ${on ? 'checked' : ''}></label></div>
+      ${res ? `<div class="res ${res.ok ? 'ok' : 'bad'}">${res.busy ? 'Asking…' : res.ok ? `Works · ${esc(res.model)} answered in ${(res.ms / 1000).toFixed(1)} s` : esc(res.error || 'No answer')}</div>` : ''}
+      ${k ? `<div class="model">Model: <select data-model="${p.id}"><option value="auto">Auto — the best that answers${now ? ' (now ' + esc(now.model) + ')' : ''}</option>${
+        (list || (pinned !== 'auto' ? [pinned] : [])).map(m=>`<option${m === pinned ? ' selected' : ''}>${esc(m)}</option>`).join('')}${list ? '' : '<option value="__load">Show all models…</option>'}</select></div>` : ''}
+    </div>`;
+  }).join('');
+  return `<section class="card" id="ai">
+    <h2><span class="n">3</span>AI — one set of keys for all your apps</h2>
+    <p class="cap">${status.length ? 'Tried in this order, each with its best model first; when one is busy or out of free quota the next takes over:' : 'Add a key. Google Gemini is the most useful (free): it reads photos and searches the web.'}</p>
+    ${status.length ? `<div class="chain">${status.map((x, i)=>`${i ? '→' : ''}<span class="${i === 0 ? 'first' : ''}">${esc(x.name)}${x.model ? ` <em>${esc(x.model)}</em>` : ''}${x.resting ? ' · resting' : ''}</span>`).join('')}</div>` : ''}
+    <div class="row" style="margin:14px 0 6px">
+      <label style="flex:1;min-width:220px">Which AI goes first
+        <select id="first"><option value="auto">Auto — free ones first (Gemini, Groq, Cerebras, Mistral, OpenRouter), then Ollama, then paid Claude</option>${
+          MoneyAI.PROVIDERS.map(p=>`<option value="${p.id}"${s.first === p.id ? ' selected' : ''}${s.keys[p.id] ? '' : ' disabled'}>${esc(p.name)}${s.keys[p.id] ? '' : ' (no key)'}</option>`).join('')}</select></label>
+      <label class="check"><input type="checkbox" id="fallback" ${s.fallback ? 'checked' : ''}> If it fails, try the others</label>
+    </div>
+    ${rows}
+    <div class="row end"><button class="btn primary" id="save">Save keys</button><button class="btn" id="testall">Test all</button><button class="btn" id="adopt">Bring in keys from my apps</button></div>
+    <p class="note">Keys stay in this browser and go only to the AI services, straight from here${MoneyShared.status().setup ? '; sync carries them to your other devices, encrypted' : ''}. ATS on your Mac keeps its own AI settings.</p>
+  </section>`;
+}
+
+function render(){
+  $('app').innerHTML = `
+  <header class="hero"><div class="in">
+    <a class="back" href="/">← Money Home</a>
+    <h1>Setup</h1>
+    <p>Set things once for all your apps — Money Home, Trip Vault, the 16-Year Ledger and the Expense Tracker: sync between your phone and laptop, one sign-in, and one set of AI keys.</p>
+  </div></header>
+  <main class="in">${deviceCard()}${syncCard()}${signinCard()}${aiCard()}</main>`;
+  bind();
+}
+
+async function run(fn){
+  busy = true; message = null; render();
+  try{ message = {ok: true, text: await fn()}; }catch(e){ message = {ok: false, text: e.message}; }
+  busy = false; source = await MoneyShared.loginSource(); render();
+}
+const setupText = r => `Done. ${r.pulled ? 'Brought in the settings from your other device: ' : 'Saved this device’s settings: '}${r.keys} AI key${r.keys === 1 ? '' : 's'}${r.signIn ? ' and the sign-in' : ''}. Now open each app once — its data syncs by itself.`;
+
+function bind(){
+  const on = (id, fn) => { const e = $(id); if(e) e.onclick = fn; };
+  on('setup', ()=>{ const tok = $('tok').value.trim(), pass = $('pass').value;       // read before the page redraws
+    run(async ()=>setupText(await MoneyShared.setUp(tok, pass))); });
+  on('reuse', ()=>run(async ()=>{ const c = MoneyShared.existing(); return setupText(await MoneyShared.setUp(c.token, c.pass)); }));
+  on('syncnow', ()=>run(async ()=>{ const r = await MoneyShared.sync(); return 'Synced: ' + r.keys + ' AI key' + (r.keys === 1 ? '' : 's') + (r.signIn ? ' and the sign-in' : '') + '.'; }));
+  on('forget', ()=>{ MoneyShared.forget(); message = {ok: true, text: 'Settings sync stopped on this device (each app’s own sync is unchanged).'}; render(); });
+  $('first').onchange = e=>{ const h = MoneyAI.aiLocal(); h.first = e.target.value; MoneyAI.saveAiLocal(h); changed(); render(); };
+  $('fallback').onchange = e=>{ const h = MoneyAI.aiLocal(); h.fallback = e.target.checked; MoneyAI.saveAiLocal(h); changed(); render(); };
+  on('save', async ()=>{
+    const h = MoneyAI.aiLocal(); h.keys = h.keys || {};
+    let n = 0;
+    document.querySelectorAll('[data-key]').forEach(i=>{ const v = i.value.trim(); if(v){ h.keys[i.dataset.key] = v; MoneyAI.wake(i.dataset.key); n++; } });
+    h.off = Array.from(document.querySelectorAll('[data-on]')).filter(c=>!c.checked).map(c=>c.dataset.on);
+    MoneyAI.saveAiLocal(h); changed(); render();
+    toast(n ? 'Saved — every app uses it now.' : 'Saved.');
+    if(MoneyShared.status().setup) MoneyShared.sync().then(()=>render()).catch(()=>{});
+  });
+  on('adopt', async ()=>{ await MoneyAI.loadAi(); const n = MoneyAI.adoptAppKeys(); if(n) changed(); render(); toast(n ? n + ' key' + (n === 1 ? '' : 's') + ' brought in.' : 'Nothing new — every key your apps have is here.'); });
+  const test = async id => { results[id] = {busy: true}; render(); results[id] = await MoneyAI.test(id); render(); };
+  document.querySelectorAll('[data-test]').forEach(b=>b.onclick = ()=>test(b.dataset.test));
+  on('testall', async ()=>{ for(const id of MoneyAI.aiStatus().map(x=>x.id)) await test(id); });
+  document.querySelectorAll('[data-model]').forEach(sel=>sel.onchange = async ()=>{
+    const id = sel.dataset.model;
+    if(sel.value === '__load'){
+      try{ models[id] = MoneyAI.rankModels(id, await MoneyAI.listModels(id, MoneyAI.aiSettings().keys[id]), 'smart'); }
+      catch(e){ toast('Could not list the models: ' + e.message); }
+      render(); return;
+    }
+    MoneyAI.setModel(id, sel.value); changed(); render(); toast(sel.value === 'auto' ? 'Auto: the best model that answers.' : sel.value + ' goes first.');
+  });
+}
+
+(async function(){
+  if(!signedIn()){
+    $('app').innerHTML = `<div class="gate"><div><h1>Setup</h1><p>Sign in on <a href="/">Money Home</a> first, then come back.</p></div></div>`;
+    return;
+  }
+  await MoneyAI.loadAi();
+  if(MoneyAI.adoptAppKeys()) changed();        // first visit: the keys your apps already have
+  source = await MoneyShared.loginSource();
+  render();
+  if(location.hash){ const t = document.querySelector(location.hash); if(t) t.scrollIntoView(); }
+  const r = await MoneyShared.quiet();         // settings from your other device, if it changed them
+  if(r){ source = await MoneyShared.loginSource(); render(); }
+})();
+</script>
+</body>
+</html>

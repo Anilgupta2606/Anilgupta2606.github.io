@@ -311,4 +311,163 @@ const MoneyAI = (function(){
   return {PROVIDERS, loadAi, aiSettings, aiLocal, saveAiLocal, adoptAppKeys, aiStatus, rankModels, shareableAi, takeSyncedAi,
           aiAvailable, aiNames, canSee, canSearch, resting, wake, chat, json, test, setModel, listModels};
 })();
-if(typeof module !== 'undefined') module.exports = MoneyAI;
+
+/* =========================================================
+   MONEY SHARED — set up once, for every app on the site:
+   · one sign-in: the Expense Tracker's username and password, carried (as its hash, encrypted) to
+     your other devices, so the phone opens with the same password as the laptop,
+   · one sync setup: the GitHub token and passphrase are given to Trip Vault, the Ledger and the
+     Expense Tracker at once (each keeps its own private, encrypted gist),
+   · the AI keys and choices (the AI hub) travel in one small encrypted "settings" gist.
+   ========================================================= */
+const MoneyShared = (function(){
+  const lsGet = (k, d) => { try{ const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; }catch(e){ return d; } };
+  const lsSet = (k, v) => { try{ if(v === undefined) localStorage.removeItem(k); else localStorage.setItem(k, JSON.stringify(v)); }catch(e){} };
+  const AUTH = 'money-auth', CFG = 'money-setup', FILE = 'money-home.settings.json';
+  /* each app's own sync settings in this browser */
+  const APPS = [
+    {id: 'trip', name: 'Trip Vault', key: 'tripvault-sync-config', url: '/tripManangement/'},
+    {id: 'led', name: '16-Year Ledger', key: 'ledger-sync-config', url: '/InvestmentPlan/'},
+    {id: 'exp', name: 'Expense Tracker', key: 'sync-config', url: '/expenseTracker/'},
+  ];
+
+  async function sha256(text){
+    const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+    return Array.prototype.map.call(new Uint8Array(buf), b=>b.toString(16).padStart(2, '0')).join('');
+  }
+  async function etAuth(){
+    try{
+      if(!window.indexedDB || (indexedDB.databases && !(await indexedDB.databases()).some(d=>d.name === 'expense-tracker'))) return null;
+      const db = await new Promise((res, rej)=>{ const r = indexedDB.open('expense-tracker'); r.onupgradeneeded = ()=>{ try{ r.transaction.abort(); }catch(e){} }; r.onsuccess = ()=>res(r.result); r.onerror = ()=>rej(r.error); });
+      try{
+        if(!db.objectStoreNames.contains('kv')) return null;
+        const s = await new Promise((res, rej)=>{ const r = db.transaction('kv').objectStore('kv').get('state'); r.onsuccess = ()=>res(r.result); r.onerror = ()=>rej(r.error); });
+        return s && s.auth && s.auth.passwordHash ? {user: s.auth.username, hash: s.auth.passwordHash, scheme: 'et'} : null;
+      } finally { db.close(); }
+    }catch(e){ return null; }
+  }
+  const verify = async (a, u, p) => u.toLowerCase() === String(a.user || '').toLowerCase() &&
+    await sha256(a.scheme === 'et' ? 'expense-tracker|' + u.toLowerCase() + '|' + p : u.toLowerCase() + ':' + p) === a.hash;
+  /* The sign-in, for every app: the Expense Tracker's here, else the one your other device carried over,
+     else the app's own (Ledger / Trip Vault), else admin / admin on a fresh device. -> true / false */
+  async function checkLogin(user, pass, own){
+    const u = String(user || '').trim();
+    const et = await etAuth();
+    if(et) return verify(et, u, pass);
+    const carried = lsGet(AUTH, null);
+    if(carried && carried.hash) return verify(carried, u, pass);
+    const plan = lsGet('ledger-draft-v2', null) || lsGet('ledger-state-v2', null);
+    if(plan && plan.auth && plan.auth.hash) return verify({user: plan.auth.user, hash: plan.auth.hash}, u, pass);
+    if(own && own.hash) return verify({user: own.user, hash: own.hash}, u, pass);
+    return u.toLowerCase() === 'admin' && pass === 'admin';
+  }
+  async function loginSource(){
+    if(await etAuth()) return 'expense-tracker';
+    if((lsGet(AUTH, null) || {}).hash) return 'carried';
+    const plan = lsGet('ledger-draft-v2', null) || lsGet('ledger-state-v2', null);
+    return plan && plan.auth && plan.auth.hash ? 'ledger' : 'default';
+  }
+
+  /* ---- encryption, the same scheme as the apps' own sync */
+  const b64 = bytes => { let s = ''; for(let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000)); return btoa(s); };
+  const unb64 = s => Uint8Array.from(atob(s), c=>c.charCodeAt(0));
+  async function keyFor(pass, salt){
+    const raw = await crypto.subtle.importKey('raw', new TextEncoder().encode(pass), 'PBKDF2', false, ['deriveKey']);
+    return crypto.subtle.deriveKey({name: 'PBKDF2', salt, iterations: 200000, hash: 'SHA-256'}, raw, {name: 'AES-GCM', length: 256}, false, ['encrypt', 'decrypt']);
+  }
+  async function seal(obj, pass){
+    const salt = crypto.getRandomValues(new Uint8Array(16)), iv = crypto.getRandomValues(new Uint8Array(12));
+    const data = new Uint8Array(await crypto.subtle.encrypt({name: 'AES-GCM', iv}, await keyFor(pass, salt), new TextEncoder().encode(JSON.stringify(obj))));
+    return {app: 'money-settings', v: 1, savedAt: Date.now(), salt: b64(salt), iv: b64(iv), data: b64(data)};
+  }
+  async function unseal(env, pass){
+    try{ return JSON.parse(new TextDecoder().decode(await crypto.subtle.decrypt({name: 'AES-GCM', iv: unb64(env.iv)}, await keyFor(pass, unb64(env.salt)), unb64(env.data)))); }
+    catch(e){ throw new Error('The passphrase does not match the one your other device used.'); }
+  }
+  async function gh(token, path, init){
+    init = init || {};
+    let res;
+    try{ res = await fetch('https://api.github.com' + path, Object.assign({}, init, {cache: 'no-store', headers: Object.assign({Accept: 'application/vnd.github+json', Authorization: 'Bearer ' + token, 'X-GitHub-Api-Version': '2022-11-28'}, init.body ? {'Content-Type': 'application/json'} : {})})); }
+    catch(e){ throw new Error('Could not reach GitHub (offline?).'); }
+    if(res.status === 401) throw new Error('GitHub refused the token (expired, or mistyped?).');
+    if(res.status === 403 || res.status === 404) throw new Error('The token needs the “Gists: read and write” permission.');
+    if(!res.ok) throw new Error('GitHub error ' + res.status + '.');
+    return res;
+  }
+
+  const config = () => lsGet(CFG, null);
+  const markChanged = () => lsSet(CFG + '-changed', Date.now());
+  /* What travels: the AI hub's keys and choices (not Ollama: it is this computer's) and the sign-in. */
+  async function mine(){
+    const hub = MoneyAI.aiLocal(), shared = MoneyAI.shareableAi();
+    return {ai: {keys: shared.keys, first: hub.first || 'auto', fallback: hub.fallback !== false, model: hub.model || {}, off: hub.off || []},
+            auth: (await etAuth()) || lsGet(AUTH, null), updatedAt: lsGet(CFG + '-changed', 0)};
+  }
+
+  /* Bring the settings gist and this device together: keys either has are kept (the more recently changed
+     side wins a clash), and the sign-in comes from the device that has the Expense Tracker. */
+  async function sync(){
+    const cfg = config();
+    if(!cfg) throw new Error('Not set up on this device yet.');
+    if(!cfg.gistId){
+      for(let page = 1; page <= 5 && !cfg.gistId; page++){
+        const list = await (await gh(cfg.token, '/gists?per_page=100&page=' + page)).json();
+        const hit = list.find(g=>g.files && FILE in g.files);
+        if(hit) cfg.gistId = hit.id;
+        if(list.length < 100) break;
+      }
+    }
+    let remote = null;
+    if(cfg.gistId){
+      const g = await (await gh(cfg.token, '/gists/' + cfg.gistId)).json();
+      const f = g.files && g.files[FILE];
+      if(f) remote = await unseal(JSON.parse(f.truncated ? await (await fetch(f.raw_url)).text() : f.content), cfg.pass);
+    }
+    const here = await mine(), hasEt = !!(await etAuth());
+    let out = here;
+    if(remote){
+      const newer = (remote.updatedAt || 0) > (here.updatedAt || 0);
+      const a = newer ? remote.ai : here.ai, b = newer ? here.ai : remote.ai;
+      out = {ai: Object.assign({}, b, a, {keys: Object.assign({}, b.keys, a.keys), model: Object.assign({}, b.model, a.model)}),
+             auth: hasEt ? here.auth : (remote.auth || here.auth), updatedAt: Math.max(remote.updatedAt || 0, here.updatedAt || 0)};
+      // this device takes the result (its own Ollama address stays)
+      const hub = MoneyAI.aiLocal();
+      hub.keys = Object.assign({}, out.ai.keys, (hub.keys || {}).ollama ? {ollama: hub.keys.ollama} : {});
+      hub.first = out.ai.first; hub.fallback = out.ai.fallback; hub.model = out.ai.model; hub.off = out.ai.off;
+      MoneyAI.saveAiLocal(hub);
+      if(out.auth && !hasEt) lsSet(AUTH, out.auth);
+    }
+    const files = {}; files[FILE] = {content: JSON.stringify(await seal(out, cfg.pass))};
+    if(cfg.gistId) await gh(cfg.token, '/gists/' + cfg.gistId, {method: 'PATCH', body: JSON.stringify({files})});
+    else cfg.gistId = (await (await gh(cfg.token, '/gists', {method: 'POST', body: JSON.stringify({description: 'Money Home settings (encrypted)', public: false, files})})).json()).id;
+    cfg.syncedAt = Date.now(); cfg.lastError = undefined;
+    lsSet(CFG, cfg);
+    return {pulled: !!remote, keys: Object.keys(out.ai.keys).length, signIn: !!out.auth};
+  }
+
+  /* Set up this device once: the token and passphrase for the settings and for every app's sync. */
+  async function setUp(token, pass){
+    if(!token || !pass) throw new Error('Enter both the token and the passphrase.');
+    if(pass.length < 8) throw new Error('Use a passphrase of at least 8 characters.');
+    await gh(token, '/gists?per_page=1');                       // the token works
+    lsSet(CFG, {token, pass});
+    APPS.forEach(a=>{ const c = lsGet(a.key, null); if(!c || !c.token) lsSet(a.key, {token, pass}); });
+    return sync();
+  }
+  /* The sync settings some app on this device already has, to offer instead of typing them again. */
+  const existing = () => { for(const a of [{key: CFG}].concat(APPS)){ const c = lsGet(a.key, null); if(c && c.token && c.pass) return {token: c.token, pass: c.pass}; } return null; };
+  function status(){
+    const cfg = config();
+    return {setup: cfg ? {syncedAt: cfg.syncedAt, lastError: cfg.lastError} : null,
+            apps: APPS.map(a=>{ const c = lsGet(a.key, null); return Object.assign({}, a, {on: !!(c && c.token), syncedAt: c && c.syncedAt, lastError: c && c.lastError}); })};
+  }
+  function forget(){ lsSet(CFG, undefined); }
+  /* Quietly bring the settings in, at most every 10 minutes (the apps call it as they open). */
+  async function quiet(){
+    const c = config();
+    if(!c || (c.syncedAt && Date.now() - c.syncedAt < 600000)) return null;
+    try{ return await sync(); }catch(e){ lsSet(CFG, Object.assign(c, {lastError: e.message})); return null; }
+  }
+  return {checkLogin, loginSource, setUp, sync, quiet, status, existing, forget, markChanged, APPS};
+})();
+if(typeof module !== 'undefined'){ module.exports = MoneyAI; module.exports.MoneyShared = MoneyShared; }

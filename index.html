@@ -204,12 +204,12 @@ function askCard(){
   const conv = ASK.turns.map(t => t.role === 'user' ? `<div class="q">${esc(t.content)}</div>`
     : `<div class="a ${t.error ? 'err' : ''}">${esc(t.content)}${t.by ? `<span class="by">${esc(t.by)}</span>` : ''}</div>`).join('');
   const sugg = ['How much did I spend last month, and on what?', 'Am I on track for my retirement target?', 'What is next on my trip?', 'Where can I save money this month?'];
-  return `<section class="card ask"><div class="top"><h3>Ask AI</h3><a class="hub" href="/ai/">AI hub · ${hasAi() ? esc(MoneyAI.aiNames()[0]) + ' first' : 'add a key'}</a></div>
+  return `<section class="card ask"><div class="top"><h3>Ask AI</h3><a class="hub" href="/setup/#ai">AI · ${hasAi() ? esc(MoneyAI.aiNames()[0]) + ' first' : 'add a key'}</a></div>
     <p class="cap">One assistant for all your apps — it sees the numbers on this page: your plan, spending, trips${ASK.ctx && /ATS/.test(ASK.ctx) ? ' and ATS holdings' : ''}.</p>
     ${conv ? `<div class="convo" id="convo">${conv}</div>` : ''}
     ${hasAi() ? `<form id="askf"><textarea id="askq" rows="1" placeholder="Ask about your money, plan or trips…"></textarea><button class="go" id="askgo">${ASK.busy ? 'Stop' : 'Ask'}</button></form>
       ${ASK.turns.length ? '' : `<div class="sugg">${sugg.map(q => `<button type="button" data-q="${esc(q)}">${esc(q)}</button>`).join('')}</div>`}`
-    : `<div class="empty">Add a free AI key in the <a href="/ai/">AI hub</a> (Google Gemini is the most useful) — every app then uses it.</div>`}</section>`;
+    : `<div class="empty">Add a free AI key in <a href="/setup/#ai">Setup</a> (Google Gemini is the most useful) — every app then uses it.</div>`}</section>`;
 }
 function bindAsk(){
   const f = $('askf');
@@ -252,6 +252,7 @@ async function tripVault(){
 
 /* ---------- sign-in: the Expense Tracker's (else the Ledger's own, else admin / admin) */
 async function checkLogin(u, p){
+  if(typeof MoneyShared !== 'undefined') return MoneyShared.checkLogin(u, p);     // one sign-in for every app (Setup)
   const et = await Cloud.checkExpenseTrackerLogin(u, p);
   if(et !== null) return et;
   const plan = ledger();
@@ -266,7 +267,7 @@ function showLogin(){
     <label for="p">Password</label><input id="p" type="password" autocomplete="current-password" required>
     <p class="err" id="e" hidden>That username or password is wrong.</p>
     <button>Sign in</button>
-    <p class="sub" style="margin:8px 0 0;font-size:12px">The same sign-in as the Expense Tracker and the Ledger.</p></form></div>`;
+    <p class="sub" style="margin:8px 0 0;font-size:12px">The same sign-in as the Expense Tracker, the Ledger and Trip Vault. New phone? Sign in with admin / admin, then open Setup.</p></form></div>`;
   $('u').focus();
   $('lf').onsubmit = async e => { e.preventDefault();
     if(!(await checkLogin($('u').value, $('p').value))){ $('e').hidden = false; $('p').select(); return; }
@@ -315,6 +316,7 @@ async function render(){
   const et = await Cloud.expenseTracker(true);
   const tv = await tripVault();
   if(typeof MoneyAI !== 'undefined') await MoneyAI.loadAi();      // keys kept in the Expense Tracker count too
+  if(typeof MoneyShared !== 'undefined') MoneyShared.quiet();       // settings changed on your other device (every 10 min at most)
   const linked = !!Cloud.atsLink();
   draw(et, linked ? 'checking' : null, tv);
   if(!linked) return;
@@ -383,7 +385,7 @@ function draw(et, ats, tv){
     <div class="topline"><div class="brand">${logo()}Money Home</div>
       <div class="chips"><span class="chip ${mk.on ? 'on' : ''}"><i></i>${esc(mk.text)}</span>
         <span class="chip">${esc(new Date().toLocaleDateString('en-IN', {weekday:'long', day:'numeric', month:'long'}))}</span>
-        <a class="chip" href="/ai/" style="text-decoration:none">✦ AI hub</a></div></div>
+        <a class="chip" href="/setup/" style="text-decoration:none">⚙ Setup</a></div></div>
     <div class="hero-grid"><div>
       <div class="hello">${hello}. Here is where you stand.</div>
       ${netWorth ? `<div class="big"><span class="num">${cr(netWorth)}</span></div>
