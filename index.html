@@ -267,7 +267,7 @@ function showLogin(){
     <label for="p">Password</label><input id="p" type="password" autocomplete="current-password" required>
     <p class="err" id="e" hidden>That username or password is wrong.</p>
     <button>Sign in</button>
-    <p class="sub" style="margin:8px 0 0;font-size:12px">The same sign-in as the Expense Tracker, the Ledger and Trip Vault. New phone? Sign in with admin / admin, then open Setup.</p></form></div>`;
+    <p class="sub" style="margin:8px 0 0;font-size:12px">The same sign-in as the Expense Tracker, the Ledger and Trip Vault.</p></form></div>`;
   $('u').focus();
   $('lf').onsubmit = async e => { e.preventDefault();
     if(!(await checkLogin($('u').value, $('p').value))){ $('e').hidden = false; $('p').select(); return; }
