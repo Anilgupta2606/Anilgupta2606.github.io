@@ -171,6 +171,7 @@ main{max-width:1120px;margin:0 auto;padding-inline:20px;padding-block:0 60px}
 <div id="app"></div>
 <script src="/ai/ai.js"></script>
 <script src="/ai/brain.js"></script>
+<script src="/ai/ask.js"></script>
 <script src="/InvestmentPlan/cloud.js"></script>
 <script>
 "use strict";
@@ -204,16 +205,17 @@ const signedIn = () => { try{ return sessionStorage.getItem(SESSION) === 'yes'; 
 function ledger(){ try{ return JSON.parse(localStorage.getItem('ledger-draft-v2') || localStorage.getItem('ledger-state-v2') || 'null'); }catch(e){ return null; } }
 
 /* ---------- Ask AI: one assistant for all the apps, through the site's central AI (the AI hub, /ai/) */
-const ASK = {turns: [], busy: false, ctl: null, ctx: ''};
+const ASK = {turns: [], busy: false, ctl: null, ctx: '', data: null};
+const hasAsk = () => typeof MoneyAsk !== 'undefined';
 const hasAi = () => typeof MoneyAI !== 'undefined' && MoneyAI.aiAvailable();
 function askCard(){
   const conv = ASK.turns.map(t => t.role === 'user' ? `<div class="q">${esc(t.content)}</div>`
     : `<div class="a ${t.error ? 'err' : ''}">${esc(t.content)}${t.by ? `<span class="by">${esc(t.by)}</span>` : ''}</div>`).join('');
   const sugg = ['How much did I spend last month, and on what?', 'Am I on track for my retirement target?', 'What is next on my trip?', 'Which of my documents need renewing soon?'];
-  return `<section class="card ask"><div class="top"><h3>Ask AI</h3><a class="hub" href="/setup/#ai">AI · ${hasAi() ? esc(MoneyAI.aiNames()[0]) + ' first' : 'add a key'}</a></div>
+  return `<section class="card ask"><div class="top"><h3>Ask</h3><a class="hub" href="/setup/#ai">AI · ${hasAi() ? esc(MoneyAI.aiNames()[0]) + ' first' : 'add a key'}</a></div>
     <p class="cap">One assistant for all your apps — it sees what this page shows: your plan, spending, trips and documents${ASK.ctx && /ATS/.test(ASK.ctx) ? ' and ATS holdings' : ''}.</p>
     ${conv ? `<div class="convo" id="convo">${conv}</div>` : ''}
-    ${hasAi() ? `<form id="askf"><textarea id="askq" rows="1" placeholder="Ask about your money, plan or trips…"></textarea><button class="go" id="askgo">${ASK.busy ? 'Stop' : 'Ask'}</button></form>
+    ${hasAi() || hasAsk() ? `<form id="askf"><textarea id="askq" rows="1" placeholder="Ask about your money, plan or trips…"></textarea><button class="go" id="askgo">${ASK.busy ? 'Stop' : 'Ask'}</button></form>
       ${ASK.turns.length ? '' : `<div class="sugg">${sugg.map(q => `<button type="button" data-q="${esc(q)}">${esc(q)}</button>`).join('')}</div>`}`
     : `<div class="empty">Add a free AI key in <a href="/setup/#ai">Setup</a> (Google Gemini is the most useful) — every app then uses it.</div>`}</section>`;
 }
@@ -231,12 +233,26 @@ function bindAsk(){
     ASK.turns.push({role: 'user', content: text});
     ASK.busy = true; ASK.ctl = new AbortController();
     render();
+    // your own data first: spending, income, savings, trips, documents and the plan are answered exactly, without AI
+    const own = hasAsk() && ASK.data ? MoneyAsk.answer(text, ASK.data) : null;
+    if(own){
+      ASK.turns.push({role: 'assistant', content: own.text, by: own.by});
+      ASK.busy = false; ASK.ctl = null; render();
+      setTimeout(() => { const c = $('convo'); if(c) c.lastElementChild.scrollIntoView({block: 'nearest'}); const i = $('askq'); if(i) i.focus(); }, 50);
+      return;
+    }
+    if(!hasAi()){
+      ASK.turns.push({role: 'assistant', content: 'I answer questions about your spending, income, savings, trips, documents and plan from your own data. For anything else, add a free AI key in Setup.', error: true});
+      ASK.busy = false; ASK.ctl = null; render(); return;
+    }
     const system = `You are the assistant on "Money Home", the start page of the owner's personal apps: the 16-Year Ledger (investment plan), the Expense Tracker (bank statements), Trip Vault (trips) and ATS (trading dashboard). Answer in plain, short sentences (Indian rupees, ₹, lakh/crore), using only the figures below; say so when something is not in them, and which app to open to see it. You explain and help plan; you do not give licensed investment advice or tell them to buy or sell a specific security.
 Today is ${new Date().toISOString().slice(0, 10)}.
 ${ASK.ctx || 'No data from the apps in this browser yet.'}`;
     try{
       const r = await MoneyAI.chat(system, ASK.turns.filter(t => !t.error).map(t => ({role: t.role, content: t.content})).slice(-10), {}, ASK.ctl.signal);
-      ASK.turns.push({role: 'assistant', content: r.text.trim(), by: r.provider + ' · ' + r.model});
+      // the AI's figures checked against your data: one it made up is pointed out
+      const made = hasAsk() ? MoneyAsk.checkFigures(r.text, ASK.ctx) : [];
+      ASK.turns.push({role: 'assistant', content: r.text.trim() + (made.length ? '\n\n⚠ Not in your data: ' + made.join(', ') + ' — check before relying on ' + (made.length === 1 ? 'it' : 'them') + '.' : ''), by: r.provider + ' · ' + r.model});
     }catch(err){
       if(err.code !== 'cancelled') ASK.turns.push({role: 'assistant', content: err.message, error: true});
     }finally{ ASK.busy = false; ASK.ctl = null; render(); setTimeout(() => { const c = $('convo'); if(c) c.lastElementChild.scrollIntoView({block: 'nearest'}); const i = $('askq'); if(i) i.focus(); }, 50); }
@@ -388,6 +404,11 @@ function draw(et, ats, tv){
   const pdocs = personalDocs(tv);
   if(pdocs.length) ctx.push('Personal documents in Trip Vault (no numbers shown): ' + pdocs.map(d=>(DOC_LABEL[d.type] || d.type) + (d.person ? ' of ' + d.person : '') + (d.fields && d.fields.validUntil ? ', valid until ' + d.fields.validUntil : '') + (d.fields && d.fields.issuedOn ? ', issued ' + d.fields.issuedOn : '')).join('; ') + '.');
   ASK.ctx = ctx.join('\n');
+  // the same data, as data, for answering from it without AI
+  ASK.data = {today: new Date().toISOString().slice(0, 10), txns: (et && et.txns) || [],
+    ledger: real ? {netWorth, corpus, targetLow: tLo, targetHigh: tHi, retire, yearsLeft, sip} : null,
+    trips: ((tv && tv.trips) || []).map(t => ({name: t.name, city: t.city, start: t.start, end: t.end})).filter(t => t.start),
+    docs: ((tv && tv.docs) || []).filter(d => d.fields && d.fields.validUntil).map(d => ({type: d.type, label: DOC_LABEL[d.type] || d.title || d.type, person: d.person, validUntil: d.fields.validUntil}))};
 
   const hero = `<header class="hero"><div class="hero-in">
     <div class="topline"><div class="brand">${logo()}Money Home</div>
