@@ -184,13 +184,15 @@ function privateRow(s){
     <span class="st ${on ? 'ready' : ''}">${on ? 'on' : 'off'}</span>
     <div class="keyin"><select id="priv-model" aria-label="Private AI model">${MoneyAI.PRIVATE_MODELS.map(x=>`<option value="${x.id}"${x.id === sel ? ' selected' : ''}>${esc(x.name)} — ${esc(x.size)} download, ${esc(x.memory)} memory · ${esc(x.note)}</option>`).join('')}</select></div>
     <div class="tools">${navigator.gpu ? `<button class="btn primary" id="priv-try"${PRIV.busy ? ' disabled' : ''}>${PRIV.cached[sel] ? 'Test' : 'Download & test'}</button>` : ''}</div>
+    <p class="note">Thinking lets the model reason before it answers. On a laptop it writes 600–3,000 words first (about 1–5 minutes an answer); the app itself already checks every plan against your rules, so it is off unless you want it.</p>
     <div class="res">${!navigator.gpu ? '<span class="bad">This browser has no WebGPU, so the private AI cannot run here.</span>'
       : PRIV.busy ? `<span class="spin"></span> ${esc(PRIV.step || 'Starting…')}`
       : PRIV.error ? `<span class="bad">${esc(PRIV.error)}</span>`
-      : r ? `<b>${esc(m.name)}</b> ready in ${r.loadSec.toFixed(0)} s${r.loadSec > 60 ? ' (first time: the download)' : ''} · ${r.steps.map(x=>`${esc(x.name)}: ${x.error ? '<span class="bad">' + esc(x.error) + '</span>' : x.sec.toFixed(1) + ' s' + (x.ok ? ' ✓' : ' <span class="bad">(answer not usable)</span>')}`).join(' · ')}
+      : r ? `<b>${esc(m.name)}</b> ready in ${r.loadSec.toFixed(0)} s${r.loadSec > 60 ? ' (first time: the download)' : ''} · ${r.steps.map(x=>`${esc(x.name)}: ${x.error ? '<span class="bad">' + esc(x.error) + '</span>' : x.sec.toFixed(1) + ' s' + (!x.ok ? ' <span class="bad">(answer not usable)</span>' : x.right === false ? ' <span class="bad">(wrong answer)</span>' : ' ✓')}`).join(' · ')}${r.think ? ' · <em>with thinking</em>' : ''}
           <details><summary>What it answered</summary>${r.steps.map(x=>`<p class="note"><b>${esc(x.name)}</b>: ${esc(x.text || x.error || '')}</p>`).join('')}</details>`
       : `The first test downloads ${esc(m.size)} once (the browser keeps it), then runs three real tasks and times them.`}</div>
-    <div class="model">${on ? `<button class="btn" id="priv-off">Turn off</button>` : r && r.steps.some(x=>x.ok) ? `<button class="btn primary" id="priv-on">Use it in all my apps</button>` : ''}
+    <div class="model"><label class="note">Thinking <select id="priv-think" aria-label="Private AI thinking">${[['off', 'Off — answers in seconds (recommended)'], ['auto', 'Only for tasks that need reasoning'], ['on', 'Always — minutes per answer']].map(([v, t])=>`<option value="${v}"${(MoneyAI.aiLocal().think || 'off') === v ? ' selected' : ''}>${t}</option>`).join('')}</select></label>
+      ${on ? `<button class="btn" id="priv-off">Turn off</button>` : r && r.steps.some(x=>x.ok) ? `<button class="btn primary" id="priv-on">Use it in all my apps</button>` : ''}
       ${PRIV.cached[sel] ? `<button class="btn" id="priv-rm">Remove the download</button>` : ''}</div>
   </div>`;
 }
@@ -201,7 +203,7 @@ function bindPrivate(){
   if(tr) tr.onclick = async ()=>{
     PRIV.busy = true; PRIV.error = ''; PRIV.result = null; PRIV.step = 'Loading the AI engine…'; render();
     let last = 0;
-    try{ PRIV.result = await MoneyAI.trialPrivate(PRIV.model, t=>{ PRIV.step = t; if(Date.now() - last > 400){ last = Date.now(); const e = document.querySelector('.priv .res'); if(e) e.innerHTML = '<span class="spin"></span> ' + esc(t); } }); PRIV.cached[PRIV.model] = true; }
+    try{ PRIV.result = await MoneyAI.trialPrivate(PRIV.model, t=>{ PRIV.step = t; if(Date.now() - last > 400){ last = Date.now(); const e = document.querySelector('.priv .res'); if(e) e.innerHTML = '<span class="spin"></span> ' + esc(t); } }, (MoneyAI.aiLocal().think || 'off') !== 'off'); PRIV.cached[PRIV.model] = true; }
     catch(e){ PRIV.error = 'Could not run it here: ' + e.message; }
     PRIV.busy = false; render();
   };
@@ -209,6 +211,9 @@ function bindPrivate(){
   if(on) on.onclick = ()=>{ const h = MoneyAI.aiLocal(); h.keys = h.keys || {}; h.keys.webllm = PRIV.model; MoneyAI.saveAiLocal(h); render(); toast('Private AI is on — pick it under “Which AI goes first” to use it before the others.'); };
   const off = $('priv-off');
   if(off) off.onclick = ()=>{ const h = MoneyAI.aiLocal(); delete (h.keys || {}).webllm; if(h.first === 'webllm') h.first = 'auto'; MoneyAI.saveAiLocal(h); render(); toast('Private AI is off.'); };
+  const th = $('priv-think');
+  if(th) th.onchange = ()=>{ const h = MoneyAI.aiLocal(); h.think = th.value; MoneyAI.saveAiLocal(h); PRIV.result = null; render();
+    toast(th.value === 'off' ? 'Thinking off: answers in seconds.' : 'Thinking ' + (th.value === 'on' ? 'always on' : 'on for reasoning tasks') + ' — Test shows how long it takes on this device.'); };
   const rm = $('priv-rm');
   if(rm) rm.onclick = async ()=>{ try{ await MoneyAI.removePrivate(PRIV.model); PRIV.cached[PRIV.model] = false; toast('Removed from this browser.'); }catch(e){ toast(e.message); } render(); };
 }

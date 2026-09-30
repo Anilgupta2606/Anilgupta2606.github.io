@@ -170,63 +170,95 @@ const MoneyAI = (function(){
     {id: 'Llama-3.2-3B-Instruct-q4f16_1-MLC', name: 'Llama 3.2 3B', size: '1.8 GB', memory: '2.3 GB', note: 'lighter'},
     {id: 'Qwen3-1.7B-q4f16_1-MLC', name: 'Qwen3 1.7B', size: '1.1 GB', memory: '2.0 GB', note: 'for phones; quickest'},
   ];
-  let privEngine = null, privModel = '', privLoading = null;
-  async function privateEngine(model, tell){
-    if(privEngine && privModel === model) return privEngine;
-    if(privLoading && privModel === model) return privLoading;
+  let privEngine = null, privModel = '', privCtx = 0, privLoading = null, privQueue = Promise.resolve();
+  // thinking needs room: the model's working memory grows from 4k to 8k tokens (about 0.6 GB more graphics memory)
+  const privateThinking = () => { const t = aiLocal().think; return t === 'on' || t === 'auto' ? t : 'off'; };
+  async function privateEngine(model, tell, ctx){
+    ctx = ctx || (privateThinking() === 'off' ? 4096 : 8192);
+    if(privEngine && privModel === model && privCtx >= ctx) return privEngine;
+    if(privLoading) await privLoading.catch(()=>{});
+    if(privEngine && privModel === model && privCtx >= ctx) return privEngine;
     if(!navigator.gpu) throw Unavailable('Private AI needs WebGPU (a recent Chrome, Edge or Safari).', 501);
-    privModel = model;
     privLoading = (async ()=>{
       const webllm = await import(WEBLLM_URL);
-      if(privEngine){ try{ await privEngine.unload(); }catch(e){} }
-      const eng = await webllm.CreateMLCEngine(model, {initProgressCallback: p=>{ if(tell) tell(String(p.text || '').replace(/\[.*?\]\s*/, '').slice(0, 120), 'webllm'); }});
-      privEngine = eng;
+      if(privEngine){ try{ await privEngine.unload(); }catch(e){} privEngine = null; }
+      const eng = await webllm.CreateMLCEngine(model, {initProgressCallback: p=>{ if(tell) tell(String(p.text || '').replace(/\[.*?\]\s*/, '').slice(0, 120), 'webllm'); }},
+        {context_window_size: ctx});
+      privEngine = eng; privModel = model; privCtx = ctx;
       return eng;
     })();
     try{ return await privLoading; } finally { privLoading = null; }
   }
-  async function callPrivate(model, system, turns, opts, signal){
+  /* The model answers one question at a time: a second one waits its turn instead of failing.
+     opts.think: let it reason first (Qwen3's thinking mode) - slower, better at rules, times and sums.
+     With "auto" in Setup it thinks when the asking app says the task needs it (opts.reason). */
+  function callPrivate(model, system, turns, opts, signal){
+    const run = privQueue.then(()=>privateAnswer(model, system, turns, opts, signal));
+    privQueue = run.catch(()=>{});
+    return run;
+  }
+  async function privateAnswer(model, system, turns, opts, signal){
+    if(signal && signal.aborted){ const c = new Error('Stopped.'); c.code = 'cancelled'; throw c; }
     const tell = opts.onProgress ? (t, id)=>opts.onProgress('Private AI: ' + t, id) : null;
-    const eng = await privateEngine(model, tell);
-    if(signal) signal.addEventListener('abort', ()=>{ try{ eng.interruptGenerate(); }catch(e){} });
-    if(tell) tell('writing…', 'webllm');
-    let res;
+    const mode = privateThinking();
+    const think = opts.think !== undefined ? !!opts.think : mode === 'on' || (mode === 'auto' && !!opts.reason);
+    const eng = await privateEngine(model, tell, think ? 8192 : undefined);
+    const stop = ()=>{ try{ eng.interruptGenerate(); }catch(e){} };
+    if(signal) signal.addEventListener('abort', stop);
+    let text = '', usage = null, last = 0, t0 = Date.now();
     try{
-      res = await eng.chat.completions.create({
+      const stream = await eng.chat.completions.create({
         messages: [{role: 'system', content: system}].concat(turns.map(t=>({role: t.role, content: t.content}))),
-        temperature: 0.2, max_tokens: opts.maxTokens || 1800,
-        extra_body: {enable_thinking: false},
+        temperature: think ? 0.6 : 0.2, top_p: think ? 0.95 : 1, max_tokens: opts.maxTokens ? opts.maxTokens + (think ? 2500 : 0) : (think ? 4000 : 1800),
+        extra_body: {enable_thinking: think}, stream: true, stream_options: {include_usage: true},
       });
+      for await (const ch of stream){
+        text += ((ch.choices || [])[0] || {}).delta ? (ch.choices[0].delta.content || '') : '';
+        if(ch.usage) usage = ch.usage;
+        if(tell && Date.now() - last > 1000){
+          last = Date.now();
+          const thinking = think && text.indexOf('</think>') < 0;
+          const words = (thinking ? text : text.split('</think>').pop()).split(/\s+/).filter(Boolean).length;
+          tell((thinking ? 'thinking… ' : 'writing… ') + words + ' words, ' + Math.round((Date.now() - t0) / 1000) + ' s', 'webllm');
+        }
+      }
     }catch(e){
       if(signal && signal.aborted){ const c = new Error('Stopped.'); c.code = 'cancelled'; throw c; }
-      if(/context|too long|exceed/i.test(e.message)) throw Unavailable('Private AI: this request is too long for the in-browser model', 413);
+      if(/context|too long|exceed|prompt tokens/i.test(e.message)) throw Unavailable('Private AI: this request is too long for the in-browser model', 413);
       throw Unavailable('Private AI: ' + String(e.message).slice(0, 120), 500);
-    }
-    const text = String(((res.choices || [])[0] || {}).message && res.choices[0].message.content || '').replace(/<think>[\s\S]*?<\/think>/g, '').trim();
-    if(!text) throw Unavailable('Private AI returned an empty answer.', 502);
-    return {text, sources: [], usage: res.usage};
+    }finally{ if(signal) signal.removeEventListener('abort', stop); }
+    if(signal && signal.aborted){ const c = new Error('Stopped.'); c.code = 'cancelled'; throw c; }
+    const thought = (/<think>([\s\S]*?)<\/think>/.exec(text) || [])[1] || '';
+    text = text.replace(/<think>[\s\S]*?(<\/think>|$)/g, '').trim();
+    if(!text) throw Unavailable('Private AI returned an empty answer' + (think ? ' (it ran out of room while thinking)' : '') + '.', 502);
+    return {text, sources: [], usage, thought: thought.trim()};
   }
-  /* A short trial on this device: loads the model (downloading it the first time) and times three real tasks. */
-  async function trialPrivate(model, onStep){
-    const t0 = Date.now(), out = {model, steps: []};
-    await privateEngine(model, t=>onStep && onStep(t));
+  /* A short trial on this device: loads the model (downloading it the first time) and times real tasks.
+     think: true runs them with thinking on; the last task needs reasoning (times and a rule). */
+  async function trialPrivate(model, onStep, think){
+    const t0 = Date.now(), out = {model, think: !!think, steps: []};
+    await privateEngine(model, t=>onStep && onStep(t), think ? 8192 : 4096);
     out.loadSec = (Date.now() - t0) / 1000;
     const tasks = [
       ['News summary', 'You brief a traveller. Answer with JSON only: {"status":"clear"|"caution"|"serious","headline":"one line","points":["2-4 short points"]}',
-        'Dubai, 23-28 Dec. Headlines: Dubai airport runs normally after brief fog delays on Monday; Emirates adds flights for the holidays; UK Foreign Office: no restrictions for the UAE; light rain forecast on 25 Dec.'],
+        'Dubai, 23-28 Dec. Headlines: Dubai airport runs normally after brief fog delays on Monday; Emirates adds flights for the holidays; UK Foreign Office: no restrictions for the UAE; light rain forecast on 25 Dec.', null],
       ['Reading a document', 'You read documents and answer with JSON only: {"type":"aadhaar|pan|passport|licence|other","person":"","number":"","validUntil":"YYYY-MM-DD or empty"}',
-        'Union of India - Driving Licence\nTransport Department, Maharashtra\nDL No: MH12 20150012345\nName: ANIL GUPTA\nDate of Issue: 14-12-2006\nValid Till: 13-12-2026'],
+        'Union of India - Driving Licence\nTransport Department, Maharashtra\nDL No: MH12 20150012345\nName: ANIL GUPTA\nDate of Issue: 14-12-2006\nValid Till: 13-12-2026', null],
       ['Fixing a plan item', 'You fix travel plans. Answer with JSON only: {"items":[{"start":"HH:MM","end":"HH:MM","title":""}]}. Rule: nothing before 13:30 because the traveller lands at 10:25 and reaches the hotel at 12:55.',
-        'Day 1 items: 10:25-10:25 Land in Dubai; 11:00-12:00 Lunch - Shawarma; 14:00-14:30 Check in; 19:00-20:15 Dinner. Move what breaks the rule and keep the rest.'],
+        'Day 1 items: 10:25-10:25 Land in Dubai; 11:00-12:00 Lunch - Shawarma; 14:00-14:30 Check in; 19:00-20:15 Dinner. Move what breaks the rule and keep the rest.',
+        // right when: landing kept, lunch moved to 13:30 or later without overlapping check-in, dinner kept
+        j=>{ const it = (j.items || []), m = t=>{ const x = /^(\d{1,2}):(\d{2})/.exec(t || ''); return x ? +x[1] * 60 + +x[2] : -1; };
+          const lunch = it.find(i=>/lunch/i.test(i.title)), ci = it.find(i=>/check/i.test(i.title)), din = it.find(i=>/dinner/i.test(i.title));
+          return !!lunch && m(lunch.start) >= 810 && !!ci && (m(lunch.end) <= m(ci.start) || m(lunch.start) >= m(ci.end)) && !!din && din.start === '19:00'; }],
     ];
-    for(const [name, system, user] of tasks){
+    for(const [name, system, user, right] of tasks){
       if(onStep) onStep(name + '…');
       const t = Date.now();
       try{
-        const r = await callPrivate(model, system, [{role: 'user', content: user}], {}, null);
-        let ok = true; try{ json(r.text); }catch(e){ ok = false; }
+        const r = await callPrivate(model, system, [{role: 'user', content: user}], {think: !!think, onProgress: onStep ? (x)=>onStep(name + ' — ' + x) : null}, null);
+        let ok = true, j = null; try{ j = json(r.text); }catch(e){ ok = false; }
         const tok = r.usage && r.usage.completion_tokens;
-        out.steps.push({name, sec: (Date.now() - t) / 1000, ok, tokens: tok, text: r.text.slice(0, 400)});
+        out.steps.push({name, sec: (Date.now() - t) / 1000, ok, right: right && j ? right(j) : undefined, tokens: tok, text: r.text.slice(0, 400)});
       }catch(e){ out.steps.push({name, sec: (Date.now() - t) / 1000, ok: false, error: e.message}); }
     }
     return out;
@@ -240,6 +272,7 @@ const MoneyAI = (function(){
     try{ const webllm = await import(WEBLLM_URL); return await webllm.hasModelInCache(model); }catch(e){ return false; }
   }
 
+  const temp = opts => typeof opts.temperature === 'number' ? opts.temperature : 0.2;
   async function callOne(id, key, model, system, turns, opts, signal){
     if(id === 'webllm') return callPrivate(model, system, turns, opts, signal);
     const name = PROVIDERS.find(p=>p.id === id).name;
@@ -247,8 +280,9 @@ const MoneyAI = (function(){
     if(id === 'gemini'){
       const contents = turns.map((t, i)=>({role: t.role === 'assistant' ? 'model' : 'user',
         parts: [{text: t.content}].concat(i === turns.length - 1 ? images.map(im=>({inline_data:{mime_type: im.mime, data: im.b64}})) : [])}));
-      const body = {systemInstruction:{parts:[{text:system}]}, contents, generationConfig:{temperature:0.2, maxOutputTokens:8192}};
+      const body = {systemInstruction:{parts:[{text:system}]}, contents, generationConfig:{temperature: temp(opts), maxOutputTokens:8192}};
       if(opts.search) body.tools = [{google_search:{}}];
+      else if(opts.schema) Object.assign(body.generationConfig, {responseMimeType: 'application/json', responseSchema: opts.schema});
       const res = await post('https://generativelanguage.googleapis.com/v1beta/models/' + encodeURIComponent(model) + ':generateContent?key=' + encodeURIComponent(key), {}, body, signal);
       if(!res.ok) await failure(name, res, id);
       const d = await res.json();
@@ -263,7 +297,7 @@ const MoneyAI = (function(){
         ? images.map(im=>im.mime === 'application/pdf' ? {type:'document', source:{type:'base64', media_type:im.mime, data:im.b64}} : {type:'image', source:{type:'base64', media_type:im.mime, data:im.b64}}).concat([{type:'text', text:t.content}])
         : t.content}));
       const res = await post('https://api.anthropic.com/v1/messages', {'x-api-key':key, 'anthropic-version':'2023-06-01', 'anthropic-dangerous-direct-browser-access':'true'},
-        {model, max_tokens:8192, temperature:0.2, system, messages}, signal);
+        {model, max_tokens:8192, temperature: temp(opts), system, messages}, signal);
       if(!res.ok) await failure(name, res, id);
       const d = await res.json();
       return {text: (d.content || []).map(c=>c.text || '').join(''), sources: []};
@@ -271,7 +305,7 @@ const MoneyAI = (function(){
     if(id === 'ollama'){
       // Ollama's own API, with "thinking" off: reasoning models otherwise think for minutes on a laptop
       const res = await post(key.replace(/\/+$/, '') + '/api/chat', {},
-        {model, stream:false, think:false, options:{temperature:0.2, num_ctx:8192}, messages:[{role:'system', content:system}].concat(turns)}, signal, 600000);
+        Object.assign({model, stream:false, think:false, options:{temperature: temp(opts), num_ctx:8192}, messages:[{role:'system', content:system}].concat(turns)}, opts.schema ? {format: 'json'} : {}), signal, 600000);
       if(!res.ok) await failure(name, res, id);
       const d = await res.json();
       const text = ((d.message || {}).content || '').replace(/<think>[\s\S]*?<\/think>/g, '');
@@ -281,8 +315,10 @@ const MoneyAI = (function(){
     const base = OPENAI_BASE[id];
     const headers = {Authorization:'Bearer ' + key};
     if(id === 'openrouter'){ headers['HTTP-Referer'] = location.origin; headers['X-Title'] = 'Trip Vault'; }
-    const res = await post(base + '/chat/completions', headers,
-      {model, temperature:0.2, max_tokens:8192, messages:[{role:'system', content:system}].concat(turns)}, signal, 90000);
+    const body = json => Object.assign({model, temperature: temp(opts), max_tokens:8192, messages:[{role:'system', content:system}].concat(turns)}, json ? {response_format: {type: 'json_object'}} : {});
+    let res = await post(base + '/chat/completions', headers, body(!!opts.schema), signal, 90000);
+    // some models refuse the JSON switch: ask again without it (the instructions still ask for JSON)
+    if(opts.schema && res.status === 400 && /response_format|json/i.test(await res.clone().text().catch(()=>''))) res = await post(base + '/chat/completions', headers, body(false), signal, 90000);
     if(!res.ok) await failure(name, res, id);
     const d = await res.json();
     const text = ((((d.choices || [])[0] || {}).message) || {}).content || '';
@@ -406,7 +442,7 @@ const MoneyAI = (function(){
           tell('Asking ' + pname + ' · ' + model + (opts.search ? ' (with a web search)' : '') + '…', id);
           const out = await callOne(id, key, model, system, turns, opts, signal);
           remember(id, tier, model); wake(id);
-          return Object.assign(out, {provider: PROVIDERS.find(p=>p.id === id).name, model});
+          return Object.assign(out, {id, provider: PROVIDERS.find(p=>p.id === id).name, model});
         }catch(e){
           if(e.code === 'cancelled') throw e;
           lastError = e;
@@ -422,6 +458,21 @@ const MoneyAI = (function(){
       return Object.assign(await chat(system, turns, Object.assign({}, opts, {search: false, searchOptional: false}), signal), {noSearch: true});
     const why = skipped.concat(lastError && lastError.unavailable ? [lastError.message] : []);
     throw new Error('No AI service could answer' + (why.length ? ': ' + why.join('; ').replace(/\.$/, '') : '') + '. Try again later or add another free key.');
+  }
+  /* Gemini-style schema (types in capitals) as a plain JSON schema, for the instructions */
+  function plainSchema(x){
+    if(Array.isArray(x)) return x.map(plainSchema);
+    if(!x || typeof x !== 'object') return x;
+    const o = {};
+    Object.entries(x).forEach(([k, v])=>{ o[k] = k === 'type' && typeof v === 'string' ? v.toLowerCase() : plainSchema(v); });
+    return o;
+  }
+  /* One prompt -> one JSON object that matches `schema` (Gemini style): the apps' strict-JSON questions.
+     -> {data, id, provider, model} */
+  async function generate(prompt, schema, opts, signal){
+    const system = 'Reply with a single JSON object and nothing else. It must match this JSON schema:\n' + JSON.stringify(plainSchema(schema));
+    const r = await chat(system, [{role: 'user', content: prompt}], Object.assign({temperature: 0, schema}, opts || {}), signal);
+    return {data: json(r.text), id: r.id, provider: r.provider, model: r.model};
   }
   /* The JSON inside an AI answer (it may wrap it in prose or ``` fences). */
   function json(text){
@@ -455,7 +506,7 @@ const MoneyAI = (function(){
   const setModel = (id, m) => { const h = aiLocal(); h.model = Object.assign({}, h.model, {[id]: m}); saveAiLocal(h); };
 
   return {PRIVATE_MODELS, trialPrivate, removePrivate, privateCached, PROVIDERS, loadAi, aiSettings, aiLocal, saveAiLocal, adoptAppKeys, aiStatus, rankModels, shareableAi, takeSyncedAi,
-          aiAvailable, aiNames, canSee, canSearch, resting, wake, backAt, chat, json, test, setModel, listModels};
+          aiAvailable, aiNames, canSee, canSearch, resting, wake, backAt, chat, generate, json, test, setModel, listModels};
 })();
 
 /* =========================================================
