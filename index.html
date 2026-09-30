@@ -145,6 +145,13 @@ main{max-width:1120px;margin:0 auto;padding-inline:20px;padding-block:0 60px}
 .gate .err{color:var(--dn);font-size:13px}
 .skel{opacity:.55}
 /* ---------- Ask AI ---------- */
+.docs-card{margin-top:16px}
+.docs-card .top{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between}
+.docs-card .open{margin-top:0}
+.docs-card .renew{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.docs-card .renew li{font-size:14px;display:flex;flex-wrap:wrap;gap:6px;align-items:baseline}
+.docs-card .lim{color:var(--exp);font-weight:600}
+.docs-card .dn{font-weight:600}
 .ask{margin-top:16px}
 .ask .top{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .ask .top h3{margin-right:auto}
@@ -183,6 +190,23 @@ const ym = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'
 const ymLabel = (m, style = 'long') => new Date(+m.slice(0, 4), +m.slice(5, 7) - 1, 1).toLocaleDateString('en-IN', {month: style, year: style === 'long' ? 'numeric' : undefined});
 const ago = ms => { const s = (Date.now() - ms) / 1000; return s < 90 ? 'just now' : s < 3600 ? Math.round(s / 60) + ' min ago' : s < 86400 ? Math.round(s / 3600) + ' h ago' : Math.round(s / 86400) + ' d ago'; };
 const LINKS = {ats:'http://localhost:8765/', exp:'/expenseTracker/', led:'/InvestmentPlan/', trip:'/tripManangement/'};
+/* Trip Vault's personal documents (its Document Vault): everything that is not a travel paper */
+const TRAVEL_DOC = ['boarding-pass', 'flight', 'hotel', 'train', 'bus', 'visa', 'car', 'activity'];
+const DOC_LABEL = {passport: 'Passport', aadhaar: 'Aadhaar', pan: 'PAN card', licence: 'Driving licence', 'voter-id': 'Voter ID', tax: 'Tax papers', bank: 'Bank statement',
+  investment: 'Investment statement', insurance: 'Insurance', property: 'Property / rent', vehicle: 'Vehicle papers', medical: 'Medical', education: 'Education', employment: 'Employment', bill: 'Bill / warranty', other: 'Other'};
+function personalDocs(tv){ return ((tv && tv.docs) || []).filter(d=>TRAVEL_DOC.indexOf(d.type) < 0); }
+function docsCard(tv){
+  const docs = personalDocs(tv);
+  const today = new Date().toISOString().slice(0, 10), soon = new Date(Date.now() + 90 * 864e5).toISOString().slice(0, 10);
+  const renew = docs.filter(d=>d.fields && d.fields.validUntil && d.fields.validUntil <= soon).sort((a, b)=>a.fields.validUntil.localeCompare(b.fields.validUntil));
+  const byType = {}; docs.forEach(d=>{ const k = DOC_LABEL[d.type] || 'Other'; byType[k] = (byType[k] || 0) + 1; });
+  const fmt = d => new Date(d + 'T00:00:00').toLocaleDateString('en-IN', {day: 'numeric', month: 'short', year: 'numeric'});
+  return `<section class="card docs-card" style="--c:var(--trip)"><div class="top"><h3>Personal documents</h3><a class="open" href="/tripManangement/#docs/personal">Open personal documents <span aria-hidden="true">→</span></a></div>
+    ${docs.length ? `<p class="cap">${docs.length} kept in Trip Vault — ${Object.entries(byType).map(([k, n])=>esc(k) + (n > 1 ? ' ×' + n : '')).join(', ')}</p>
+      ${renew.length ? `<ul class="renew">${renew.map(d=>`<li><b>${esc(DOC_LABEL[d.type] || d.title)}</b> — ${esc(d.person || '')} <span class="${d.fields.validUntil < today ? 'dn' : 'lim'}">${d.fields.validUntil < today ? 'expired' : 'renew by'} ${esc(fmt(d.fields.validUntil))}</span></li>`).join('')}</ul>` : '<p class="cap">Nothing to renew in the next three months.</p>'}`
+      : `<div class="empty">Keep Aadhaar, PAN, passport, licence, tax papers, statements, policies and bills in one place — the reader sorts them, and they open on your phone too.</div>`}
+  </section>`;
+}
 const SESSION = 'money-home-session';
 const ICON = {
   ats:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19V9M10 19V5M16 19v-7M22 19H2"/></svg>',
@@ -203,9 +227,9 @@ const hasAi = () => typeof MoneyAI !== 'undefined' && MoneyAI.aiAvailable();
 function askCard(){
   const conv = ASK.turns.map(t => t.role === 'user' ? `<div class="q">${esc(t.content)}</div>`
     : `<div class="a ${t.error ? 'err' : ''}">${esc(t.content)}${t.by ? `<span class="by">${esc(t.by)}</span>` : ''}</div>`).join('');
-  const sugg = ['How much did I spend last month, and on what?', 'Am I on track for my retirement target?', 'What is next on my trip?', 'Where can I save money this month?'];
+  const sugg = ['How much did I spend last month, and on what?', 'Am I on track for my retirement target?', 'What is next on my trip?', 'Which of my documents need renewing soon?'];
   return `<section class="card ask"><div class="top"><h3>Ask AI</h3><a class="hub" href="/setup/#ai">AI · ${hasAi() ? esc(MoneyAI.aiNames()[0]) + ' first' : 'add a key'}</a></div>
-    <p class="cap">One assistant for all your apps — it sees the numbers on this page: your plan, spending, trips${ASK.ctx && /ATS/.test(ASK.ctx) ? ' and ATS holdings' : ''}.</p>
+    <p class="cap">One assistant for all your apps — it sees what this page shows: your plan, spending, trips and documents${ASK.ctx && /ATS/.test(ASK.ctx) ? ' and ATS holdings' : ''}.</p>
     ${conv ? `<div class="convo" id="convo">${conv}</div>` : ''}
     ${hasAi() ? `<form id="askf"><textarea id="askq" rows="1" placeholder="Ask about your money, plan or trips…"></textarea><button class="go" id="askgo">${ASK.busy ? 'Stop' : 'Ask'}</button></form>
       ${ASK.turns.length ? '' : `<div class="sugg">${sugg.map(q => `<button type="button" data-q="${esc(q)}">${esc(q)}</button>`).join('')}</div>`}`
@@ -379,6 +403,8 @@ function draw(et, ats, tv){
       return {t, fl, hotels, n: docs.length}; }).filter(x => !x.t.end || x.t.end >= today).slice(0, 4);
     if(trips.length) ctx.push('Trip Vault, upcoming trips: ' + trips.map(x => `${x.t.name} (${[x.t.city, x.t.start && x.t.start + ' to ' + (x.t.end || '?')].filter(Boolean).join(', ')}; ${x.n} documents${x.fl.length ? '; flights ' + x.fl.join(', ') : ''}${x.hotels.length ? '; staying at ' + x.hotels.join(', ') : ''})`).join('; ') + '.');
   }
+  const pdocs = personalDocs(tv);
+  if(pdocs.length) ctx.push('Personal documents in Trip Vault (no numbers shown): ' + pdocs.map(d=>(DOC_LABEL[d.type] || d.type) + (d.person ? ' of ' + d.person : '') + (d.fields && d.fields.validUntil ? ', valid until ' + d.fields.validUntil : '') + (d.fields && d.fields.issuedOn ? ', issued ' + d.fields.issuedOn : '')).join('; ') + '.');
   ASK.ctx = ctx.join('\n');
 
   const hero = `<header class="hero"><div class="hero-in">
@@ -506,9 +532,10 @@ function draw(et, ats, tv){
       ${card('led', '16-Year Ledger', 'Investment plan', real && plan.plan && plan.plan.dob ? '' : '', ledBody, 'Open the Ledger')}
       ${card('trip', 'Trip Vault', 'Trips, tickets and plans', '', tripBody, 'Open Trip Vault')}
     </div>
+    ${docsCard(tv)}
     ${askCard()}
     ${monthCard || nextCard ? `<div class="row2">${monthCard || '<div></div>'}${nextCard}</div>` : ''}
-    <div class="foot"><span>Read in this browser from the Expense Tracker, the Ledger and Trip Vault${atsOk ? ', and live from ATS on this Mac' : ''}. Nothing is sent anywhere.</span>
+    <div class="foot"><span>Read in this browser from the Expense Tracker, the Ledger and Trip Vault (with your personal documents)${atsOk ? ', and live from ATS on this Mac' : ''}. Nothing is sent anywhere.</span>
       <span style="display:flex;gap:8px"><button class="btn" id="re">Refresh</button><button class="btn" id="out">Sign out</button></span></div>
   </main>`;
   bindAsk();
