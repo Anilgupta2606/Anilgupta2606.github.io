@@ -598,7 +598,8 @@ const MoneyShared = (function(){
   async function mine(){
     const hub = MoneyAI.aiLocal(), shared = MoneyAI.shareableAi();
     return {ai: {keys: shared.keys, first: hub.first || 'auto', fallback: hub.fallback !== false, model: hub.model || {}, off: hub.off || []},
-            auth: (await etAuth()) || lsGet(AUTH, null), updatedAt: lsGet(CFG + '-changed', 0)};
+            auth: (await etAuth()) || lsGet(AUTH, null), updatedAt: lsGet(CFG + '-changed', 0),
+            brain: typeof MoneyBrain !== 'undefined' ? MoneyBrain.exportAll() : (lsGet('money-brain', null) ? {lessons: lsGet('money-brain', {}).lessons || {}, forgotten: lsGet('money-brain', {}).forgotten || {}} : undefined)};
   }
 
   /* Bring the settings gist and this device together: keys either has are kept (the more recently changed
@@ -627,6 +628,9 @@ const MoneyShared = (function(){
       const a = newer ? remote.ai : here.ai, b = newer ? here.ai : remote.ai;
       out = {ai: Object.assign({}, b, a, {keys: Object.assign({}, b.keys, a.keys), model: Object.assign({}, b.model, a.model)}),
              auth: hasEt ? here.auth : (remote.auth || here.auth), updatedAt: Math.max(remote.updatedAt || 0, here.updatedAt || 0)};
+      // what the Brain has learned on each device: both kept, the lesson changed last wins
+      if(remote.brain && typeof MoneyBrain !== 'undefined'){ MoneyBrain.merge(remote.brain); out.brain = MoneyBrain.exportAll(); }
+      else out.brain = here.brain || remote.brain;
       // this device takes the result (its own Ollama address stays)
       const hub = MoneyAI.aiLocal();
       hub.keys = Object.assign({}, out.ai.keys, Object.fromEntries(['ollama', 'webllm'].filter(k=>(hub.keys || {})[k]).map(k=>[k, hub.keys[k]])));   // this device's own stay

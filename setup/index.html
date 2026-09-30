@@ -73,6 +73,17 @@ input:focus,select:focus{outline:2px solid var(--gold);outline-offset:1px}
 .priv{background:color-mix(in srgb,var(--gold) 7%,transparent);border-radius:12px;padding-inline:10px}
 .priv .res{color:var(--ink2)}
 .priv .res details{margin-top:6px}
+.bgroup{font:700 13px var(--body);color:var(--mut);margin:14px 0 4px}
+.lesson{display:grid;grid-template-columns:minmax(0,1fr) 90px auto;gap:10px;align-items:center;padding:9px 0;border-top:1px solid var(--line)}
+.lesson.off{opacity:.5}
+.lesson .lt b{display:block;font-size:14px}
+.lesson .lt small{color:var(--mut);font-size:12px}
+.lesson .pin{font-size:11px;font-weight:700;color:var(--up)}
+.lesson .conf{height:6px;border-radius:99px;background:var(--card2);overflow:hidden}
+.lesson .conf i{display:block;height:100%;background:var(--gold)}
+.lesson .la{display:flex;gap:6px}
+.lesson .la .btn{padding:5px 9px;font-size:12px}
+@media (max-width:760px){.lesson{grid-template-columns:1fr 70px}.lesson .la{grid-column:1/-1}}
 .spin{display:inline-block;width:12px;height:12px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:sp .8s linear infinite;vertical-align:-2px}
 @keyframes sp{to{transform:rotate(360deg)}}
 .row{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
@@ -106,6 +117,7 @@ ol.steps li{margin:3px 0}
 <div id="app"></div>
 <div class="toast" id="toast"></div>
 <script src="/ai/ai.js"></script>
+<script src="/ai/brain.js"></script>
 <script>
 "use strict";
 /* Setup: everything you set once for all the apps on this site - sync between devices, the sign-in, the AI keys.
@@ -218,6 +230,47 @@ function bindPrivate(){
   if(rm) rm.onclick = async ()=>{ try{ await MoneyAI.removePrivate(PRIV.model); PRIV.cached[PRIV.model] = false; toast('Removed from this browser.'); }catch(e){ toast(e.message); } render(); };
 }
 
+/* What the site's own Brain has learned from you (/ai/brain.js): see it, keep it, switch it off or forget it. */
+const APP_NAME = {trip: 'Trip Vault', money: 'Expense Tracker', ledger: '16-Year Ledger', home: 'Money Home'};
+const TOPIC_NAME = {like: 'Places you like and skip', time: 'Your times', food: 'Food', walking: 'Getting around', doctype: 'Reading documents', category: 'Categories'};
+function brainText(L){
+  let t = MoneyBrain.describe(L);
+  if(L.kind === 'number' && /\{time\}/.test(t)){ const m = Math.round(L.mean / 5) * 5; t = t.replace('{time}', String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0')); }
+  if(L.kind === 'choice' && L.topic === 'like'){ const top = Object.entries(L.votes).sort((a, b)=>b[1] - a[1])[0]; if(top) t = (top[0] === 'like' ? 'Likes ' : 'Skips ') + (L.key === 'food' ? 'food places' : MoneyBrain.categoryName(L.key)); }
+  return t;
+}
+function brainCard(){
+  if(typeof MoneyBrain === 'undefined') return '';
+  const all = MoneyBrain.lessons();
+  const groups = {};
+  all.forEach(L=>{ const g = (APP_NAME[L.app] || L.app) + ' · ' + (TOPIC_NAME[L.topic] || L.topic); (groups[g] = groups[g] || []).push(L); });
+  return `<section class="card" id="brain">
+    <h2><span class="n">4</span>What it has learned</h2>
+    <p class="cap">Your apps' own thinking (no AI model) learns from what you do: the places you keep, lock or remove in a plan, what you type in “Not happy with it?”, the times you set. A lesson grows with every repeat and fades when it stops happening; it is used only once it is clear. It travels between your devices inside the encrypted sync, nowhere else.</p>
+    ${all.length ? Object.entries(groups).map(([g, list])=>`<h3 class="bgroup">${esc(g)}</h3>${list.map(L=>{
+      const c = Math.round(MoneyBrain.confidenceOf(L) * 100);
+      return `<div class="lesson${L.off ? ' off' : ''}" data-lesson="${esc(L.id)}">
+        <div class="lt"><b>${esc(brainText(L))}</b>${L.pinned ? ' <span class="pin">set by you</span>' : ''}<small>${esc(L.why || '')}${L.n > 1 ? ' · seen ' + L.n + ' times' : ''}</small></div>
+        <div class="conf" title="How sure: ${c}%${c < 60 ? ' — not used until it is clearer' : ''}"><i style="width:${c}%"></i></div>
+        <div class="la"><button class="btn" data-l-pin title="Keep it: fixed, learning will not change it">Keep</button><button class="btn" data-l-off>${L.off ? 'Turn on' : 'Turn off'}</button><button class="btn" data-l-forget>Forget</button></div>
+      </div>`; }).join('')}`).join('') + `<div class="row end"><button class="btn" id="brain-forget-all">Forget everything</button></div>`
+    : `<p class="note">Nothing yet. It starts learning as you use the apps — for example remove or lock a few places in a Trip Vault plan, or type “we are vegetarian” in “Not happy with it?”.</p>`}
+  </section>`;
+}
+function bindBrain(){
+  document.querySelectorAll('[data-lesson]').forEach(el=>{
+    const id = el.dataset.lesson, L = MoneyBrain.lessons().find(x=>x.id === id);
+    if(!L) return;
+    el.querySelector('[data-l-forget]').onclick = ()=>{ MoneyBrain.forget(id); render(); toast('Forgotten.'); };
+    el.querySelector('[data-l-off]').onclick = ()=>{ MoneyBrain.switchOff(id, !L.off); render(); };
+    el.querySelector('[data-l-pin]').onclick = ()=>{ const top = L.kind === 'number' ? L.mean : Object.entries(L.votes).sort((a, b)=>b[1] - a[1])[0][0]; MoneyBrain.pin(id, top); render(); toast('Kept — it will not change unless you change it.'); };
+  });
+  const fa = $('brain-forget-all');
+  if(fa) fa.onclick = ()=>{ if(confirmTwice(fa)){ MoneyBrain.forgetAll(); render(); toast('Everything it had learned is forgotten.'); } };
+}
+/* A second click confirms (no browser pop-up) */
+function confirmTwice(btn){ if(btn.dataset.sure){ return true; } btn.dataset.sure = '1'; btn.textContent = 'Click again to forget everything'; setTimeout(()=>{ delete btn.dataset.sure; btn.textContent = 'Forget everything'; }, 4000); return false; }
+
 function aiCard(){
   const s = MoneyAI.aiSettings(), hub = MoneyAI.aiLocal(), status = MoneyAI.aiStatus();
   const rows = MoneyAI.PROVIDERS.map(p=>{
@@ -259,7 +312,7 @@ function render(){
     <h1>Setup</h1>
     <p>Set things once for all your apps — Money Home, Trip Vault, the 16-Year Ledger and the Expense Tracker: sync between your phone and laptop, one sign-in, and one set of AI keys.</p>
   </div></header>
-  <main class="in">${deviceCard()}${syncCard()}${signinCard()}${aiCard()}</main>`;
+  <main class="in">${deviceCard()}${syncCard()}${signinCard()}${aiCard()}${brainCard()}</main>`;
   bind();
 }
 
@@ -271,6 +324,7 @@ async function run(fn){
 const setupText = r => `Done. ${r.pulled ? 'Brought in the settings from your other device: ' : 'Saved this device’s settings: '}${r.keys} AI key${r.keys === 1 ? '' : 's'}${r.signIn ? ' and the sign-in' : ''}. Now open each app once — its data syncs by itself.`;
 
 function bind(){
+  if(typeof MoneyBrain !== 'undefined') bindBrain();
   const on = (id, fn) => { const e = $(id); if(e) e.onclick = fn; };
   on('setup', ()=>{ const tok = $('tok').value.trim(), pass = $('pass').value;       // read before the page redraws
     run(async ()=>setupText(await MoneyShared.setUp(tok, pass))); });
