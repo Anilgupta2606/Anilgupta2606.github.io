@@ -35,15 +35,17 @@ const MoneyAI = (function(){
     {id:'cerebras', name:'Cerebras', signupUrl:'https://cloud.cerebras.ai', placeholder:'csk-…', models:['gpt-oss-120b','llama-3.3-70b','llama3.1-8b']},
     {id:'mistral', name:'Mistral', signupUrl:'https://console.mistral.ai/api-keys', placeholder:'key', models:['mistral-small-latest','mistral-medium-latest']},
     {id:'openrouter', name:'OpenRouter', signupUrl:'https://openrouter.ai/keys', placeholder:'sk-or-…', models:['openrouter/free','meta-llama/llama-3.3-70b-instruct:free']},
+    {id:'webllm', name:'Private AI (in this browser)', signupUrl:'https://webllm.mlc.ai', placeholder:'', models:['Qwen3-4B-q4f16_1-MLC'], keyless:true, device:true},
     {id:'ollama', name:'Local (Ollama)', signupUrl:'https://ollama.com', placeholder:'http://localhost:11434', models:['gemma3:4b'], keyless:true},
     {id:'anthropic', name:'Anthropic Claude (paid)', signupUrl:'https://console.anthropic.com/settings/keys', placeholder:'sk-ant-…', models:['claude-haiku-4-5-20251001'], vision:true},
   ];
   const OPENAI_BASE = {groq:'https://api.groq.com/openai/v1', cerebras:'https://api.cerebras.ai/v1', mistral:'https://api.mistral.ai/v1', openrouter:'https://openrouter.ai/api/v1'};
+  const DEVICE_ONLY = {ollama: true, webllm: true};         // this computer's own: not shared with your other devices
   const SYNCED_AI = 'tripvault-ai-synced';          // keys that came from another device through Trip Vault's encrypted sync
   /* The keys this device uses, to carry to your other devices inside the encrypted sync (not Ollama: it is this computer's). */
   function shareableAi(){
     const s = aiSettings(), keys = {};
-    Object.entries(s.keys).forEach(([id, k])=>{ if(id !== 'ollama' && s.from[id] !== 'synced') keys[id] = k; });
+    Object.entries(s.keys).forEach(([id, k])=>{ if(!DEVICE_ONLY[id] && s.from[id] !== 'synced') keys[id] = k; });
     return {keys, order: s.order, model: s.model};
   }
   /* Keys from another device: kept as a source, and added to the hub for any service it has no key for. */
@@ -52,7 +54,7 @@ const MoneyAI = (function(){
     if(!a || !a.keys) return;
     const hub = aiLocal(); hub.keys = hub.keys || {};
     let added = false;
-    Object.entries(a.keys).forEach(([id, k])=>{ if(k && !hub.keys[id] && id !== 'ollama'){ hub.keys[id] = k; added = true; } });
+    Object.entries(a.keys).forEach(([id, k])=>{ if(k && !hub.keys[id] && !DEVICE_ONLY[id]){ hub.keys[id] = k; added = true; } });
     if(added) saveAiLocal(hub);
   }
   const AI_KEY = 'money-ai', REST_KEY = 'money-ai-rest', MODELS_KEY = 'money-ai-models';
@@ -64,7 +66,7 @@ const MoneyAI = (function(){
   function adoptAppKeys(){
     const s = aiSettings(), hub = aiLocal(); hub.keys = hub.keys || {};
     let added = 0;
-    Object.entries(s.keys).forEach(([id, k])=>{ if(!hub.keys[id] && s.from[id] !== 'hub' && id !== 'ollama'){ hub.keys[id] = k; added++; } });
+    Object.entries(s.keys).forEach(([id, k])=>{ if(!hub.keys[id] && s.from[id] !== 'hub' && !DEVICE_ONLY[id]){ hub.keys[id] = k; added++; } });
     if(added) saveAiLocal(hub);
     return added;
   }
@@ -106,7 +108,12 @@ const MoneyAI = (function(){
   async function post(url, headers, body, signal, wait){
     const ctl = new AbortController(), timer = setTimeout(()=>ctl.abort(), wait || 120000);
     if(signal) signal.addEventListener('abort', ()=>ctl.abort());
-    try{ return await fetch(url, {method:'POST', headers:Object.assign({'Content-Type':'application/json'}, headers), body:JSON.stringify(body), signal:ctl.signal}); }
+    try{
+      const res = await fetch(url, {method:'POST', headers:Object.assign({'Content-Type':'application/json'}, headers), body:JSON.stringify(body), signal:ctl.signal});
+      // the time limit covers the whole answer: OpenRouter sends its headers at once and then waits minutes before the body
+      const text = await res.text();
+      return new Response(text, {status: res.status, statusText: res.statusText, headers: res.headers});
+    }
     catch(e){
       if(signal && signal.aborted){ const c = new Error('Stopped.'); c.code = 'cancelled'; throw c; }
       if(e.name === 'AbortError') throw Unavailable('No answer in time.', 504);
@@ -125,7 +132,88 @@ const MoneyAI = (function(){
   }
   /* opts.images: [{mime, b64}] (only services that can see get them); opts.search: Gemini looks on the web.
      -> {text, sources:[{title, url}]} */
+  /* ---- Private AI: an open model running inside this browser, on the computer's (or phone's) graphics chip
+     (WebLLM). Downloaded once and kept by the browser; loaded once per page; nothing leaves the device. */
+  const WEBLLM_URL = 'https://cdn.jsdelivr.net/npm/@mlc-ai/web-llm@0.2.85/+esm';
+  const PRIVATE_MODELS = [
+    {id: 'Qwen3-4B-q4f16_1-MLC', name: 'Qwen3 4B', size: '2.3 GB', memory: '3.4 GB', note: 'the best balance on a laptop'},
+    {id: 'Qwen3.5-4B-q4f16_1-MLC', name: 'Qwen3.5 4B', size: '2.6 GB', memory: '3.9 GB', note: 'newest; needs a little more memory'},
+    {id: 'Phi-4-mini-instruct-q4f16_1-MLC', name: 'Phi-4 mini', size: '2.3 GB', memory: '3.4 GB', note: "Microsoft's small model"},
+    {id: 'Llama-3.2-3B-Instruct-q4f16_1-MLC', name: 'Llama 3.2 3B', size: '1.8 GB', memory: '2.3 GB', note: 'lighter'},
+    {id: 'Qwen3-1.7B-q4f16_1-MLC', name: 'Qwen3 1.7B', size: '1.1 GB', memory: '2.0 GB', note: 'for phones; quickest'},
+  ];
+  let privEngine = null, privModel = '', privLoading = null;
+  async function privateEngine(model, tell){
+    if(privEngine && privModel === model) return privEngine;
+    if(privLoading && privModel === model) return privLoading;
+    if(!navigator.gpu) throw Unavailable('Private AI needs WebGPU (a recent Chrome, Edge or Safari).', 501);
+    privModel = model;
+    privLoading = (async ()=>{
+      const webllm = await import(WEBLLM_URL);
+      if(privEngine){ try{ await privEngine.unload(); }catch(e){} }
+      const eng = await webllm.CreateMLCEngine(model, {initProgressCallback: p=>{ if(tell) tell(String(p.text || '').replace(/\[.*?\]\s*/, '').slice(0, 120), 'webllm'); }});
+      privEngine = eng;
+      return eng;
+    })();
+    try{ return await privLoading; } finally { privLoading = null; }
+  }
+  async function callPrivate(model, system, turns, opts, signal){
+    const tell = opts.onProgress ? (t, id)=>opts.onProgress('Private AI: ' + t, id) : null;
+    const eng = await privateEngine(model, tell);
+    if(signal) signal.addEventListener('abort', ()=>{ try{ eng.interruptGenerate(); }catch(e){} });
+    if(tell) tell('writing…', 'webllm');
+    let res;
+    try{
+      res = await eng.chat.completions.create({
+        messages: [{role: 'system', content: system}].concat(turns.map(t=>({role: t.role, content: t.content}))),
+        temperature: 0.2, max_tokens: opts.maxTokens || 1800,
+        extra_body: {enable_thinking: false},
+      });
+    }catch(e){
+      if(signal && signal.aborted){ const c = new Error('Stopped.'); c.code = 'cancelled'; throw c; }
+      if(/context|too long|exceed/i.test(e.message)) throw Unavailable('Private AI: this request is too long for the in-browser model', 413);
+      throw Unavailable('Private AI: ' + String(e.message).slice(0, 120), 500);
+    }
+    const text = String(((res.choices || [])[0] || {}).message && res.choices[0].message.content || '').replace(/<think>[\s\S]*?<\/think>/g, '').trim();
+    if(!text) throw Unavailable('Private AI returned an empty answer.', 502);
+    return {text, sources: [], usage: res.usage};
+  }
+  /* A short trial on this device: loads the model (downloading it the first time) and times three real tasks. */
+  async function trialPrivate(model, onStep){
+    const t0 = Date.now(), out = {model, steps: []};
+    await privateEngine(model, t=>onStep && onStep(t));
+    out.loadSec = (Date.now() - t0) / 1000;
+    const tasks = [
+      ['News summary', 'You brief a traveller. Answer with JSON only: {"status":"clear"|"caution"|"serious","headline":"one line","points":["2-4 short points"]}',
+        'Dubai, 23-28 Dec. Headlines: Dubai airport runs normally after brief fog delays on Monday; Emirates adds flights for the holidays; UK Foreign Office: no restrictions for the UAE; light rain forecast on 25 Dec.'],
+      ['Reading a document', 'You read documents and answer with JSON only: {"type":"aadhaar|pan|passport|licence|other","person":"","number":"","validUntil":"YYYY-MM-DD or empty"}',
+        'Union of India - Driving Licence\nTransport Department, Maharashtra\nDL No: MH12 20150012345\nName: ANIL GUPTA\nDate of Issue: 14-12-2006\nValid Till: 13-12-2026'],
+      ['Fixing a plan item', 'You fix travel plans. Answer with JSON only: {"items":[{"start":"HH:MM","end":"HH:MM","title":""}]}. Rule: nothing before 13:30 because the traveller lands at 10:25 and reaches the hotel at 12:55.',
+        'Day 1 items: 10:25-10:25 Land in Dubai; 11:00-12:00 Lunch - Shawarma; 14:00-14:30 Check in; 19:00-20:15 Dinner. Move what breaks the rule and keep the rest.'],
+    ];
+    for(const [name, system, user] of tasks){
+      if(onStep) onStep(name + '…');
+      const t = Date.now();
+      try{
+        const r = await callPrivate(model, system, [{role: 'user', content: user}], {}, null);
+        let ok = true; try{ json(r.text); }catch(e){ ok = false; }
+        const tok = r.usage && r.usage.completion_tokens;
+        out.steps.push({name, sec: (Date.now() - t) / 1000, ok, tokens: tok, text: r.text.slice(0, 400)});
+      }catch(e){ out.steps.push({name, sec: (Date.now() - t) / 1000, ok: false, error: e.message}); }
+    }
+    return out;
+  }
+  async function removePrivate(model){
+    const webllm = await import(WEBLLM_URL);
+    if(privEngine && privModel === model){ try{ await privEngine.unload(); }catch(e){} privEngine = null; privModel = ''; }
+    await webllm.deleteModelAllInfoInCache(model);
+  }
+  async function privateCached(model){
+    try{ const webllm = await import(WEBLLM_URL); return await webllm.hasModelInCache(model); }catch(e){ return false; }
+  }
+
   async function callOne(id, key, model, system, turns, opts, signal){
+    if(id === 'webllm') return callPrivate(model, system, turns, opts, signal);
     const name = PROVIDERS.find(p=>p.id === id).name;
     const images = opts.images || [];
     if(id === 'gemini'){
@@ -166,7 +254,7 @@ const MoneyAI = (function(){
     const headers = {Authorization:'Bearer ' + key};
     if(id === 'openrouter'){ headers['HTTP-Referer'] = location.origin; headers['X-Title'] = 'Trip Vault'; }
     const res = await post(base + '/chat/completions', headers,
-      {model, temperature:0.2, max_tokens:8192, messages:[{role:'system', content:system}].concat(turns)}, signal);
+      {model, temperature:0.2, max_tokens:8192, messages:[{role:'system', content:system}].concat(turns)}, signal, 90000);
     if(!res.ok) await failure(name, res);
     const d = await res.json();
     const text = ((((d.choices || [])[0] || {}).message) || {}).content || '';
@@ -177,6 +265,8 @@ const MoneyAI = (function(){
   const NOT_CHAT = /embed|tts|whisper|audio|speech|transcribe|image-gen|imagen|veo|lyria|dall|guard|moderation|rerank|live|realtime|robotics|computer-use|omni|customtools|aqa|learnlm|compound|playai|safeguard/i;
   const PREFER = ['gpt-oss-120b','kimi-k2','qwen3-235b','qwen-3-235b','llama-4-maverick','deepseek-v3','llama-3.3-70b','mistral-large','mistral-medium','qwen3-32b','qwen-3-32b','llama-4-scout','mistral-small','gpt-oss-20b','gemma-3-27b','ministral-8b','llama-3.1-8b','llama3.1-8b'];
   const sizeB = m => Number((m.match(/(\d+(?:\.\d+)?)b\b/i) || [])[1] || 0);
+  // a giant free model (400B+, or an "ultra" reasoning one) is queued and thinks for minutes: after the mid-size ones
+  const huge = m => sizeB(m) > 300 || /ultra|reason|thinking|-r1\b/i.test(m) ? 1 : 0;
   const verOf = m => Number((m.match(/(\d+(?:\.\d+)?)/) || [])[1] || 0);
   // for quick tasks: the mid-size models ATS found answer fastest and still well
   const FAST_PREFER = ['gpt-oss-20b','ministral-3b','ministral-8b','qwen3-32b','qwen-3-32b','llama-3.1-8b','llama3.1-8b','gemma-3-27b','mistral-small','llama-4-scout','llama-3.3-70b','gpt-oss-120b'];
@@ -206,10 +296,11 @@ const MoneyAI = (function(){
     if(id === 'openrouter') list = uniq.filter(m=>/:free$/.test(m) || m === 'openrouter/free');
     const ranked = list.filter(m=>m !== 'openrouter/free').sort(fast
       ? (a, b)=>prefIdx(a, FAST_PREFER) - prefIdx(b, FAST_PREFER) || (sizeB(a) || 50) - (sizeB(b) || 50)
-      : (a, b)=>prefIdx(a) - prefIdx(b) || sizeB(b) - sizeB(a) || a.localeCompare(b));
+      : (a, b)=>prefIdx(a) - prefIdx(b) || huge(a) - huge(b) || sizeB(b) - sizeB(a) || a.localeCompare(b));
     return id === 'openrouter' && list.indexOf('openrouter/free') >= 0 ? ranked.slice(0, 3).concat(['openrouter/free'], ranked.slice(3)) : ranked;
   }
   async function listModels(id, key){
+    if(id === 'webllm') return [key];              // the one you chose in Setup
     let res;
     if(id === 'gemini') res = await fetch('https://generativelanguage.googleapis.com/v1beta/models?pageSize=200&key=' + encodeURIComponent(key));
     else if(id === 'anthropic') res = await fetch('https://api.anthropic.com/v1/models', {headers:{'x-api-key':key, 'anthropic-version':'2023-06-01', 'anthropic-dangerous-direct-browser-access':'true'}});
@@ -223,6 +314,7 @@ const MoneyAI = (function(){
   }
   /* What a key can use (asked once a day), ranked for the task. */
   async function bestModels(id, key, tier){
+    if(id === 'webllm') return [key];
     const cache = lsGet(MODELS_KEY, {}), c = cache[id], tag = key.slice(-6);
     let names = c && c.key === tag && Date.now() - c.at < 86400000 && c.names && c.names.length ? c.names : null;
     if(!names){
@@ -324,7 +416,7 @@ const MoneyAI = (function(){
   }
   const setModel = (id, m) => { const h = aiLocal(); h.model = Object.assign({}, h.model, {[id]: m}); saveAiLocal(h); };
 
-  return {PROVIDERS, loadAi, aiSettings, aiLocal, saveAiLocal, adoptAppKeys, aiStatus, rankModels, shareableAi, takeSyncedAi,
+  return {PRIVATE_MODELS, trialPrivate, removePrivate, privateCached, PROVIDERS, loadAi, aiSettings, aiLocal, saveAiLocal, adoptAppKeys, aiStatus, rankModels, shareableAi, takeSyncedAi,
           aiAvailable, aiNames, canSee, canSearch, resting, wake, chat, json, test, setModel, listModels};
 })();
 
@@ -448,7 +540,7 @@ const MoneyShared = (function(){
              auth: hasEt ? here.auth : (remote.auth || here.auth), updatedAt: Math.max(remote.updatedAt || 0, here.updatedAt || 0)};
       // this device takes the result (its own Ollama address stays)
       const hub = MoneyAI.aiLocal();
-      hub.keys = Object.assign({}, out.ai.keys, (hub.keys || {}).ollama ? {ollama: hub.keys.ollama} : {});
+      hub.keys = Object.assign({}, out.ai.keys, Object.fromEntries(['ollama', 'webllm'].filter(k=>(hub.keys || {})[k]).map(k=>[k, hub.keys[k]])));   // this device's own stay
       hub.first = out.ai.first; hub.fallback = out.ai.fallback; hub.model = out.ai.model; hub.off = out.ai.off;
       MoneyAI.saveAiLocal(hub);
       if(out.auth && !hasEt) lsSet(AUTH, out.auth);
