@@ -162,6 +162,9 @@ main{max-width:1120px;margin:0 auto;padding-inline:20px;padding-block:0 60px}
 .convo .q{align-self:flex-end;background:var(--card2);border-radius:14px 14px 4px 14px;padding:8px 12px;max-width:85%;font-weight:600;font-size:14px}
 .convo .a{background:color-mix(in srgb,var(--gold) 9%,var(--card));border:1px solid var(--line);border-radius:14px 14px 14px 4px;padding:10px 13px;font-size:14px;white-space:pre-wrap;overflow-wrap:anywhere}
 .convo .by{display:block;margin-top:6px;font-size:11.5px;color:var(--mut)}
+.convo .srcs{display:flex;flex-wrap:wrap;gap:4px 10px;margin-top:6px;font-size:12px}
+.convo .srcs a{color:inherit;opacity:.8}
+.convo .a{white-space:pre-line}
 .convo .err{color:var(--dn)}
 @media (max-width:600px){.ask form{flex-direction:column}.ask button.go{padding:12px}}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
@@ -172,6 +175,7 @@ main{max-width:1120px;margin:0 auto;padding-inline:20px;padding-block:0 60px}
 <script src="/ai/ai.js"></script>
 <script src="/ai/brain.js"></script>
 <script src="/ai/ask.js"></script>
+<script src="/ai/web.js"></script>
 <script src="/InvestmentPlan/cloud.js"></script>
 <script>
 "use strict";
@@ -210,10 +214,10 @@ const hasAsk = () => typeof MoneyAsk !== 'undefined';
 const hasAi = () => typeof MoneyAI !== 'undefined' && MoneyAI.aiAvailable();
 function askCard(){
   const conv = ASK.turns.map(t => t.role === 'user' ? `<div class="q">${esc(t.content)}</div>`
-    : `<div class="a ${t.error ? 'err' : ''}">${esc(t.content)}${t.by ? `<span class="by">${esc(t.by)}</span>` : ''}</div>`).join('');
-  const sugg = ['How much did I spend last month, and on what?', 'Am I on track for my retirement target?', 'What is next on my trip?', 'Which of my documents need renewing soon?'];
+    : `<div class="a ${t.error ? 'err' : ''}">${esc(t.content)}${(t.sources || []).length ? `<span class="srcs">${t.sources.map((x, i) => `<a href="${esc(x.url)}" target="_blank" rel="noopener">[${i + 1}] ${esc(x.title)}</a>`).join(' ')}</span>` : ''}${t.by ? `<span class="by">${esc(t.by)}</span>` : ''}</div>`).join('');
+  const sugg = ['How much did I spend last month, and on what?', 'Am I on track for my retirement target?', 'EMI for 50 lakh at 8.5% for 20 years', '100 USD to INR', 'Weather in Dubai this week', 'What is a mutual fund?'];
   return `<section class="card ask"><div class="top"><h3>Ask</h3><a class="hub" href="/setup/#ai">AI · ${hasAi() ? esc(MoneyAI.aiNames()[0]) + ' first' : 'add a key'}</a></div>
-    <p class="cap">One assistant for all your apps — it sees what this page shows: your plan, spending, trips and documents${ASK.ctx && /ATS/.test(ASK.ctx) ? ' and ATS holdings' : ''}.</p>
+    <p class="cap">Your plan, spending, trips and documents${ASK.ctx && /ATS/.test(ASK.ctx) ? ', ATS holdings' : ''} are answered from your own data; money sums (EMI, SIP, CAGR, GST), exchange rates, weather, meanings and facts are looked up on the web — with the sources shown.</p>
     ${conv ? `<div class="convo" id="convo">${conv}</div>` : ''}
     ${hasAi() || hasAsk() ? `<form id="askf"><textarea id="askq" rows="1" placeholder="Ask about your money, plan or trips…"></textarea><button class="go" id="askgo">${ASK.busy ? 'Stop' : 'Ask'}</button></form>
       ${ASK.turns.length ? '' : `<div class="sugg">${sugg.map(q => `<button type="button" data-q="${esc(q)}">${esc(q)}</button>`).join('')}</div>`}`
@@ -241,8 +245,23 @@ function bindAsk(){
       setTimeout(() => { const c = $('convo'); if(c) c.lastElementChild.scrollIntoView({block: 'nearest'}); const i = $('askq'); if(i) i.focus(); }, 50);
       return;
     }
+    // beyond the apps: calculators, live facts, and reading the web — then, with an AI, a plain answer held to what was read
+    let web = null;
+    if(typeof MoneyWeb !== 'undefined'){
+      try{ web = await MoneyWeb.answer(text); }catch(e){ web = null; }
+      if(web && web.kind !== 'not-found'){
+        let out = web, by = 'Money Brain · ' + ({calculator: 'worked out exactly', currency: 'live rate', weather: 'live forecast', time: 'world clock', definition: 'dictionary', fact: 'Wikidata'}[web.kind] || 'read from the web') + ' (no AI)';
+        if(web.passages && hasAi()){
+          try{ out = await MoneyWeb.rephrase(text, web, (sys, turns, o) => MoneyAI.chat(sys, turns, o, ASK.ctl && ASK.ctl.signal)); if(out.by) by = 'Read from the web, put in words by ' + out.by; }catch(e){ out = web; }
+        }
+        ASK.turns.push({role: 'assistant', content: out.text + (out.note ? '\n\n' + out.note : ''), sources: out.sources, by});
+        ASK.busy = false; ASK.ctl = null; render();
+        setTimeout(() => { const c = $('convo'); if(c) c.lastElementChild.scrollIntoView({block: 'nearest'}); const i = $('askq'); if(i) i.focus(); }, 50);
+        return;
+      }
+    }
     if(!hasAi()){
-      ASK.turns.push({role: 'assistant', content: 'I answer questions about your spending, income, savings, trips, documents and plan from your own data. For anything else, add a free AI key in Setup.', error: true});
+      ASK.turns.push({role: 'assistant', content: web && web.kind === 'not-found' ? web.text + ' An AI key (free, in Setup) would let me answer from general knowledge.' : 'I answer from your own data (spending, trips, documents, plan) and look things up on the web (sums, rates, weather, facts). For anything else, add a free AI key in Setup.', error: true});
       ASK.busy = false; ASK.ctl = null; render(); return;
     }
     const system = `You are the assistant on "Money Home", the start page of the owner's personal apps: the 16-Year Ledger (investment plan), the Expense Tracker (bank statements), Trip Vault (trips) and ATS (trading dashboard). Answer in plain, short sentences (Indian rupees, ₹, lakh/crore), using only the figures below; say so when something is not in them, and which app to open to see it. You explain and help plan; you do not give licensed investment advice or tell them to buy or sell a specific security.
@@ -252,7 +271,7 @@ ${ASK.ctx || 'No data from the apps in this browser yet.'}`;
       const r = await MoneyAI.chat(system, ASK.turns.filter(t => !t.error).map(t => ({role: t.role, content: t.content})).slice(-10), {}, ASK.ctl.signal);
       // the AI's figures checked against your data: one it made up is pointed out
       const made = hasAsk() ? MoneyAsk.checkFigures(r.text, ASK.ctx) : [];
-      ASK.turns.push({role: 'assistant', content: r.text.trim() + (made.length ? '\n\n⚠ Not in your data: ' + made.join(', ') + ' — check before relying on ' + (made.length === 1 ? 'it' : 'them') + '.' : ''), by: r.provider + ' · ' + r.model});
+      ASK.turns.push({role: 'assistant', content: r.text.trim() + (made.length ? '\n\n⚠ Not in your data: ' + made.join(', ') + ' — check before relying on ' + (made.length === 1 ? 'it' : 'them') + '.' : ''), by: r.provider + ' · ' + r.model + ' — from its own knowledge, not checked against the web'});
     }catch(err){
       if(err.code !== 'cancelled') ASK.turns.push({role: 'assistant', content: err.message, error: true});
     }finally{ ASK.busy = false; ASK.ctl = null; render(); setTimeout(() => { const c = $('convo'); if(c) c.lastElementChild.scrollIntoView({block: 'nearest'}); const i = $('askq'); if(i) i.focus(); }, 50); }
