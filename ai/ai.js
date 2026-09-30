@@ -98,7 +98,8 @@ const MoneyAI = (function(){
 
   const restMap = () => lsGet(REST_KEY, {});
   function resting(id){ const r = restMap()[id]; return r && r.until > Date.now() ? r : null; }
-  function rest(id, why){ const m = restMap(); m[id] = {until: Date.now() + 15 * 60000, why}; lsSet(REST_KEY, m); }
+  const changed = () => { try{ window.dispatchEvent(new CustomEvent('moneyai-change')); }catch(e){} };
+  function rest(id, why){ const m = restMap(); m[id] = {until: Date.now() + 15 * 60000, why}; lsSet(REST_KEY, m); changed(); }
   function wake(id){ const m = restMap(); delete m[id]; lsSet(REST_KEY, m); }
 
   function Unavailable(message, status, limit){ const e = new Error(message); e.unavailable = true; e.status = status; e.limit = !!limit; return e; }
@@ -228,8 +229,8 @@ const MoneyAI = (function(){
     return ranked.length ? ranked : PROVIDERS.find(p=>p.id === id).models;
   }
   /* Which model answered last, per service and kind of task (tried first next time), and models a key cannot use (skipped for a day). */
-  const WORKING_KEY = 'tripvault-ai-working', BAD_KEY = 'tripvault-ai-bad';
-  function remember(id, tier, model){ const w = lsGet(WORKING_KEY, {}); w[id] = Object.assign({}, w[id], {[tier]: model, at: Date.now()}); lsSet(WORKING_KEY, w); }
+  const WORKING_KEY = 'money-ai-working', BAD_KEY = 'money-ai-bad';
+  function remember(id, tier, model){ const w = lsGet(WORKING_KEY, {}); w[id] = Object.assign({}, w[id], {[tier]: model, at: Date.now()}, {last: tier}); lsSet(WORKING_KEY, w); lsSet(WORKING_KEY + '-now', {id, model, at: Date.now()}); changed(); }
   function markBad(id, model){ const b = lsGet(BAD_KEY, {}); b[id + '|' + model] = Date.now() + 86400000; lsSet(BAD_KEY, b); }
   const isBad = (id, model) => (lsGet(BAD_KEY, {})[id + '|' + model] || 0) > Date.now();
   /* What answers now, for the settings: [{id, name, model, resting}] in the order they are tried. */
@@ -470,4 +471,136 @@ const MoneyShared = (function(){
   }
   return {checkLogin, loginSource, setUp, sync, quiet, status, existing, forget, markChanged, APPS};
 })();
+
+/* =========================================================
+   The AI switch, in every app's top bar (as in ATS): which AI is answering, and a choice of
+   Auto (the best one that answers) or one AI first. The choice is the same in every app.
+   MoneyAI.widget(element, {chipClass}) puts it in the element.
+   ========================================================= */
+MoneyAI.widget = (function(){
+  const css = `
+.mai{position:relative;display:inline-flex}
+.mai-chip{display:inline-flex;align-items:center;gap:7px;font:600 13px/1 inherit;font-family:inherit;color:inherit;background:transparent;border:1px solid color-mix(in srgb,currentColor 22%,transparent);border-radius:999px;padding:7px 11px;cursor:pointer;white-space:nowrap;max-width:260px}
+.mai-chip:hover{border-color:color-mix(in srgb,currentColor 45%,transparent)}
+.mai-chip:focus-visible{outline:2px solid #0A7C8C;outline-offset:2px}
+.mai-chip b{font-weight:700;overflow:hidden;text-overflow:ellipsis}
+.mai-chip .mai-m{opacity:.7;font-weight:500;overflow:hidden;text-overflow:ellipsis}
+.mai-dot{width:8px;height:8px;border-radius:50%;flex:none;background:#9aa7b4}
+.mai-dot.good{background:#1FB36B;box-shadow:0 0 0 3px rgb(31 179 107 / .2)}
+.mai-dot.lim{background:#F2A516;box-shadow:0 0 0 3px rgb(242 165 22 / .2)}
+.mai-dot.bad{background:#E5484D}
+.mai-pop{position:absolute;right:0;top:calc(100% + 8px);z-index:1000;width:320px;max-width:calc(100vw - 24px);background:#fff;color:#0B2545;border:1px solid #D5E0EB;border-radius:16px;box-shadow:0 18px 44px -12px rgb(11 37 69 / .35);padding:14px;font:14px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif;text-align:left}
+.mai-pop[hidden]{display:none}
+.mai-pop.mai-up{top:auto;bottom:calc(100% + 8px)}
+.mai-pop.mai-left{right:auto;left:0}
+.mai-pop h4{margin:0 0 2px;font-size:15px}
+.mai-pop .mai-sub{margin:0 0 10px;font-size:12.5px;color:#5B6F86}
+.mai-opt{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:11px;cursor:pointer;border:1px solid transparent}
+.mai-opt:hover{background:#EEF4FA}
+.mai-opt.on{background:#E3F4F4;border-color:#9FD6D8}
+.mai-opt input{margin:0;accent-color:#0A7C8C}
+.mai-opt span.t{flex:1;min-width:0}
+.mai-opt b{display:block;font-size:14px}
+.mai-opt small{display:block;color:#5B6F86;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mai-now{font-size:11.5px;font-weight:700;color:#0A7C8C;background:#E3F4F4;border-radius:999px;padding:2px 8px;white-space:nowrap}
+.mai-fb{display:flex;gap:8px;align-items:center;margin:10px 2px 8px;font-size:13px;cursor:pointer}
+.mai-fb input{accent-color:#0A7C8C}
+.mai-foot{display:flex;justify-content:space-between;gap:8px;border-top:1px solid #E1E9F1;padding-top:10px;font-size:13px}
+.mai-foot a{color:#0A7C8C;font-weight:600;text-decoration:none}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]) .mai-pop{background:#0F2440;color:#EEF4FB;border-color:#2C4F77}
+  :root:not([data-theme="light"]) .mai-pop .mai-sub, :root:not([data-theme="light"]) .mai-opt small{color:#9FB3CA}
+  :root:not([data-theme="light"]) .mai-opt:hover{background:#15304F} :root:not([data-theme="light"]) .mai-opt.on{background:#12394A;border-color:#1F6B72}
+  :root:not([data-theme="light"]) .mai-now{background:#12394A;color:#3CCFCF} :root:not([data-theme="light"]) .mai-foot{border-color:#1E3A5C} :root:not([data-theme="light"]) .mai-foot a{color:#3CCFCF} }
+:root[data-theme="dark"] .mai-pop{background:#0F2440;color:#EEF4FB;border-color:#2C4F77}
+:root[data-theme="dark"] .mai-pop .mai-sub, :root[data-theme="dark"] .mai-opt small{color:#9FB3CA}
+:root[data-theme="dark"] .mai-opt:hover{background:#15304F} :root[data-theme="dark"] .mai-opt.on{background:#12394A;border-color:#1F6B72}
+:root[data-theme="dark"] .mai-now{background:#12394A;color:#3CCFCF} :root[data-theme="dark"] .mai-foot{border-color:#1E3A5C} :root[data-theme="dark"] .mai-foot a{color:#3CCFCF}
+/* the host app's own form styles must not reach inside the panel */
+.mai .mai-pop label.mai-opt, .mai .mai-pop label.mai-fb{display:flex;flex-direction:row;align-items:center;font-weight:400;color:inherit;margin:0}
+.mai .mai-pop label.mai-fb{margin:10px 2px 8px}
+.mai .mai-pop input[type=radio], .mai .mai-pop input[type=checkbox]{width:16px;height:16px;min-height:0;min-width:0;padding:0;margin:0;flex:none;border:0;box-shadow:none;background:none}
+.mai .mai-pop h4, .mai .mai-pop p{letter-spacing:normal;text-transform:none}
+@media (max-width:640px){ .mai-chip .mai-m{display:none} .mai-chip{max-width:150px}
+  .mai-pop, .mai-pop.mai-up, .mai-pop.mai-left{position:fixed;left:12px;right:12px;top:72px;bottom:auto;width:auto;max-width:none;max-height:calc(100vh - 160px);overflow:auto} }`;
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  const short = n => String(n || '').replace(/ \(.*\)/, '').replace(/^Google /, '').replace(/^Anthropic /, '');
+  const mshort = m => String(m || '').split('/').pop().replace(/:free$/, '');
+  const lsGet = (k, d) => { try{ const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; }catch(e){ return d; } };
+  const mounts = [];
+  function state(){
+    const s = MoneyAI.aiSettings(), w = lsGet('money-ai-working', {});
+    const answering = MoneyAI.aiStatus();                      // the ones that will be asked, in order
+    const inUse = answering.find(x=>!x.resting) || null;       // who answers the next question
+    // every AI that is set up, to pick from (not only the ones asked now)
+    const list = s.order.filter(id=>s.keys[id] && s.off.indexOf(id) < 0)
+      .map(id=>({id, name: MoneyAI.PROVIDERS.find(p=>p.id === id).name, model: (w[id] || {}).smart || '', resting: MoneyAI.resting(id)}));
+    return {s, list, inUse};
+  }
+  function chip(st){
+    const {list, inUse} = st;
+    const dot = !list.length ? '' : inUse ? 'good' : 'lim';
+    const name = !list.length ? 'set up' : inUse ? short(inUse.name) : 'resting';
+    const model = inUse && inUse.model ? mshort(inUse.model) : '';
+    const title = !list.length ? 'No AI set up yet — add a key in Setup'
+      : inUse ? `Answering: ${inUse.name}${inUse.model ? ' · ' + inUse.model : ''} (${st.s.first === 'auto' ? 'Auto — the best one available' : 'your choice'})` +
+        (list.length > 1 ? `\nStandby: ${list.filter(x=>x !== inUse).map(x=>short(x.name)).join(', ')}` : '') + '\nClick to switch'
+      : 'Every AI is at its free limit — they try again in a few minutes';
+    return {dot, name, model, title};
+  }
+  function popHTML(st){
+    const {s, list, inUse} = st;
+    const opt = (value, on, title, sub, dot, now) => `<label class="mai-opt${on ? ' on' : ''}"><input type="radio" name="mai-first-${value === 'auto' ? 'a' : 'p'}" data-first="${value}" ${on ? 'checked' : ''}>
+      ${dot !== null ? `<span class="mai-dot ${dot}"></span>` : ''}<span class="t"><b>${esc(title)}</b><small>${esc(sub)}</small></span>${now ? '<span class="mai-now">in use</span>' : ''}</label>`;
+    const rows = list.map(x=>opt(x.id, s.first === x.id, x.name, x.resting ? 'at its free limit — resting' : (x.model ? mshort(x.model) : 'best model picked on first use'), x.resting ? 'lim' : 'good', inUse && inUse.id === x.id));
+    return `<h4>Which AI answers</h4><p class="mai-sub">The same in all your apps.</p>
+      ${list.length ? opt('auto', s.first === 'auto', 'Auto', 'The best one that answers — free ones first', null, false) + rows.join('')
+        : '<p class="mai-sub">No AI set up yet.</p>'}
+      ${list.length > 1 ? `<label class="mai-fb"><input type="checkbox" data-fallback ${s.fallback ? 'checked' : ''}> If it fails or runs out, try the others</label>` : ''}
+      <div class="mai-foot"><a href="/setup/#ai">Keys and models — in Setup</a></div>`;
+  }
+  function draw(m){
+    const st = state(), c = chip(st);
+    m.btn.innerHTML = `<span class="mai-dot ${c.dot}"></span>AI <b>${esc(c.name)}</b>${c.model ? `<span class="mai-m">· ${esc(c.model)}</span>` : ''}`;
+    m.btn.title = c.title;
+    if(!m.pop.hidden) drawPop(m, st);
+  }
+  function drawPop(m, st){
+    m.pop.innerHTML = popHTML(st || state());
+    m.pop.querySelectorAll('[data-first]').forEach(r=>r.onchange = ()=>{
+      const h = MoneyAI.aiLocal(); h.first = r.dataset.first;
+      if(h.first !== 'auto') MoneyAI.wake(h.first);            // picked by hand: try it now
+      MoneyAI.saveAiLocal(h); if(typeof MoneyShared !== 'undefined') MoneyShared.markChanged();
+      window.dispatchEvent(new CustomEvent('moneyai-change'));
+    });
+    const fb = m.pop.querySelector('[data-fallback]');
+    if(fb) fb.onchange = ()=>{ const h = MoneyAI.aiLocal(); h.fallback = fb.checked; MoneyAI.saveAiLocal(h); if(typeof MoneyShared !== 'undefined') MoneyShared.markChanged(); window.dispatchEvent(new CustomEvent('moneyai-change')); };
+  }
+  function close(m){ m.pop.hidden = true; m.btn.setAttribute('aria-expanded', 'false'); }
+  window.addEventListener('moneyai-change', ()=>mounts.forEach(draw));
+  window.addEventListener('storage', e=>{ if(/^money-ai/.test(e.key || '')) mounts.forEach(draw); });   // changed in another tab
+  document.addEventListener('click', e=>mounts.forEach(m=>{ if(!m.root.contains(e.target)) close(m); }));
+  document.addEventListener('keydown', e=>{ if(e.key === 'Escape') mounts.forEach(close); });
+  setInterval(()=>mounts.forEach(draw), 60000);               // a resting service wakes up
+  return function(el, opts){
+    if(!el) return;
+    opts = opts || {};
+    if(!document.getElementById('mai-css')){ const st = document.createElement('style'); st.id = 'mai-css'; st.textContent = css; document.head.appendChild(st); }
+    el.innerHTML = '';
+    const root = document.createElement('div'); root.className = 'mai';
+    const btn = document.createElement('button'); btn.type = 'button'; btn.className = 'mai-chip' + (opts.chipClass ? ' ' + opts.chipClass : '');
+    btn.setAttribute('aria-haspopup', 'dialog'); btn.setAttribute('aria-expanded', 'false');
+    const pop = document.createElement('div'); pop.className = 'mai-pop' + (opts.up ? ' mai-up' : '') + (opts.left ? ' mai-left' : ''); pop.hidden = true; pop.setAttribute('role', 'dialog'); pop.setAttribute('aria-label', 'Which AI answers');
+    root.append(btn, pop); el.appendChild(root);
+    const m = {root, btn, pop};
+    btn.onclick = ()=>{ const open = pop.hidden; mounts.forEach(close); if(open){ pop.hidden = false; btn.setAttribute('aria-expanded', 'true'); drawPop(m); } };
+    for(let i = mounts.length - 1; i >= 0; i--) if(!document.contains(mounts[i].root)) mounts.splice(i, 1);   // the page redrew
+    mounts.push(m);
+    draw(m);
+    MoneyAI.loadAi().then(()=>draw(m)).catch(()=>{});
+    return m;
+  };
+})();
+
+// also as window properties, for bundled apps (the Expense Tracker) that cannot see script-level names
+if(typeof window !== 'undefined'){ window.MoneyAI = MoneyAI; window.MoneyShared = MoneyShared; }
 if(typeof module !== 'undefined'){ module.exports = MoneyAI; module.exports.MoneyShared = MoneyShared; }

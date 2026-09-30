@@ -385,6 +385,7 @@ function draw(et, ats, tv){
     <div class="topline"><div class="brand">${logo()}Money Home</div>
       <div class="chips"><span class="chip ${mk.on ? 'on' : ''}"><i></i>${esc(mk.text)}</span>
         <span class="chip">${esc(new Date().toLocaleDateString('en-IN', {weekday:'long', day:'numeric', month:'long'}))}</span>
+        <span id="ai-switch"></span>
         <a class="chip" href="/setup/" style="text-decoration:none">⚙ Setup</a></div></div>
     <div class="hero-grid"><div>
       <div class="hello">${hello}. Here is where you stand.</div>
@@ -511,6 +512,7 @@ function draw(et, ats, tv){
       <span style="display:flex;gap:8px"><button class="btn" id="re">Refresh</button><button class="btn" id="out">Sign out</button></span></div>
   </main>`;
   bindAsk();
+  if(typeof MoneyAI !== 'undefined' && MoneyAI.widget) MoneyAI.widget($('ai-switch'), {chipClass: 'chip'});   // which AI answers
   $('re').onclick = render;
   $('out').onclick = () => { try{ sessionStorage.removeItem(SESSION); }catch(_){} showLogin(); };
 }
