@@ -440,6 +440,8 @@ function draw(et, ats, tv){
     ledger: real ? {netWorth, corpus, targetLow: tLo, targetHigh: tHi, retire, yearsLeft, sip} : null,
     trips: ((tv && tv.trips) || []).map(t => ({name: t.name, city: t.city, start: t.start, end: t.end})).filter(t => t.start),
     docs: ((tv && tv.docs) || []).filter(d => d.fields && d.fields.validUntil).map(d => ({type: d.type, label: DOC_LABEL[d.type] || d.title || d.type, person: d.person, validUntil: d.fields.validUntil}))};
+  // the same, kept in this browser for the AI page (/ai/chat/: its "Your apps" connector) — never leaves the browser by itself
+  try{ localStorage.setItem('money-apps-snapshot', JSON.stringify({at: new Date().toISOString(), ctx: ASK.ctx, data: ASK.data})); }catch(e){}
 
   const hero = `<header class="hero"><div class="hero-in">
     <div class="topline"><div class="brand">${logo()}Money Home</div>
