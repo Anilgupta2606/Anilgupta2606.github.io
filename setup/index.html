@@ -278,7 +278,7 @@ function webCard(){
   const r = MoneyAI.aiLocal().relay || {};
   return `<section class="card" id="web">
     <h2><span class="n">4</span>Web search — so Ask can search the whole web</h2>
-    <p class="cap">Your relay searches the web and reads the pages for the apps (the search keys stay on Cloudflare, never in the browser). Set it up once with the steps in the AI project's README; then paste its address and your relay token here.</p>
+    <p class="cap">Ask searches the whole web and reads the pages. <b>On your Mac</b> it uses your own search engine (SearXNG) and reads pages on the Mac — no keys. <b>On your phone</b>, or if the Mac's helper is not running, it uses your Cloudflare relay (Tavily and Jina keys, kept on Cloudflare). Paste the relay's address and token once; this syncs to your other devices.</p>
     <div class="two"><label>Relay address<input id="rl-url" value="${esc(r.url || '')}" placeholder="https://money-relay.<you>.workers.dev" autocomplete="off" spellcheck="false"></label>
       <label>Relay token<input id="rl-tok" type="password" value="${esc(r.token || '')}" autocomplete="off"></label></div>
     <div class="row end"><button class="btn primary" id="rl-save">Save and test</button>${r.url ? '<button class="btn" id="rl-off">Remove</button>' : ''}<span class="note" id="rl-res">${WEBTEST ? esc(WEBTEST) : r.url ? 'Saved.' : ''}</span></div>
@@ -293,8 +293,11 @@ function bindWeb(){
     $('rl-res').textContent = 'Testing…';
     try{
       const R = MoneyWeb.relay({url, token}), hl = await R.health();
-      const s = await R.search('Reserve Bank of India repo rate', 3);
-      WEBTEST = '✓ Working — search by ' + s.provider + ' (' + s.results.length + ' results). Set up: ' + [hl.search.tavily ? 'Tavily ×' + hl.search.tavily : '', hl.search.serpapi ? 'SerpApi' : '', hl.search.google ? 'Google' : ''].filter(Boolean).join(', ') + '; reading by ' + hl.reader + '.';
+      const c = hl.cloud || {};
+      if(c.error) throw new Error('The relay: ' + c.error);
+      const cloudTest = await MoneyWeb.relay({url, token}, {local: false}).search('Reserve Bank of India repo rate', 3);
+      WEBTEST = (hl.local ? '✓ This Mac: your own search engine and page reading (used first). ' : 'This device has no Money AI helper (fine on a phone). ')
+        + '✓ Relay: search by ' + cloudTest.provider + ' (' + [c.search && c.search.tavily ? 'Tavily ×' + c.search.tavily : '', c.search && c.search.serpapi ? 'SerpApi' : '', c.search && c.search.google ? 'Google' : ''].filter(Boolean).join(', ') + '), reading by ' + (c.reader || 'Jina') + (hl.local ? ' (the backup here; the main one on your phone).' : '.');
     }catch(e){ WEBTEST = '✗ ' + e.message; }
     render();
   };
