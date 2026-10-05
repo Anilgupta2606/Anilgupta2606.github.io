@@ -93,6 +93,58 @@ function levels(points){
   return out;
 }
 
+// ADX (trend strength) with +DI/−DI (who is in control), Wilder's 14
+function adx(rows, n = 14){
+  if(rows.length < n * 3) return null;
+  let trS = 0, pS = 0, mS = 0; const dx = [];
+  for(let i = 1; i < rows.length; i++){
+    const r = rows[i], p = rows[i - 1], up = r.h - p.h, dn = p.l - r.l;
+    const tr = Math.max(r.h - r.l, Math.abs(r.h - p.c), Math.abs(r.l - p.c)), pdm = up > dn && up > 0 ? up : 0, mdm = dn > up && dn > 0 ? dn : 0;
+    if(i <= n){ trS += tr; pS += pdm; mS += mdm; } else { trS = trS - trS / n + tr; pS = pS - pS / n + pdm; mS = mS - mS / n + mdm; }
+    if(i >= n){ const pdi = 100 * pS / trS, mdi = 100 * mS / trS; dx.push({dx: 100 * Math.abs(pdi - mdi) / ((pdi + mdi) || 1), pdi, mdi}); }
+  }
+  let a = dx.slice(0, n).reduce((t, x)=>t + x.dx, 0) / n;
+  for(let i = n; i < dx.length; i++) a = (a * (n - 1) + dx[i].dx) / n;
+  const last = dx[dx.length - 1];
+  return {adx: a, pdi: last.pdi, mdi: last.mdi};
+}
+// Stochastic %K(14) and %D(3)
+function stochastic(rows, n = 14){
+  const k = [];
+  for(let i = n - 1; i < rows.length; i++){ const w = rows.slice(i - n + 1, i + 1), hi = Math.max(...w.map(x=>x.h)), lo = Math.min(...w.map(x=>x.l)); k.push(hi > lo ? (rows[i].c - lo) / (hi - lo) * 100 : 50); }
+  const d = k.slice(-3).reduce((t, x)=>t + x, 0) / Math.min(3, k.length);
+  return {k: k[k.length - 1], d};
+}
+// Supertrend(10, 3): direction and its trailing line
+function supertrend(rows, n = 10, mult = 3){
+  if(rows.length < n + 2) return null;
+  const tr = rows.map((r, i)=>i ? Math.max(r.h - r.l, Math.abs(r.h - rows[i - 1].c), Math.abs(r.l - rows[i - 1].c)) : r.h - r.l);
+  let atrv = tr.slice(1, n + 1).reduce((t, x)=>t + x, 0) / n, up = 0, dn = 0, dir = 1, line = 0;
+  for(let i = n; i < rows.length; i++){
+    if(i > n) atrv = (atrv * (n - 1) + tr[i]) / n;
+    const mid = (rows[i].h + rows[i].l) / 2, bu = mid + mult * atrv, bl = mid - mult * atrv;
+    up = i === n || bu < up || rows[i - 1].c > up ? bu : up;
+    dn = i === n || bl > dn || rows[i - 1].c < dn ? bl : dn;
+    if(dir === 1 && rows[i].c < dn) dir = -1; else if(dir === -1 && rows[i].c > up) dir = 1;
+    line = dir === 1 ? dn : up;
+  }
+  return {dir, line};
+}
+// candlestick patterns in the last three candles
+function candles3(rows){
+  const out = [], n = rows.length;
+  for(let i = Math.max(1, n - 3); i < n; i++){
+    const r = rows[i], p = rows[i - 1], body = Math.abs(r.c - r.o), range = (r.h - r.l) || 1e-9, upper = r.h - Math.max(r.c, r.o), lower = Math.min(r.c, r.o) - r.l;
+    const day = new Date(r.t).toISOString().slice(0, 10), downBefore = i >= 3 && rows[i - 3].c > p.c, upBefore = i >= 3 && rows[i - 3].c < p.c;
+    if(r.c > r.o && p.c < p.o && r.c >= p.o && r.o <= p.c) out.push({t: day, name: 'bullish engulfing', bull: true});
+    else if(r.c < r.o && p.c > p.o && r.o >= p.c && r.c <= p.o) out.push({t: day, name: 'bearish engulfing', bull: false});
+    else if(lower >= 2 * body && upper <= body && downBefore) out.push({t: day, name: 'hammer (possible bounce)', bull: true});
+    else if(upper >= 2 * body && lower <= body && upBefore) out.push({t: day, name: 'shooting star (possible top)', bull: false});
+    else if(body <= range * 0.1) out.push({t: day, name: 'doji (indecision)', bull: null});
+  }
+  return out;
+}
+
 /* ---------------------------------------------------------------- the report */
 const fmt = (x, d) => x == null || !isFinite(x) ? '—' : Number(x).toLocaleString('en-IN', {minimumFractionDigits: d == null ? 2 : d, maximumFractionDigits: d == null ? 2 : d});
 const pct = x => (x >= 0 ? '+' : '') + fmt(x * 100) + '%';
@@ -146,6 +198,22 @@ export async function analyse(query, timeframe){
   if(downRun >= 3) notes.push(`${downRun} ${unit}s down in a row`);
   if(upRun >= 3) notes.push(`${upRun} ${unit}s up in a row`);
   if(last.v && vol20 && last.v > vol20 * 1.5) notes.push(`last ${unit}'s volume was ${fmt(last.v / vol20, 1)}× its 20-${unit} average`);
+  // trend strength, momentum, the trailing line, candles
+  const ax = adx(rows), st = stochastic(rows), sup = supertrend(rows), cds = candles3(rows);
+  if(ax){ if(ax.adx >= 25) (ax.pdi > ax.mdi ? bull : bear).push(`ADX ${fmt(ax.adx, 1)}: a strong trend with ${ax.pdi > ax.mdi ? 'buyers' : 'sellers'} in control (+DI ${fmt(ax.pdi, 1)}, −DI ${fmt(ax.mdi, 1)})`); else notes.push(`ADX ${fmt(ax.adx, 1)}: ${ax.adx < 20 ? 'no clear trend (a range market)' : 'a weak trend'}`); }
+  if(sup) (sup.dir === 1 ? bull : bear).push(`Supertrend ${sup.dir === 1 ? 'up — its trailing stop' : 'down — it would turn up above'} ${fmt(sup.line)}`);
+  if(st.k < 20) notes.push(`Stochastic %K ${fmt(st.k, 1)} / %D ${fmt(st.d, 1)}: oversold`); else if(st.k > 80) notes.push(`Stochastic %K ${fmt(st.k, 1)} / %D ${fmt(st.d, 1)}: overbought`);
+  cds.forEach(c=>{ if(c.bull === true) bull.push(c.name + ' on ' + c.t); else if(c.bull === false) bear.push(c.name + ' on ' + c.t); else notes.push(c.name + ' on ' + c.t); });
+  // the bigger picture: the weekly trend (for a daily view), and against the Nifty over 3 months (for a share)
+  let weekly = '', rs = '';
+  if(timeframe === 'day'){
+    try{ const w = (await candles(symbol, 'week')).rows, wc = w.map(r=>r.c), wn = wc.length - 1, w20 = sma(wc, 20, wn), w50 = sma(wc, 50, wn);
+      if(w20 && w50){ const up = wc[wn] > w20 && w20 > w50, down = wc[wn] < w20 && w20 < w50; weekly = up ? 'up (above its 20- and 50-week averages)' : down ? 'down (below its 20- and 50-week averages)' : 'mixed (between its 20- and 50-week averages)'; (up ? bull : down ? bear : notes).push('weekly trend ' + weekly); } }catch(e){}
+    if(!/^\^|=|-USD$/.test(symbol)){
+      try{ const nf = (await candles('^NSEI', 'day')).rows.map(r=>r.c), k = per.m3, my = ret(k), idx = nf.length > k ? nf[nf.length - 1] / nf[nf.length - 1 - k] - 1 : null;
+        if(my != null && idx != null){ rs = `3 months: ${pct(my)} against the Nifty 50's ${pct(idx)} — ${my > idx ? 'stronger than the market' : 'weaker than the market'}`; (my > idx ? bull : bear).push('relative strength: ' + (my > idx ? 'beating' : 'lagging') + ' the Nifty over 3 months'); } }catch(e){}
+    }
+  }
   const lean = bear.length > bull.length + 1 ? 'bearish' : bull.length > bear.length + 1 ? 'bullish' : 'mixed';
   const S1 = below[0], S2 = below[1], R1 = above[0];
   const scen = [];
@@ -166,6 +234,10 @@ export async function analyse(query, timeframe){
     `Structure: ${struct}.`,
     `Support (turning points below): ${below.length ? below.map(x=>fmt(x.p) + (x.n > 1 ? ' (touched ' + x.n + '×)' : '')).join(', ') : 'none nearby; the 52-week low ' + fmt(lo52)}. Resistance above: ${above.length ? above.map(x=>fmt(x.p) + (x.n > 1 ? ' (touched ' + x.n + '×)' : '')).join(', ') : 'none nearby; the 52-week high ' + fmt(hi52)}.`,
     `Bearish signs: ${bear.join('; ') || 'none'}. Bullish signs: ${bull.join('; ') || 'none'}. Overall the indicators lean ${lean}.`,
+    ax || st ? `Trend strength and momentum: ${ax ? 'ADX ' + fmt(ax.adx, 1) + ' (+DI ' + fmt(ax.pdi, 1) + ', −DI ' + fmt(ax.mdi, 1) + '); ' : ''}Stochastic %K ${fmt(st.k, 1)}, %D ${fmt(st.d, 1)}${sup ? '; Supertrend ' + (sup.dir === 1 ? 'up, trailing stop ' : 'down, turns up above ') + fmt(sup.line) : ''}.` : '',
+    cds.length ? `Recent candles: ${cds.map(c=>c.name + ' (' + c.t + ')').join('; ')}.` : '',
+    weekly ? `Weekly trend: ${weekly}.` : '',
+    rs ? `Against the market: ${rs}.` : '',
     notes.length ? `Notes: ${notes.join('; ')}.` : '',
     `What would decide it: ${scen.join(' ')}`,
     `(Indicators describe the past; they are not a forecast or advice.)`,

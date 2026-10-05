@@ -493,6 +493,7 @@ Rules: ${Object.values(RULES).join('; ')}.${(m=>m.length ? '\nMistakes you made 
     R10: 'Something dated after today has not happened yet',
     R11: 'Something dated before today has already happened',
     R12: 'Every claim must be backed by what was read',
+    R13: 'No promised returns: never "guaranteed", "sure-shot" or "will definitely"',
   };
   // dates written in a sentence ("5 to 7 October 2026", "October 5, 2026", "2026-10-05") -> [Date]
   const MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
@@ -590,6 +591,9 @@ Rules: ${Object.values(RULES).join('; ')}.${(m=>m.length ? '\nMistakes you made 
       const missing = names.filter(w=>!srcL.includes(w.toLowerCase()) && !w.split(' ').every(x=>srcL.includes(x.toLowerCase())));
       if(missing.length) out.push({rule: 'R8', text: 'Not in any source read: ' + missing.slice(0, 4).join(', ') + '.'});
     }
+    // R13: no promised returns (markets: analysis, never a promise)
+    const promise = /\b(guaranteed (returns?|profits?|gains?)|sure[- ]shot|will definitely (rise|go up|fall|go down|double|give)|risk[- ]free (returns?|profits?)|can'?t lose|100% (safe|sure|certain))\b/i.exec(bare);
+    if(promise && !/\b(no|not|never|nothing is)\b[^.]{0,30}$/i.test(bare.slice(0, promise.index))) out.push({rule: 'R13', text: '"' + promise[0] + '" promises a result — markets give no guarantees; say what could happen and the risk.'});
     // R9: answer once
     const sents = sentencesOf(bare).map(x=>x.trim().toLowerCase()).filter(x=>x.length >= 25);
     if(/\bfinal answer\b/i.test(text) || sents.length !== new Set(sents).size) out.push({rule: 'R9', text: 'Say it once — remove the "Final answer" part and repeated sentences.'});
