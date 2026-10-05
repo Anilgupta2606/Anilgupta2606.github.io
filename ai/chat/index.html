@@ -323,6 +323,11 @@ code{font-family:var(--mono); font-size:.85em; background:var(--page2); padding:
 .close{float:right}
 @media (prefers-reduced-motion: reduce){ *{animation:none!important; transition:none!important} }
 @media (max-width:600px){ .pill.model{max-width:48vw; overflow:hidden; text-overflow:ellipsis; display:inline-block} .q div{max-width:92%} .hint span:first-child{display:none} }
+  .urow{padding:10px 0;border-bottom:1px solid var(--line)}
+  .uhead{display:flex;justify-content:space-between;gap:10px;align-items:baseline;flex-wrap:wrap}
+  .uhead small,.urow>small{color:var(--mut);font-size:12.5px;line-height:1.5}
+  .ubar{height:6px;border-radius:3px;background:var(--line);margin:6px 0 4px;overflow:hidden}
+  .ubar i{display:block;height:100%;background:var(--search)}
 </style>
 </head>
 <body>
@@ -334,6 +339,7 @@ code{font-family:var(--mono); font-size:.85em; background:var(--page2); padding:
   <div class="sbnav">
     <button class="navbtn" id="openTasks" type="button"><i>⏰</i>Scheduled</button>
     <button class="navbtn" id="openConn" type="button"><i>🔌</i>Connectors</button>
+    <button class="navbtn" id="openUsage" type="button"><i>📊</i>Usage</button>
     <button class="navbtn" id="openLearned" type="button"><i>✦</i><span>What it learned</span><b class="count" id="learnedCount" hidden></b></button>
   </div>
   <div class="acct">
@@ -414,6 +420,13 @@ code{font-family:var(--mono); font-size:.85em; background:var(--page2); padding:
   <h2>Scheduled</h2>
   <p class="sub">A question asked for you at a time — "every weekday at 9:15, a Nifty summary". Each result lands in its own chat (⏰) with a notification on your Mac. Runs while the Mac is awake; a time it slept through runs when it wakes.</p>
   <div id="tasks"></div>
+</aside>
+<aside class="panel" id="usagePanel" aria-label="Model usage">
+  <button class="ghost close" id="closeUsage">Close</button>
+  <h2>Usage</h2>
+  <p class="sub">Which models answered, how often and how much — kept on your Mac. Tokens are counted by Ollama for the models on this Mac and estimated for Apple, ChatGPT and cloud ones.</p>
+  <div class="two" style="margin:10px 0"><select id="usageDays" aria-label="Period"><option value="1">Today</option><option value="7">7 days</option><option value="30" selected>30 days</option><option value="365">A year</option></select></div>
+  <div id="usage"></div>
 </aside>
 <aside class="panel" id="connPanel" aria-label="Connectors">
   <button class="ghost close" id="closeConn">Close</button>
@@ -744,7 +757,7 @@ async function openPicker(){
   const cloud = info.cloud && info.cloud.length ? info.cloud : (typeof MoneyAI !== 'undefined' ? Object.keys(browserKeys()) : []);
   const privateOk = typeof MoneyAI !== 'undefined' && !LOCAL_PAGE;
   const item = (p, icon, title, sub) => `<button type="button" role="menuitem" data-p='${esc(JSON.stringify(p))}' class="${JSON.stringify(p) === JSON.stringify(pick) ? 'on' : ''}"><i>${icon}</i><span><b>${esc(title)}</b><small>${esc(sub)}</small></span></button>`;
-  box.innerHTML = item({kind: 'auto'}, '✦', 'Auto (recommended)', 'The right model for each question: general, code, pictures, hard questions')
+  box.innerHTML = item({kind: 'auto'}, '✦', 'Auto (recommended)', info.apple && info.apple.chatgpt ? 'The right model for each question: ChatGPT (through Siri) for money, hard questions and code; Apple Private Cloud for web answers; this Mac for your files, chat and pictures' : 'The right model for each question: general, code, pictures, hard questions')
     + (cloud.length >= 2 ? item({kind: 'council'}, '🏛', 'Best answer (council)', 'Research here, then two top cloud models write it and an editor merges them — the most reliable') : '')
     + (info.local.length ? '<h6>On this Mac</h6>' + info.local.map(m=>item({kind: 'local', model: m.name}, '💻', m.name, (m.role ? m.role + ' · ' : '') + m.gb + ' GB')).join('') : '')
     + (info.apple && (info.apple.apple || info.apple.chatgpt || info.apple.pcc) ? '<h6>Apple Intelligence</h6>'
@@ -887,8 +900,8 @@ document.querySelectorAll('.tries button').forEach(b=>b.onclick = () => ask(b.da
 const openPanel = on => { $('#panel').classList.toggle('open', on); $('#scrim').classList.toggle('open', on); if(on) loadLearned(); };
 $('#openLearned').onclick = () => openPanel(true);
 $('#closeLearned').onclick = () => openPanel(false);
-$('#scrim').onclick = () => { openPanel(false); openConn(false); openChats(false); openTasks(false); };
-document.addEventListener('keydown', e=>{ if(e.key === 'Escape'){ openPanel(false); openConn(false); openChats(false); openTasks(false); } });
+$('#scrim').onclick = () => { openUsage(false); openPanel(false); openConn(false); openChats(false); openTasks(false); };
+document.addEventListener('keydown', e=>{ if(e.key === 'Escape'){ openUsage(false); openPanel(false); openConn(false); openChats(false); openTasks(false); } });
 $('#clear').onclick = () => newChat();
 /* ---------------------------------------------------------------- files you attach: read here, in this browser
    (text as it is; a PDF's text with Mozilla's pdf.js), then sent with the question as numbered sources */
@@ -1071,6 +1084,7 @@ async function runCommand(line){
   else if(c === '/new') newChat();
   else if(c === '/chats' || c === '/resume') openChats(true);
   else if(c === '/schedule') openTasks(true);
+  else if(c === '/data-usage' || c === '/usage') openUsage(true);
   else if(c === '/deep'){ if(arg) ask(arg, {deep: true}); else toast('Write the question after /deep'); }
   else if(c === '/image'){ if(arg) ask('Generate an image of ' + arg); else toast('Describe the picture after /image'); }
   else if(c === '/help'){ const el = turnEl('/help'); finish(el, '/help', {text: COMMANDS.map(x=>'- `' + x.c + (x.a ? ' ' + x.a : '') + '` — ' + x.d).join('\n'), model: 'Commands', by: 'Type / in the box to see these'}, []); }
@@ -1194,6 +1208,20 @@ async function loadTasks(){
   box.querySelectorAll('[data-run]').forEach(b=>b.onclick = async () => { await post('/task', {id: b.dataset.run, run: true}); toast('Running — the result will appear in its ⏰ chat'); setTimeout(loadChats, 60000); });
   $('#tform').onsubmit = async e => { e.preventDefault(); const r = await post('/task', {prompt: $('#tp').value, time: $('#tt').value, days: $('#td').value, cloud: $('#tc').checked}).catch(()=>null); toast(r && r.id ? 'Scheduled' : 'Could not schedule that'); loadTasks(); };
 }
+async function loadUsage(){
+  const box = $('#usage');
+  if(mode !== 'mac'){ box.innerHTML = '<p class="sub">Usage is kept by the helper on your Mac. Open this page on the Mac to see it.</p>'; return; }
+  let u = null; try{ u = await fetch(HELPER + '/usage?days=' + $('#usageDays').value).then(r=>r.json()); }catch(e){}
+  if(!u || !u.models || !u.models.length){ box.innerHTML = '<p class="sub">No model has answered in this period yet.</p>'; return; }
+  const n = x => x >= 1e6 ? (x / 1e6).toFixed(1) + 'M' : x >= 1e3 ? (x / 1e3).toFixed(1) + 'k' : String(x);
+  const max = Math.max(...u.models.map(m=>m.calls));
+  box.innerHTML = '<h3>Models</h3>' + u.models.map(m=>`<div class="urow"><div class="uhead"><b>${esc(m.model)}</b><small>${esc(m.by)}</small></div><div class="ubar"><i style="width:${Math.max(3, m.calls / max * 100)}%"></i></div><small>${m.calls} call${m.calls === 1 ? '' : 's'} · ${m.today} today · ${m.images ? m.images + ' picture' + (m.images === 1 ? '' : 's') : n(m.in) + ' in / ' + n(m.out) + ' out tokens'}${m.ms ? ' · ' + (m.ms / m.calls / 1000).toFixed(1) + 's a call' : ''}<br>${esc(Object.entries(m.roles).map(([r, c])=>r + ' ' + c).join(' · '))}</small></div>`).join('')
+    + '<h3>Who wrote the answers</h3>' + u.writers.map(w=>`<div class="urow"><div class="uhead"><b>${esc(w.writer)}</b><small>${w.answers} answer${w.answers === 1 ? '' : 's'} · ${Math.round(w.secs / w.answers)}s on average</small></div><small>${esc(Object.entries(w.kinds).map(([k, c])=>k + ' ' + c).join(' · '))}</small></div>`).join('');
+}
+const openUsage = on => { $('#usagePanel').classList.toggle('open', on); $('#scrim').classList.toggle('open', on); if(on){ openChats(false); loadUsage(); } };
+$('#openUsage').onclick = () => openUsage(true);
+$('#closeUsage').onclick = () => openUsage(false);
+$('#usageDays').onchange = loadUsage;
 const openTasks = on => { $('#taskPanel').classList.toggle('open', on); $('#scrim').classList.toggle('open', on); if(on){ openChats(false); loadTasks(); } };
 $('#openTasks').onclick = () => openTasks(true);
 $('#closeTasks').onclick = () => openTasks(false);

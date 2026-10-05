@@ -123,6 +123,9 @@ const MoneyAsk = (function(){
     // ---- money in and out (the Expense Tracker)
     const moneyQ = /\bspen[dt]|\bspending|\bexpens|\bcost me|\bpaid\b|\bkharch|\bwent (to|on)\b|\bhow much (on|for|at|to)\b|\btotal (on|for)\b|\bearn|\bincome|\bsalary|\breceived|\bgot paid|\binvest|\bsav(e|ed|ing|ings)\b|\bwhere did (my|the) money go|\bbreakdown\b|\bbiggest\b|\bmost on\b|\btop (categories|spends?)/.test(q);
     if(!moneyQ) return null;
+    // only questions about YOUR money: "is it paid or free?", "the paid plan", "how do salaries work" are not about your statements
+    if(/\b(paid or free|free or paid|free (tier|plan|version|limit)|paid (plan|tier|version|thing|feature|service|app)|pricing|price plan|is (it|this|that) (paid|free))\b/.test(q)) return null;
+    if(!/\b(i|i'm|i've|my|me|mine|we|we've|our|us)\b/.test(q) && !/\bspending\b|\bexpenses\b|\bkharch|\bhow much (on|for|at|to|went)\b|\bwent (to|on)\b|\btotal (on|for)\b|\bbreakdown\b|\bmost on\b|\btop (categories|spends?)\b|\b(january|february|march|april|may|june|july|august|september|october|november|december|last month|this month|last year|this year)\b/.test(q)) return null;
     if(!txns.length) return say('The Expense Tracker has no statements in this browser yet — upload one there and ask again.');
     const firstData = txns.reduce((m, t)=>!m || t.date < m ? t.date : m, '');
     const named = catOf(q).length || Array.from(new Set(txns.map(t=>t.merchantName).filter(Boolean))).some(m=>{ const w = String(m).toLowerCase().split(/[^a-z0-9]+/).filter(x=>x.length >= 4)[0]; return w && q.includes(' ' + w); });
