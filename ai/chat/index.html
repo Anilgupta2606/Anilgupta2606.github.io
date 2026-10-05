@@ -75,6 +75,7 @@ body{padding-left:var(--sb)}
 .chat:hover{background:var(--page)} .chat.cur{background:var(--think-bg); color:var(--ink); font-weight:600}
 .chat .ct{flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
 .chat .src{font-size:11px; color:var(--mut); flex:none}
+.clearall{display:block; margin:16px 8px 6px; font-size:12.5px; color:var(--mut)} .clearall.danger{color:var(--err); font-weight:600}
 .chat.hit{align-items:flex-start} .chat.hit .ct{white-space:normal} .chat.hit b{display:block; font-weight:600; font-size:13px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap} .chat.hit small{display:block; font-size:12px; color:var(--mut); line-height:1.35; max-height:2.7em; overflow:hidden}
 .chat .del{border:0; background:none; color:var(--mut); cursor:pointer; font-size:15px; width:24px; height:24px; border-radius:7px; visibility:hidden; flex:none}
 .chat:hover .del,.chat.cur .del{visibility:visible} .chat .del:hover{color:var(--check); background:var(--check-bg)}
@@ -645,7 +646,7 @@ async function ask(q, opt){
       out.secs = Math.round((Date.now() - t0) / 1000);
       done(out);
     } else {
-      const r = await fetch(HELPER + '/ask', {method: 'POST', headers: {'content-type': 'application/json'}, signal: ctl.signal, body: JSON.stringify({question: q, history: turns, cloud: cloudKeys(), fresh: !!opt.fresh, attachments: files.map(f=>f.image ? {name: f.name, image: f.image} : f), goal, disabled, lastKind: (history.length && history[history.length - 1].answer.kind) || ''})});
+      const r = await fetch(HELPER + '/ask', {method: 'POST', headers: {'content-type': 'application/json'}, signal: ctl.signal, body: JSON.stringify({question: q, deep: !!opt.deep, history: turns, cloud: cloudKeys(), fresh: !!opt.fresh, attachments: files.map(f=>f.image ? {name: f.name, image: f.image} : f), goal, disabled, lastKind: (history.length && history[history.length - 1].answer.kind) || ''})});
       if(!r.ok) throw new Error((await r.json().catch(()=>({}))).error || 'It answered ' + r.status);
       const reader = r.body.getReader(), dec = new TextDecoder();
       let buf = '', out = null;
@@ -971,6 +972,7 @@ const COMMANDS = [
   {c: '/theme', a: 'auto | light | dark', d: 'Change the look'},
   {c: '/schedule', a: '', d: 'Scheduled tasks — a question asked for you every day at a time'},
   {c: '/image', a: 'a description', d: 'Make a picture from a description'},
+  {c: '/deep', a: 'a hard question', d: 'Deep mode: the bigger model on your Mac, a plan, thinking it through (slower)'},
   {c: '/chats', a: '', d: 'Your past chats — open one to carry on (also /resume)'},
   {c: '/new', a: '', d: 'Start a new chat (the last one stays in Chats)'},
   {c: '/help', a: '', d: 'Show all commands'},
@@ -1012,6 +1014,7 @@ async function runCommand(line){
   else if(c === '/new') newChat();
   else if(c === '/chats' || c === '/resume') openChats(true);
   else if(c === '/schedule') openTasks(true);
+  else if(c === '/deep'){ if(arg) ask(arg, {deep: true}); else toast('Write the question after /deep'); }
   else if(c === '/image'){ if(arg) ask('Generate an image of ' + arg); else toast('Describe the picture after /image'); }
   else if(c === '/help'){ const el = turnEl('/help'); finish(el, '/help', {text: COMMANDS.map(x=>'- `' + x.c + (x.a ? ' ' + x.a : '') + '` — ' + x.d).join('\n'), model: 'Commands', by: 'Type / in the box to see these'}, []); }
   else { toast('No such command — type / to see them'); return true; }
@@ -1074,7 +1077,13 @@ function drawChats(){
     if(g !== last){ html += `<h6>${g}</h6>`; last = g; }
     html += `<div class="chat${c.id === sessionId ? ' cur' : ''}" data-id="${esc(c.id)}" title="${esc(c.title || '')}${c.source === 'terminal' ? ' (from the terminal)' : ''}"><span class="ct">${esc(c.title || 'Untitled')}</span>${c.source === 'terminal' ? '<span class="src" title="From the terminal">⌘</span>' : c.source === 'task' ? '<span class="src" title="A scheduled task">⏰</span>' : ''}<button class="del" type="button" aria-label="Delete this chat" data-del="${esc(c.id)}">×</button></div>`;
   }
-  box.innerHTML = html;
+  box.innerHTML = html + (f ? '' : `<button class="link clearall" id="clearAll" type="button">Delete all chats</button>`);
+  const ca = box.querySelector('#clearAll');
+  if(ca) ca.onclick = async () => {
+    if(!ca.dataset.sure){ ca.dataset.sure = '1'; ca.textContent = 'Click again to delete all ' + chatCache.length + ' chats — this cannot be undone'; ca.classList.add('danger'); setTimeout(()=>{ if(ca.isConnected){ delete ca.dataset.sure; ca.textContent = 'Delete all chats'; ca.classList.remove('danger'); } }, 5000); return; }
+    if(mode === 'mac'){ try{ await post('/session', {all: true, delete: true}); }catch(e){} }
+    store.set('ai.sessions', {}); newChat(true); await loadChats(); toast('All chats deleted');
+  };
   box.querySelectorAll('.chat').forEach(el=>el.onclick = e => { if(e.target.closest('.del')) return; openChat(el.dataset.id); });
   box.querySelectorAll('[data-del]').forEach(b=>b.onclick = async () => {
     const id = b.dataset.del;
