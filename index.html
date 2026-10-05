@@ -194,6 +194,9 @@ const TRAVEL_DOC = ['boarding-pass', 'flight', 'hotel', 'train', 'bus', 'visa', 
 const DOC_LABEL = {passport: 'Passport', aadhaar: 'Aadhaar', pan: 'PAN card', licence: 'Driving licence', 'voter-id': 'Voter ID', tax: 'Tax papers', bank: 'Bank statement',
   investment: 'Investment statement', insurance: 'Insurance', property: 'Property / rent', vehicle: 'Vehicle papers', medical: 'Medical', education: 'Education', employment: 'Employment', bill: 'Bill / warranty', other: 'Other'};
 function personalDocs(tv){ return ((tv && tv.docs) || []).filter(d=>TRAVEL_DOC.indexOf(d.type) < 0); }
+/* a trip's own documents, as Trip Vault counts them: travel papers, or a passport / travel insurance / unsorted one
+   attached to it - never Aadhaar, PAN, bank and the other personal ones, even when attached to a trip */
+const isTripDoc = d => !!d && (TRAVEL_DOC.indexOf(d.type) >= 0 || (!!d.tripId && ['passport', 'insurance', 'other'].indexOf(d.type) >= 0));
 const SESSION = 'money-home-session';
 const ICON = {
   ats:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19V9M10 19V5M16 19v-7M22 19H2"/></svg>',
@@ -426,7 +429,7 @@ function draw(et, ats, tv){
   }
   if(tv && (tv.trips || []).length){
     const today = new Date().toISOString().slice(0, 10);
-    const trips = tv.trips.map(t => { const docs = (tv.docs || []).filter(d => d.tripId === t.id);
+    const trips = tv.trips.map(t => { const docs = (tv.docs || []).filter(d => d.tripId === t.id && isTripDoc(d));
       const fl = [].concat(...docs.map(d => ((d.fields || {}).segments || []))).filter(x => x.flight).map(x => `${x.flight} ${x.from}→${x.to} ${x.date || ''} ${x.dep || ''}`.trim());
       const hotels = docs.filter(d => d.type === 'hotel').map(d => (d.fields || {}).hotelName || d.title);
       return {t, fl, hotels, n: docs.length}; }).filter(x => !x.t.end || x.t.end >= today).slice(0, 4);
@@ -540,7 +543,7 @@ function draw(et, ats, tv){
   let tripBody;
   const today = new Date().toISOString().slice(0, 10);
   if(tv && (tv.trips || []).length){
-    const span = t => { const ds = []; (tv.docs || []).filter(d => d.tripId === t.id).forEach(d => { const f = d.fields || {};
+    const span = t => { const ds = []; (tv.docs || []).filter(d => d.tripId === t.id && isTripDoc(d)).forEach(d => { const f = d.fields || {};
       (f.segments || []).forEach(x => x.date && ds.push(x.date)); ['checkIn', 'checkOut', 'date'].forEach(k => /^\d{4}-\d{2}-\d{2}$/.test(f[k] || '') && ds.push(f[k])); });
       ds.sort(); return {start: t.start || ds[0] || '', end: t.end || ds[ds.length - 1] || ''}; };
     const trips = tv.trips.map(t => Object.assign({}, t, span(t)));
@@ -548,7 +551,7 @@ function draw(et, ats, tv){
     const fmt = d => d ? new Date(d + 'T00:00:00').toLocaleDateString('en-IN', {day: 'numeric', month: 'short'}) : '';
     if(next){
       const days = next.start ? Math.round((Date.parse(next.start + 'T00:00:00') - Date.parse(today + 'T00:00:00')) / 86400000) : null;
-      const docs = (tv.docs || []).filter(d => d.tripId === next.id);
+      const docs = (tv.docs || []).filter(d => d.tripId === next.id && isTripDoc(d));
       const flights = docs.reduce((n, d) => n + ((d.fields || {}).segments || []).length, 0);
       tripBody = `<div class="kv">
         <div><div class="l">Next trip</div><div class="v" style="font-size:18px">${esc(next.name)}</div><div class="s">${esc([next.city, fmt(next.start) + (next.end && next.end !== next.start ? ' – ' + fmt(next.end) : '')].filter(Boolean).join(' · '))}</div></div>
