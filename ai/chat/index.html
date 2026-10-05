@@ -54,7 +54,14 @@ header.old{position:sticky; top:0; z-index:4; backdrop-filter:blur(14px); -webki
 .pill{display:inline-flex; align-items:center; gap:6px; font-size:12.5px; font-weight:600; padding:5px 11px; border-radius:999px; background:var(--card); border:1px solid var(--line); color:var(--ink2); white-space:nowrap}
 .pill i{width:7px; height:7px; border-radius:50%; background:var(--mut)}
 .pill.on i{background:var(--read)} .pill.off i{background:var(--check)}
-.pill.model{color:var(--think); background:var(--think-bg); border-color:transparent}
+.pill.model{color:var(--think); background:var(--think-bg); border-color:transparent; cursor:pointer; font:inherit; font-size:12.5px; font-weight:600}
+.pickwrap{position:relative}
+.picker{position:absolute; right:0; top:38px; width:330px; max-height:70vh; overflow:auto; background:var(--card); border:1px solid var(--line); border-radius:16px; box-shadow:var(--shadow); padding:6px; z-index:9}
+.picker h6{font-size:11.5px; color:var(--mut); margin:10px 10px 4px; font-weight:700}
+.picker button{display:flex; width:100%; gap:10px; align-items:flex-start; text-align:left; border:0; background:none; padding:8px 10px; border-radius:10px; cursor:pointer; color:var(--ink)}
+.picker button:hover{background:var(--page)} .picker button.on{background:var(--think-bg)}
+.picker b{display:block; font-size:13.5px} .picker small{display:block; font-size:12px; color:var(--mut); line-height:1.35}
+.picker i{font-style:normal; width:20px; flex:none; text-align:center}
 .learnedBtn{background:var(--ink); color:var(--page); border:0; border-radius:999px; padding:7px 14px; font-size:13px; font-weight:600; cursor:pointer}
 
 /* layout: chats on the left (like Claude), the conversation in the middle */
@@ -345,7 +352,7 @@ code{font-family:var(--mono); font-size:.85em; background:var(--page2); padding:
   <button class="iconbtn menuBtn" id="sbOpen" type="button" aria-label="Open chats"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
   <div class="ctitle" id="chatTitle">New chat</div>
   <button class="iconbtn" id="exportChat" type="button" title="Export this chat (Markdown)" aria-label="Export this chat" hidden><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg></button>
-  <div class="where"><span class="pill" id="stWhere"><i></i>Starting</span><span class="pill" id="stSearch" hidden></span><span class="pill model" id="stModel" hidden></span></div>
+  <div class="where"><span class="pill" id="stWhere"><i></i>Starting</span><span class="pill" id="stSearch" hidden></span><span class="pickwrap"><button class="pill model" id="stModel" type="button" hidden aria-haspopup="true" title="Choose which AI answers"></button><div class="picker" id="picker" hidden role="menu"></div></span></div>
 </header>
 <section class="login" id="login" hidden>
   <form class="lcard" id="loginForm" autocomplete="on">
@@ -659,14 +666,14 @@ async function ask(q, opt){
         }catch(e){ step('ATS is not reachable — open ATS on this Mac to include your holdings'); }
       }
     }
-    if(mode === 'browser'){
+    if(mode === 'browser' || pick.kind === 'private'){
       const t0 = Date.now();
       opt_fresh = !!opt.fresh; opt_files = files;
       const out = await browserAnswer(q, turns, step);
       out.secs = Math.round((Date.now() - t0) / 1000);
       done(out);
     } else {
-      const r = await fetch(HELPER + '/ask', {method: 'POST', headers: {'content-type': 'application/json'}, signal: ctl.signal, body: JSON.stringify({question: q, deep: !!opt.deep, history: turns, cloud: cloudKeys(), fresh: !!opt.fresh, attachments: files.map(f=>f.image ? {name: f.name, image: f.image} : f), goal, disabled, lastKind: (history.length && history[history.length - 1].answer.kind) || ''})});
+      const r = await fetch(HELPER + '/ask', {method: 'POST', headers: {'content-type': 'application/json'}, signal: ctl.signal, body: JSON.stringify({question: q, deep: !!opt.deep, model: pick.kind === 'local' ? pick.model : undefined, provider: pick.kind === 'cloud' ? pick.provider : pick.kind === 'council' ? 'council' : undefined, history: turns, cloud: cloudKeys(), fresh: !!opt.fresh, attachments: files.map(f=>f.image ? {name: f.name, image: f.image} : f), goal, disabled, lastKind: (history.length && history[history.length - 1].answer.kind) || ''})});
       if(!r.ok) throw new Error((await r.json().catch(()=>({}))).error || 'It answered ' + r.status);
       const reader = r.body.getReader(), dec = new TextDecoder();
       let buf = '', out = null;
@@ -723,7 +730,31 @@ async function loadLearned(){
 }
 const pill = (id, text, cls) => { const p = $(id); p.hidden = false; p.className = 'pill ' + (cls || ''); p.innerHTML = (/model/.test(cls || '') ? '✦ ' : '<i></i>') + esc(text);
   $('#sbStatus').textContent = [$('#stWhere').textContent, $('#stModel').hidden ? '' : $('#stModel').textContent.replace('✦ ', '')].filter(Boolean).join(' · '); };
-const showModel = (text, ok) => { pill('#stModel', text, 'model'); $('#stModel').title = 'The AI model that answers' + (ok ? '' : ' (not set up)'); };
+/* ---------------------------------------------------------------- which AI answers (the picker) */
+// {kind: 'auto'} · {kind: 'local', model} · {kind: 'private'} · {kind: 'cloud', provider} · {kind: 'council'}
+let pick = store.get('ai.pick', {kind: 'auto'});
+const CLOUD_NAMES = {gemini: 'Google Gemini', groq: 'Groq — gpt-oss-120b (OpenAI\'s open model)', cerebras: 'Cerebras — gpt-oss-120b', mistral: 'Mistral', openrouter: 'OpenRouter (free models)', anthropic: 'Anthropic Claude'};
+let autoLabel = 'Auto';
+const pickLabel = () => pick.kind === 'auto' ? autoLabel : pick.kind === 'local' ? pick.model : pick.kind === 'private' ? 'Private AI (in this browser)' : pick.kind === 'council' ? 'Best answer (council)' : (CLOUD_NAMES[pick.provider] || pick.provider);
+async function openPicker(){
+  const box = $('#picker');
+  if(!box.hidden){ box.hidden = true; return; }
+  let info = {local: [], cloud: []};
+  if(mode === 'mac'){ try{ info = await fetch(HELPER + '/models').then(r=>r.json()); }catch(e){} }
+  const cloud = info.cloud && info.cloud.length ? info.cloud : (typeof MoneyAI !== 'undefined' ? Object.keys(browserKeys()) : []);
+  const privateOk = typeof MoneyAI !== 'undefined' && !LOCAL_PAGE;
+  const item = (p, icon, title, sub) => `<button type="button" role="menuitem" data-p='${esc(JSON.stringify(p))}' class="${JSON.stringify(p) === JSON.stringify(pick) ? 'on' : ''}"><i>${icon}</i><span><b>${esc(title)}</b><small>${esc(sub)}</small></span></button>`;
+  box.innerHTML = item({kind: 'auto'}, '✦', 'Auto (recommended)', 'The right model for each question: general, code, pictures, hard questions')
+    + (cloud.length >= 2 ? item({kind: 'council'}, '🏛', 'Best answer (council)', 'Research here, then two top cloud models write it and an editor merges them — the most reliable') : '')
+    + (info.local.length ? '<h6>On this Mac</h6>' + info.local.map(m=>item({kind: 'local', model: m.name}, '💻', m.name, (m.role ? m.role + ' · ' : '') + m.gb + ' GB')).join('') : '')
+    + (privateOk ? '<h6>In this browser</h6>' + item({kind: 'private'}, '🔒', 'Private AI', 'Runs inside this browser (WebGPU) — nothing leaves the device; set up in Setup') : '')
+    + (cloud.length ? '<h6>Cloud (your free keys)</h6>' + cloud.map(c=>item({kind: 'cloud', provider: c}, '☁', CLOUD_NAMES[c] || c, 'Research on this device, written by this model')).join('') : '');
+  box.hidden = false;
+  box.querySelectorAll('[data-p]').forEach(b=>b.onclick = () => { pick = JSON.parse(b.dataset.p); store.set('ai.pick', pick); box.hidden = true; showModel(null, true); toast('Answers now: ' + pickLabel()); });
+}
+$('#stModel').onclick = e => { e.stopPropagation(); openPicker(); };
+document.addEventListener('click', e=>{ if(!$('#picker').hidden && !e.target.closest('.pickwrap')) $('#picker').hidden = true; });
+const showModel = (text, ok) => { if(text != null && pick.kind === 'auto') autoLabel = 'Auto · ' + text; pill('#stModel', pickLabel() + ' ▾', 'model'); $('#stModel').title = 'Choose which AI answers' + (ok ? '' : ' (not set up)'); };
 
 /* ---------------------------------------------------------------- which way to answer */
 const post = (path, d) => fetch(HELPER + path, {method: 'POST', headers: {'content-type': 'application/json'}, body: JSON.stringify(d)}).then(r=>r.json());
@@ -762,7 +793,9 @@ async function browserAnswer(q, turns, step){
   const g = !opt_fresh && !opt_files.length && MoneyWeb.findGood(q);
   if(g) return {text: g.text, sources: g.sources || [], saved: true, model: 'Your saved answer', by: 'Your saved answer from ' + g.at + ' (you marked it 👍)'};
   const relayCfg = (MoneyAI.aiLocal() || {}).relay, hasAi = MoneyAI.aiAvailable();
-  const chat = hasAi ? (sys, t, o) => MoneyAI.chat(sys, t, o, ctl && ctl.signal) : null;
+  const only = pick.kind === 'private' ? ['webllm'] : pick.kind === 'cloud' ? [pick.provider] : null;
+  if(pick.kind === 'private') step('🔒 Your Private AI (in this browser) is answering — the first time, it takes a minute to load');
+  const chat = hasAi || only ? (sys, t, o) => MoneyAI.chat(sys, t, Object.assign({}, o, only ? {only} : {}), ctl && ctl.signal) : null;
   let quick = null;
   try{ quick = await MoneyWeb.answer(q, {factsOnly: !!(relayCfg && relayCfg.url)}); }catch(e){}
   if(quick && quick.kind !== 'not-found' && quick.kind !== 'read') return Object.assign({by: 'Worked out exactly · ' + quick.kind + ' (no AI)'}, quick);
