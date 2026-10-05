@@ -53,7 +53,10 @@ const MoneyWeb = (function(){
       return {kind: 'calculator', text: `From ${big(a)} to ${big(b)} in ${y} years is a CAGR of ${c.toFixed(2)}% a year.`, sources: []};
     }
     // lump sum: "5 lakh at 7% for 10 years", "what will 1 lakh become in 10 years at 12%"
-    if(/(\d+\.?\d*)\s*%/.test(q) && /(\d+)\s*(years?|yrs?)/.test(q) && /\b(grow|grows|become|becomes|be worth|invest|fd|fixed deposit|compound|compounded|compounding|maturity|lump ?sum|after)\b/.test(q) && (m = new RegExp(AMT, 'i').exec(q))){
+    // compound growth of one amount — not inflation, losing value, comparisons or other compounding than yearly (the model does those)
+    if(/(\d+\.?\d*)\s*%/.test(q) && /(\d+)\s*(years?|yrs?)/.test(q) && /\b(grow|grows|become|becomes|be worth|invest|fd|fixed deposit|compound|compounded|compounding|maturity|lump ?sum|after)\b/.test(q)
+      && !/\b(inflation|lose|loses|losing|lost|depreciat\w*|declin\w*|falls?|drops?|which|compare|comparison|versus|vs\.?|quarterly|monthly|half-?yearly|daily|or an?|today'?s money|purchasing power|real value)\b/i.test(q) && (m = new RegExp(AMT, 'i').exec(q))
+      && num(m[1]) >= 100 && num(m[1]) !== +(/(\d+\.?\d*)\s*%/.exec(q)[1])){
       const P = num(m[1]), rate = +(/(\d+\.?\d*)\s*%/.exec(q)[1]), years = +(/(\d+)\s*(years?|yrs?)/.exec(q)[1]);
       const fv = P * Math.pow(1 + rate / 100, years);
       return {kind: 'calculator', text: `${big(P)} at ${rate}% a year, compounded yearly, becomes ${inr(Math.round(fv))}${fv >= 1e5 ? ' (' + big(fv) + ')' : ''} in ${years} years (growth ${inr(Math.round(fv - P))}).`, sources: []};
