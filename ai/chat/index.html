@@ -733,7 +733,7 @@ const pill = (id, text, cls) => { const p = $(id); p.hidden = false; p.className
 /* ---------------------------------------------------------------- which AI answers (the picker) */
 // {kind: 'auto'} · {kind: 'local', model} · {kind: 'private'} · {kind: 'cloud', provider} · {kind: 'council'}
 let pick = store.get('ai.pick', {kind: 'auto'});
-const CLOUD_NAMES = {gemini: 'Google Gemini', groq: 'Groq — gpt-oss-120b (OpenAI\'s open model)', cerebras: 'Cerebras — gpt-oss-120b', mistral: 'Mistral', openrouter: 'OpenRouter (free models)', anthropic: 'Anthropic Claude'};
+const CLOUD_NAMES = {apple: 'Apple Intelligence (on this Mac)', chatgpt: 'ChatGPT (through Siri)', pcc: 'Apple Private Cloud', gemini: 'Google Gemini', groq: 'Groq — gpt-oss-120b (OpenAI\'s open model)', cerebras: 'Cerebras — gpt-oss-120b', mistral: 'Mistral', openrouter: 'OpenRouter (free models)', anthropic: 'Anthropic Claude'};
 let autoLabel = 'Auto';
 const pickLabel = () => pick.kind === 'auto' ? autoLabel : pick.kind === 'local' ? pick.model : pick.kind === 'private' ? 'Private AI (in this browser)' : pick.kind === 'council' ? 'Best answer (council)' : (CLOUD_NAMES[pick.provider] || pick.provider);
 async function openPicker(){
@@ -747,6 +747,10 @@ async function openPicker(){
   box.innerHTML = item({kind: 'auto'}, '✦', 'Auto (recommended)', 'The right model for each question: general, code, pictures, hard questions')
     + (cloud.length >= 2 ? item({kind: 'council'}, '🏛', 'Best answer (council)', 'Research here, then two top cloud models write it and an editor merges them — the most reliable') : '')
     + (info.local.length ? '<h6>On this Mac</h6>' + info.local.map(m=>item({kind: 'local', model: m.name}, '💻', m.name, (m.role ? m.role + ' · ' : '') + m.gb + ' GB')).join('') : '')
+    + (info.apple && (info.apple.apple || info.apple.chatgpt || info.apple.pcc) ? '<h6>Apple Intelligence</h6>'
+        + (info.apple.apple ? item({kind: 'cloud', provider: 'apple'}, '', 'Apple Intelligence (on this Mac)', 'Apple\'s on-device model — private and free; research is done here') : '')
+        + (info.apple.chatgpt ? item({kind: 'cloud', provider: 'chatgpt'}, '', 'ChatGPT (through Siri)', 'Siri\'s ChatGPT extension, through your Shortcut; research is done here') : '')
+        + (info.apple.pcc ? item({kind: 'cloud', provider: 'pcc'}, '', 'Apple Private Cloud', 'Apple\'s Private Cloud Compute, through your Shortcut') : '') : '')
     + (privateOk ? '<h6>In this browser</h6>' + item({kind: 'private'}, '🔒', 'Private AI', 'Runs inside this browser (WebGPU) — nothing leaves the device; set up in Setup') : '')
     + (cloud.length ? '<h6>Cloud (your free keys)</h6>' + cloud.map(c=>item({kind: 'cloud', provider: c}, '☁', CLOUD_NAMES[c] || c, 'Research on this device, written by this model')).join('') : '');
   box.hidden = false;
