@@ -620,7 +620,7 @@ async function ask(q, opt){
     finish(el, q, out, steps, traces);
     const imgs = out.images || [];
     if(imgs.length) Promise.all(imgs.map(im=>preview(im.b64))).then(p=>{ const h = history.find(x=>x.answer && x.answer.text === out.text); if(h){ h.answer.images = p.filter(Boolean).map(t=>({thumb: t})); store.set('moneyai.history', history); saveChat(); } });
-    history.push({q, answer: {text: out.text, sources: out.sources, read: out.read, by: out.by, secs: out.secs, model: out.model, chart: out.chart, trust: out.trust ? {confidence: out.trust.confidence, checked: out.trust.checked, ok: out.trust.ok} : undefined, saved: out.saved}, steps, traces: slim(traces)});
+    history.push({q, answer: {kind: out.kind, text: out.text, sources: out.sources, read: out.read, by: out.by, secs: out.secs, model: out.model, chart: out.chart, trust: out.trust ? {confidence: out.trust.confidence, checked: out.trust.checked, ok: out.trust.ok} : undefined, saved: out.saved}, steps, traces: slim(traces)});
     history = history.slice(-40).map((h, i, all)=>i < all.length - 8 ? Object.assign({}, h, {traces: (h.traces || []).map(t=>({kind: t.kind, title: t.title}))}) : h);
     store.set('moneyai.history', history);
     setTitle();
@@ -645,7 +645,7 @@ async function ask(q, opt){
       out.secs = Math.round((Date.now() - t0) / 1000);
       done(out);
     } else {
-      const r = await fetch(HELPER + '/ask', {method: 'POST', headers: {'content-type': 'application/json'}, signal: ctl.signal, body: JSON.stringify({question: q, history: turns, cloud: cloudKeys(), fresh: !!opt.fresh, attachments: files.map(f=>f.image ? {name: f.name, image: f.image} : f), goal, disabled})});
+      const r = await fetch(HELPER + '/ask', {method: 'POST', headers: {'content-type': 'application/json'}, signal: ctl.signal, body: JSON.stringify({question: q, history: turns, cloud: cloudKeys(), fresh: !!opt.fresh, attachments: files.map(f=>f.image ? {name: f.name, image: f.image} : f), goal, disabled, lastKind: (history.length && history[history.length - 1].answer.kind) || ''})});
       if(!r.ok) throw new Error((await r.json().catch(()=>({}))).error || 'It answered ' + r.status);
       const reader = r.body.getReader(), dec = new TextDecoder();
       let buf = '', out = null;
