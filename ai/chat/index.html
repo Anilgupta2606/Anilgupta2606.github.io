@@ -1270,6 +1270,9 @@ function start(){
   // the conversation so far comes back after a reload
   history.forEach(h=>{ if(h && h.answer){ const el = turnEl(h.q); finish(el, h.q, h.answer, h.steps || [], h.traces || []); } });
   ready = detect(); showGoal(); setTitle(); ready.then(loadChats); $('#q').focus();
+  // ?q=… (from a Siri Shortcut or a link): ask it at once, then tidy the address
+  const qs = new URLSearchParams(location.search).get('q');
+  if(qs && qs.trim()){ try{ history.length && newChat(true); }catch(e){} ask(qs.trim()); try{ window.history.replaceState(null, '', location.pathname); }catch(e){} }
 }
 if(signedIn()) start(); else { $('#login').hidden = false; $('#lu').focus(); }
 </script>
