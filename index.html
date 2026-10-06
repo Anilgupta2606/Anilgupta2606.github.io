@@ -188,6 +188,8 @@ const pct = (n, d = 2) => (n >= 0 ? '+' : '−') + Math.abs(n).toFixed(d) + '%';
 const ym = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
 const ymLabel = (m, style = 'long') => new Date(+m.slice(0, 4), +m.slice(5, 7) - 1, 1).toLocaleDateString('en-IN', {month: style, year: style === 'long' ? 'numeric' : undefined});
 const ago = ms => { const s = (Date.now() - ms) / 1000; return s < 90 ? 'just now' : s < 3600 ? Math.round(s / 60) + ' min ago' : s < 86400 ? Math.round(s / 3600) + ' h ago' : Math.round(s / 86400) + ' d ago'; };
+/* ATS's address on this device: the one it was linked from (your Mac's Tailscale address on the phone), else this Mac */
+const atsUrl = () => { const l = typeof Cloud !== 'undefined' && Cloud.atsLink(); return l && /^https?:\/\//.test(l.url || '') ? l.url.replace(/\/+$/, '') + '/' : LINKS.ats; };
 const LINKS = {ats:'http://localhost:8765/', exp:'/expenseTracker/', led:'/InvestmentPlan/', trip:'/tripManangement/'};
 /* Trip Vault's personal documents (its Document Vault): everything that is not a travel paper */
 const TRAVEL_DOC = ['boarding-pass', 'flight', 'hotel', 'train', 'bus', 'visa', 'car', 'activity'];
@@ -482,7 +484,7 @@ function draw(et, ats, tv){
     atsBody = `<div class="empty">Asking ATS on this Mac for today’s numbers…</div>`;
   } else {
     atsBody = `<div class="empty">${!Cloud.atsLink() ? 'Link ATS once from the Ledger (Import portfolio → Link ATS on this Mac) and your holdings show here, live.'
-      : 'ATS isn’t running on this device. It lives on your Mac — open it there to see today’s numbers.'}${real && plan.atsReadAt ? ` The Ledger last read it ${esc(ago(new Date(plan.atsReadAt).getTime()))}.` : ''}</div>`;
+      : 'ATS isn’t reachable from this device. It runs on your Mac, which must be on (from your phone: through Tailscale, linked with ATS → Holdings → Link this device).'}${real && plan.atsReadAt ? ` The Ledger last read it ${esc(ago(new Date(plan.atsReadAt).getTime()))}.` : ''}</div>`;
   }
 
   /* ----- Expense Tracker card + the month */
@@ -562,7 +564,7 @@ function draw(et, ats, tv){
 
   const card = (k, name, sub, status, body, cta) => `<section class="card" style="--c:var(--${k})">
     <div class="apphead"><span class="glyph">${ICON[k]}</span><div><h2>${name}</h2><p>${sub}</p></div>${status}</div>${body}
-    <a class="open" href="${LINKS[k]}" ${k === 'ats' ? 'target="_blank" rel="noopener"' : ''}>${cta} <span aria-hidden="true">→</span></a></section>`;
+    <a class="open" href="${esc(k === 'ats' ? atsUrl() : LINKS[k])}" ${k === 'ats' ? 'target="_blank" rel="noopener"' : ''}>${cta} <span aria-hidden="true">→</span></a></section>`;
 
   $('app').innerHTML = hero + `<main>
     <div class="apps">
