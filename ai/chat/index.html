@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>SmartHomeAI</title>
+<title>Cygnus AI</title>
 <meta name="theme-color" content="#f4f6ff">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@500;600;700&family=Figtree:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap">
@@ -381,7 +381,7 @@ main{max-width:800px; padding:22px 20px 170px}
 </head>
 <body>
 <aside class="sidebar" id="sidebar" aria-label="Chats and settings">
-  <div class="sbtop"><div class="brand"><div class="orb" id="orb"></div>SmartHomeAI</div><button class="iconbtn sbx" id="sbClose" type="button" aria-label="Close the menu">×</button></div>
+  <div class="sbtop"><div class="brand"><div class="orb" id="orb"></div>Cygnus AI</div><button class="iconbtn sbx" id="sbClose" type="button" aria-label="Close the menu">×</button></div>
   <button class="newchat" id="newChat" type="button"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>New chat</button>
   <input class="sbsearch" id="chatSearch" type="search" placeholder="Search chats" aria-label="Search chats">
   <nav class="chatlist" id="chats" aria-label="Your chats"></nav>
@@ -414,7 +414,7 @@ main{max-width:800px; padding:22px 20px 170px}
 <section class="login" id="login" hidden>
   <form class="lcard" id="loginForm" autocomplete="on">
     <div class="orb" style="--s:52px"></div>
-    <h1>Sign in to SmartHomeAI</h1>
+    <h1>Sign in to Cygnus AI</h1>
     <p class="sub">The same sign-in as the terminal (ai login) and your other apps.</p>
     <label>Username<input id="lu" autocomplete="username" required></label>
     <label>Password<input id="lp" type="password" autocomplete="current-password" required></label>
@@ -464,7 +464,7 @@ main{max-width:800px; padding:22px 20px 170px}
       <button type="button" data-in="cameraIn" role="menuitem" class="phoneOnly"><i>📷</i><span><b>Take a photo</b><small>With the camera</small></span></button>
     </div>
     <textarea id="q" rows="1" placeholder="Ask anything…  ( / for commands)" aria-label="Your question"></textarea>
-    <button class="clip talk" type="button" id="talk" aria-label="Voice mode: talk with SmartHomeAI" title="Voice mode — talk, and hear the answer" hidden><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 10v4M8 7v10M12 4v16M16 7v10M20 10v4"/></svg></button>
+    <button class="clip talk" type="button" id="talk" aria-label="Voice mode: talk with Cygnus AI" title="Voice mode — talk, and hear the answer" hidden><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 10v4M8 7v10M12 4v16M16 7v10M20 10v4"/></svg></button>
     <button class="clip mic" type="button" id="mic" aria-label="Speak your question" title="Speak (🎤)" hidden><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0014 0M12 18v3"/></svg></button>
     <button class="send" id="ask" aria-label="Ask"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg></button>
   </form>
@@ -814,7 +814,7 @@ let autoLabel = 'Auto';
 // the picture models (the relay's Cloudflare models, Pollinations, Image Playground) and Compare
 const IMG_PICK = [['auto', 'Auto pictures', 'FLUX.1 schnell; styles by Image Playground; backups when Cloudflare cannot (then Draw Things, DiffusionBee on this Mac)'], ['compare', 'Compare 4 models', 'FLUX.1 schnell, FLUX.2 klein 4B, SDXL Lightning, Pollinations — side by side'], ['compare-best', 'Compare the 4 best', 'FLUX.2 klein 9B, FLUX.2 dev, Phoenix, Lucid Origin — most of a day\'s free allowance'],
   ['flux-1-schnell', 'FLUX.1 schnell', 'good and cheap (~125 a day free)'], ['flux-2-klein-9b', 'FLUX.2 klein 9B', 'excellent and fast; ~7 a day free'], ['flux-2-dev', 'FLUX.2 dev', 'the most detailed; ~2–3 a day free'], ['phoenix', 'Leonardo Phoenix', 'follows the description closely; ~4 a day free'], ['lucid-origin', 'Leonardo Lucid Origin', 'rich, polished; ~3 a day free'],
-  ['flux-2-klein-4b', 'FLUX.2 klein 4B', 'cheap; can be slow'], ['sdxl-lightning', 'SDXL Lightning', 'fast; loose'], ['dreamshaper', 'DreamShaper 8', 'fast, painterly; loose'], ['pollinations', 'Pollinations', 'free, no key; a small mark'], ['playground', 'Apple Image Playground', 'illustration styles (its Shortcut needed)'], ['drawthings', 'Draw Things', 'on this Mac, its chosen model (API Server on)'], ['diffusionbee', 'DiffusionBee', 'on this Mac: private, offline; slower (~40 s)']];
+  ['flux-2-klein-4b', 'FLUX.2 klein 4B', 'cheap; can be slow'], ['sdxl-lightning', 'SDXL Lightning', 'fast; loose'], ['dreamshaper', 'DreamShaper 8', 'fast, painterly; loose'], ['gemini', 'Gemini 3.1 Flash Image', 'Google; needs billing on your key'], ['pollinations', 'Pollinations', 'free, no key; a small mark'], ['playground', 'Apple Image Playground', 'illustration styles (its Shortcut needed)'], ['drawthings', 'Draw Things', 'on this Mac, its chosen model (API Server on)'], ['diffusionbee', 'DiffusionBee', 'on this Mac: private, offline; slower (~40 s)']];
 const pickLabel = () => pick.kind === 'auto' ? autoLabel : pick.kind === 'local' ? pick.model : pick.kind === 'private' ? 'Private AI (in this browser)' : pick.kind === 'council' ? 'Best answer (council)' : (CLOUD_NAMES[pick.provider] || pick.provider);
 async function openPicker(){
   const box = $('#picker');
@@ -1075,7 +1075,7 @@ $('#ask').addEventListener('click', e=>{ if(busy){ e.preventDefault(); e.stopImm
 // this chat as a Markdown file
 $('#exportChat').onclick = () => {
   if(!history.length) return;
-  const md = '# ' + history[0].q + '\n\n' + history.map(h=>'**You:** ' + h.q + '\n\n**SmartHomeAI** (' + ((h.answer || {}).model || 'AI') + '):\n\n' + ((h.answer || {}).text || '') +
+  const md = '# ' + history[0].q + '\n\n' + history.map(h=>'**You:** ' + h.q + '\n\n**Cygnus AI** (' + ((h.answer || {}).model || 'AI') + '):\n\n' + ((h.answer || {}).text || '') +
     (((h.answer || {}).sources || []).length ? '\n\nSources:\n' + h.answer.sources.map((x, i)=>'- [' + (x.i || i + 1) + '] ' + (x.title || '') + (x.url ? ' — ' + x.url : '')).join('\n') : '')).join('\n\n---\n\n') + '\n';
   const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([md], {type: 'text/markdown'}));
   a.download = (String(history[0].q).replace(/[^\w\s-]/g, '').trim().slice(0, 40).replace(/\s+/g, '-') || 'chat') + '.md';
@@ -1303,7 +1303,7 @@ function newChat(quiet){
   if(!quiet) toast('New chat — the last one is in the list');
 }
 let chatName = store.get('ai.chatName', '');
-const setTitle = () => { const t = history.length ? chatName || history[0].q : 'New chat'; $('#exportChat').hidden = !history.length; $('#chatTitle').textContent = t; document.title = history.length ? String(t).slice(0, 50) + ' — SmartHomeAI' : 'SmartHomeAI'; };
+const setTitle = () => { const t = history.length ? chatName || history[0].q : 'New chat'; $('#exportChat').hidden = !history.length; $('#chatTitle').textContent = t; document.title = history.length ? String(t).slice(0, 50) + ' — Cygnus AI' : 'Cygnus AI'; };
 // on a phone the sidebar slides in; on a wide screen it is always there
 const openChats = on => { document.body.classList.toggle('sbOpen', !!on && innerWidth <= 900); $('#scrim').classList.toggle('open', !!on && innerWidth <= 900); if(on) loadChats(); };
 $('#sbOpen').onclick = () => openChats(true);
