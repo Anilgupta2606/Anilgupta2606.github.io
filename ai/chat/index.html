@@ -368,7 +368,6 @@ main{max-width:800px; padding:22px 20px 170px}
 .hint{font-size:11.5px; margin-top:6px}
 .menu.up{width:280px}
 .gengrid{display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:10px; margin:0 0 12px} .gen.many{margin:0} .gen.many img{width:100%}
-.prule{display:flex; gap:10px; padding:8px 10px; margin:2px 0 6px; border-radius:10px; background:var(--page); cursor:pointer} .prule small{display:block; font-size:11.5px; color:var(--mut); line-height:1.4}
 .glabel{font-size:12px; color:var(--mut); margin:4px 2px 0}
 .foot{margin-top:10px; padding-top:8px; font-size:12px} .foot .by{font-family:var(--body); font-size:11.5px; line-height:1.45}
 .foot .ghost{padding:3px 10px; font-size:12px}
@@ -819,10 +818,8 @@ async function openPicker(){
         + (info.apple.pcc ? item({kind: 'cloud', provider: 'pcc'}, '', 'Apple Private Cloud', 'Apple\'s Private Cloud Compute, through your Shortcut') : '') : '')
     + (privateOk ? '<h6>In this browser</h6>' + item({kind: 'private'}, '🔒', 'Private AI', 'Runs inside this browser (WebGPU) — nothing leaves the device; set up in Setup') : '')
     + (cloud.length ? '<h6>Cloud (your free keys)</h6>' + cloud.map(c=>item({kind: 'cloud', provider: c}, '☁', CLOUD_NAMES[c] || c, 'Research on this device, written by this model')).join('') : '')
-    + (mode === 'mac' ? '<h6>Pictures</h6><label class="tog prule"><input type="checkbox" id="picRules"><span><b>Picture rules</b><small>On: no nudity, sexual content or graphic gore. Off: only the picture services\' own rules.</small></span></label>' + IMG_PICK.map(([k, t, sub])=>`<button type="button" role="menuitemradio" data-img="${k}" class="${(store.get('ai.imageModel', 'auto')) === k ? 'on' : ''}"><i>🎨</i><span><b>${esc(t)}</b><small>${esc(sub)}</small></span></button>`).join('') : '');
+    + (mode === 'mac' ? '<h6>Pictures</h6>' + IMG_PICK.map(([k, t, sub])=>`<button type="button" role="menuitemradio" data-img="${k}" class="${(store.get('ai.imageModel', 'auto')) === k ? 'on' : ''}"><i>🎨</i><span><b>${esc(t)}</b><small>${esc(sub)}</small></span></button>`).join('') : '');
   box.hidden = false;
-  const pr = box.querySelector('#picRules');
-  if(pr){ fetch(HELPER + '/picture-rules').then(r=>r.json()).then(d=>{ pr.checked = d.rules !== 'off'; }).catch(()=>{}); pr.onclick = e => e.stopPropagation(); pr.onchange = async () => { await post('/picture-rules', {rules: pr.checked ? 'strict' : 'off'}).catch(()=>{}); toast(pr.checked ? 'Picture rules: on' : 'Picture rules: off'); }; }
   box.querySelectorAll('[data-img]').forEach(b=>b.onclick = () => { store.set('ai.imageModel', b.dataset.img); box.hidden = true; toast('Pictures now: ' + (IMG_PICK.find(x=>x[0] === b.dataset.img) || [, b.dataset.img])[1]); });
   box.querySelectorAll('[data-p]').forEach(b=>b.onclick = () => { pick = JSON.parse(b.dataset.p); store.set('ai.pick', pick); box.hidden = true; showModel(null, true); toast('Answers now: ' + pickLabel()); });
 }
