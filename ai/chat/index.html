@@ -331,6 +331,44 @@ code{font-family:var(--mono); font-size:.85em; background:var(--page2); padding:
   .uhead small,.urow>small{color:var(--mut);font-size:12.5px;line-height:1.5}
   .ubar{height:6px;border-radius:3px;background:var(--line);margin:6px 0 4px;overflow:hidden}
   .ubar i{display:block;height:100%;background:var(--search)}
+
+/* ---------- COMPACT: calmer and denser (text 15 px, sidebar 240 px, content 760 px) ---------- */
+:root{--sb:240px}
+body{font-size:15px; line-height:1.6}
+.sidebar{padding:12px 10px 10px; gap:8px}
+.brand{font-size:18px; gap:8px} .brand .orb{--s:26px}
+.newchat{padding:8px 10px; font-size:13.5px; border-radius:10px}
+.sbsearch{padding:6px 10px; font-size:13px; border-radius:9px}
+.chatlist h6{font-size:11px; margin:12px 8px 3px}
+.chat{padding:5px 8px 5px 10px; font-size:13px; border-radius:8px}
+.navbtn{padding:6px 10px; font-size:13px; gap:9px}
+.acctrow{padding:6px} .acctrow .avatar{width:30px; height:30px; font-size:13px} .who2 b{font-size:13px} .who2 small{font-size:11.5px}
+header.topbar{min-height:46px; padding:7px 18px}
+.ctitle{font-size:14px}
+.where .pill,.where .pickwrap{height:26px} .pill,.pill.model,.where .pill.model{font-size:12px; padding:3px 10px}
+main{max-width:800px; padding:22px 20px 170px}
+.box,.files,.hint,.goalbar,.slash{max-width:760px}
+.hello{padding:5vh 0 0}
+.hello .orb{--s:44px; margin:0 0 16px}
+.hello h1{font-size:clamp(28px,3.4vw,38px); line-height:1.1; letter-spacing:-.03em}
+.hello p.lead{font-size:15px; margin:10px 0 20px; max-width:62ch}
+.tries{grid-template-columns:repeat(auto-fill, minmax(200px,1fr)); gap:8px}
+.tries button{padding:10px 12px; border-radius:12px; gap:10px}
+.tries .em{font-size:17px; width:30px; height:30px; border-radius:9px}
+.tries b{font-size:11.5px; margin-bottom:1px} .tries span.t{font-size:13.5px; line-height:1.35}
+.turn{margin:0 0 28px}
+.q div{padding:8px 14px; border-radius:16px 16px 5px 16px; font-size:14.5px}
+.a{padding:14px 16px; border-radius:5px 16px 16px 16px}
+.a h4{font-size:15px; margin:12px 0 4px}
+.draft{font-size:14px; padding:10px 14px}
+.composer{padding:18px 16px calc(12px + env(safe-area-inset-bottom))}
+.box{padding:6px 6px 6px 14px; border-radius:18px; gap:8px; align-items:center}
+.box textarea{padding:6px 0; font-size:14.5px}
+.send{width:34px; height:34px}
+.hint{font-size:11.5px; margin-top:6px}
+.menu.up{width:280px}
+.foot{margin-top:10px; padding-top:8px; font-size:12px} .foot .by{font-family:var(--body); font-size:11.5px; line-height:1.45}
+.foot .ghost{padding:3px 10px; font-size:12px}
 </style>
 </head>
 <body>
@@ -750,7 +788,7 @@ async function loadLearned(){
   $('#learned').querySelectorAll('[data-id]').forEach(b=>b.onclick = async () => { await api.forget(b.dataset.id); loadLearned(); });
 }
 const pill = (id, text, cls) => { const p = $(id); p.hidden = false; p.className = 'pill ' + (cls || ''); p.innerHTML = (/model/.test(cls || '') ? '✦ ' : '<i></i>') + esc(text);
-  $('#sbStatus').textContent = [$('#stWhere').textContent, $('#stModel').hidden ? '' : $('#stModel').textContent.replace('✦ ', '')].filter(Boolean).join(' · '); };
+  $('#sbStatus').textContent = [$('#stWhere').textContent, $('#stModel').hidden ? '' : $('#stModel').textContent.replace('✦ ', '').replace(/\s*▾\s*$/, '')].filter(Boolean).join(' · '); };
 /* ---------------------------------------------------------------- which AI answers (the picker) */
 // {kind: 'auto'} · {kind: 'local', model} · {kind: 'private'} · {kind: 'cloud', provider} · {kind: 'council'}
 let pick = store.get('ai.pick', {kind: 'auto'});
@@ -779,7 +817,8 @@ async function openPicker(){
 }
 $('#stModel').onclick = e => { e.stopPropagation(); openPicker(); };
 document.addEventListener('click', e=>{ if(!$('#picker').hidden && !e.target.closest('.pickwrap')) $('#picker').hidden = true; });
-const showModel = (text, ok) => { if(text != null && pick.kind === 'auto') autoLabel = 'Auto · ' + text; pill('#stModel', pickLabel() + ' ▾', 'model'); $('#stModel').title = 'Choose which AI answers' + (ok ? '' : ' (not set up)'); };
+let autoDetail = '';
+const showModel = (text, ok) => { if(text != null && pick.kind === 'auto'){ autoDetail = text; autoLabel = 'Auto'; } pill('#stModel', pickLabel() + ' ▾', 'model'); $('#stModel').title = (pick.kind === 'auto' && autoDetail ? 'Auto: ' + autoDetail + ' — click to choose another' : 'Choose which AI answers') + (ok ? '' : ' (not set up)'); };
 
 /* ---------------------------------------------------------------- which way to answer */
 const post = (path, d) => fetch(HELPER + path, {method: 'POST', headers: {'content-type': 'application/json'}, body: JSON.stringify(d)}).then(r=>r.json());
@@ -875,7 +914,7 @@ async function detect(){
   if(d && d.ok && d.search && d.search.searxng){
     mode = 'mac';
     pill('#stWhere', 'On this Mac', 'on');
-    pill('#stSearch', 'Your search engine', 'on');
+    $('#stSearch').hidden = true; $('#stWhere').title = 'Running on this Mac · your own search engine (SearXNG) · pages read here';
     showModel(d.model || 'No model (ollama pull qwen3:4b-instruct)', !!d.model);
     // with Apple Intelligence set up, Auto mostly writes with ChatGPT and Private Cloud — the label says so
     fetch(HELPER + '/models').then(r=>r.json()).then(m=>{ if(m && m.apple && (m.apple.chatgpt || m.apple.pcc)) showModel([m.apple.chatgpt ? 'ChatGPT' : '', m.apple.pcc ? 'Private Cloud' : '', 'this Mac'].filter(Boolean).join(' + '), true); }).catch(()=>{});
