@@ -468,8 +468,9 @@ const hue = s => { let h = 0; for(const c of String(s)) h = (h * 31 + c.charCode
 /* an answer's text, written in Markdown by the model: code blocks (with a Copy button), headings, lists, bold, `code`,
    and [n] linked to its sources; ⚠ lines become notices. Everything is escaped first — the model's text never runs. */
 function inline(t, urls){
-  return esc(t).replace(/`([^`\n]+)`/g, '<code>$1</code>').replace(/\*\*(.+?)\*\*/g, '<b>$1</b>').replace(/(^|[^*])\*([^*\n]+)\*(?!\*)/g, '$1<i>$2</i>')
-    .replace(/\s?\[(\d+)\]/g, (m, n)=>webUrl(urls[n]) ? `<sup><a href="${esc(urls[n])}" target="_blank" rel="noopener">${n}</a></sup>` : `<sup><a>${n}</a></sup>`);
+  const keep = [];                                                   // inline code kept as it is (list[2] is not a source mark)
+  return esc(t).replace(/`([^`\n]+)`/g, (m, c)=>{ keep.push('<code>' + c + '</code>'); return '\u0001' + (keep.length - 1) + '\u0001'; }).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>').replace(/(^|[^*])\*([^*\n]+)\*(?!\*)/g, '$1<i>$2</i>')
+    .replace(/\s?\[(\d+)\]/g, (m, n)=>webUrl(urls[n]) ? `<sup><a href="${esc(urls[n])}" target="_blank" rel="noopener">${n}</a></sup>` : `<sup><a>${n}</a></sup>`).replace(/\u0001(\d+)\u0001/g, (m, i)=>keep[+i]);
 }
 function markdown(text, urls){
   const out = [], codes = [];
