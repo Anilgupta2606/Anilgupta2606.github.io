@@ -688,7 +688,7 @@ async function ask(q, opt){
       out.secs = Math.round((Date.now() - t0) / 1000);
       done(out);
     } else {
-      const r = await fetch(HELPER + '/ask', {method: 'POST', headers: {'content-type': 'application/json'}, signal: ctl.signal, body: JSON.stringify({question: q, deep: !!opt.deep, model: pick.kind === 'local' ? pick.model : undefined, provider: pick.kind === 'cloud' ? pick.provider : pick.kind === 'council' ? 'council' : undefined, history: turns, cloud: cloudKeys(), fresh: !!opt.fresh, attachments: files.map(f=>f.image ? {name: f.name, image: f.image} : f), goal, disabled, lastKind: (history.length && history[history.length - 1].answer.kind) || ''})});
+      const r = await fetch(HELPER + '/ask', {method: 'POST', headers: {'content-type': 'application/json'}, signal: ctl.signal, body: JSON.stringify({question: q, deep: !!opt.deep, deepLocal: !!opt.deepLocal, model: pick.kind === 'local' ? pick.model : undefined, provider: pick.kind === 'cloud' ? pick.provider : pick.kind === 'council' ? 'council' : undefined, history: turns, cloud: cloudKeys(), fresh: !!opt.fresh, attachments: files.map(f=>f.image ? {name: f.name, image: f.image} : f), goal, disabled, lastKind: (history.length && history[history.length - 1].answer.kind) || ''})});
       if(!r.ok) throw new Error((await r.json().catch(()=>({}))).error || 'It answered ' + r.status);
       const reader = r.body.getReader(), dec = new TextDecoder();
       let buf = '', out = null;
@@ -1044,7 +1044,7 @@ const COMMANDS = [
   {c: '/theme', a: 'auto | light | dark', d: 'Change the look'},
   {c: '/schedule', a: '', d: 'Scheduled tasks — a question asked for you every day at a time'},
   {c: '/image', a: 'a description', d: 'Make a picture from a description'},
-  {c: '/deep', a: 'a hard question', d: 'Deep mode: the bigger model on your Mac, a plan, thinking it through (slower)'},
+  {c: '/deep', a: 'a hard question', d: 'Deep mode: deeper research, then ChatGPT and Apple Private Cloud each write it and ChatGPT merges them ("/deep local …": only on this Mac)'},
   {c: '/chats', a: '', d: 'Your past chats — open one to carry on (also /resume)'},
   {c: '/new', a: '', d: 'Start a new chat (the last one stays in Chats)'},
   {c: '/help', a: '', d: 'Show all commands'},
@@ -1087,7 +1087,7 @@ async function runCommand(line){
   else if(c === '/chats' || c === '/resume') openChats(true);
   else if(c === '/schedule') openTasks(true);
   else if(c === '/data-usage' || c === '/usage') openUsage(true);
-  else if(c === '/deep'){ if(arg) ask(arg, {deep: true}); else toast('Write the question after /deep'); }
+  else if(c === '/deep'){ const local = /^local\b/i.test(arg || ''), qq = String(arg || '').replace(/^local\b\s*/i, ''); if(qq) ask(qq, {deep: true, deepLocal: local}); else toast('Write the question after /deep (or /deep local …)'); }
   else if(c === '/image'){ if(arg) ask('Generate an image of ' + arg); else toast('Describe the picture after /image'); }
   else if(c === '/help'){ const el = turnEl('/help'); finish(el, '/help', {text: COMMANDS.map(x=>'- `' + x.c + (x.a ? ' ' + x.a : '') + '` — ' + x.d).join('\n'), model: 'Commands', by: 'Type / in the box to see these'}, []); }
   else { toast('No such command — type / to see them'); return true; }
