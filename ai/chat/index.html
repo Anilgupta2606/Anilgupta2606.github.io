@@ -368,6 +368,12 @@ main{max-width:800px; padding:22px 20px 170px}
 .hint{font-size:11.5px; margin-top:6px}
 .menu.up{width:280px}
 .gengrid{display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:10px; margin:0 0 12px} .gen.many{margin:0} .gen.many img{width:100%}
+.voicebar{position:fixed; left:calc(var(--sb) + 50%); transform:translateX(calc(-50% - var(--sb) / 2)); bottom:96px; z-index:6; display:flex; align-items:center; gap:12px; background:var(--card); border:1px solid var(--line); border-radius:999px; padding:8px 10px 8px 8px; box-shadow:var(--shadow); width:min(560px, calc(100vw - var(--sb) - 32px))}
+.vorb{border:0; background:none; padding:0; cursor:pointer; display:grid} .voicebar .orb{transition:transform .2s}
+.voicebar.listening .orb{animation:vpulse 1.2s ease-in-out infinite} .voicebar.speaking .orb{animation:vpulse .6s ease-in-out infinite} .voicebar.thinking .orb{animation:spin 1.4s linear infinite}
+@keyframes vpulse{50%{transform:scale(1.12)}} @keyframes spin{to{transform:rotate(360deg)}}
+.vtext{flex:1; min-width:0} .vtext b{display:block; font-size:14px} .vtext small{display:block; font-size:12.5px; color:var(--mut); overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.vlang,.vend{padding:4px 12px; font-size:12.5px} .talk.on{color:var(--think)}
 .glabel{font-size:12px; color:var(--mut); margin:4px 2px 0}
 .foot{margin-top:10px; padding-top:8px; font-size:12px} .foot .by{font-family:var(--body); font-size:11.5px; line-height:1.45}
 .foot .ghost{padding:3px 10px; font-size:12px}
@@ -417,6 +423,12 @@ main{max-width:800px; padding:22px 20px 170px}
   </form>
 </section>
 
+<div class="voicebar" id="voicebar" hidden role="dialog" aria-label="Voice mode">
+  <button class="vorb" id="vorb" type="button" aria-label="Tap to talk, or to stop it speaking"><span class="orb" style="--s:46px"></span></button>
+  <div class="vtext"><b id="vstate">Listening…</b><small id="vheard">Say your question</small></div>
+  <button class="ghost vlang" id="vlang" type="button" title="The language you speak in">EN</button>
+  <button class="ghost vend" id="vend" type="button">End</button>
+</div>
 <main id="main">
   <section class="hello" id="hello">
     <div class="orb"></div>
@@ -452,10 +464,11 @@ main{max-width:800px; padding:22px 20px 170px}
       <button type="button" data-in="cameraIn" role="menuitem" class="phoneOnly"><i>📷</i><span><b>Take a photo</b><small>With the camera</small></span></button>
     </div>
     <textarea id="q" rows="1" placeholder="Ask anything…  ( / for commands)" aria-label="Your question"></textarea>
+    <button class="clip talk" type="button" id="talk" aria-label="Voice mode: talk with SmartHomeAI" title="Voice mode — talk, and hear the answer" hidden><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 10v4M8 7v10M12 4v16M16 7v10M20 10v4"/></svg></button>
     <button class="clip mic" type="button" id="mic" aria-label="Speak your question" title="Speak (🎤)" hidden><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0014 0M12 18v3"/></svg></button>
     <button class="send" id="ask" aria-label="Ask"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg></button>
   </form>
-  <div class="hint"><span>Enter to ask · Shift+Enter new line · ⌘K new chat · 🎤 speak</span><button class="link" id="clear" type="button">New chat</button></div>
+  <div class="hint"><span>Enter to ask · Shift+Enter new line · ⌘K new chat · 🎤 dictate · ▮▮ voice mode</span><button class="link" id="clear" type="button">New chat</button></div>
 </div>
 
 <div class="scrim" id="scrim"></div>
@@ -664,6 +677,7 @@ function teachBox(el, q){
   };
 }
 
+let lastAnswer = null;
 async function ask(q, opt){
   opt = opt || {};
   q = q.trim();
@@ -684,6 +698,7 @@ async function ask(q, opt){
   const turns = history.slice(-3).flatMap(h=>[{role: 'user', content: h.q}, {role: 'assistant', content: String(h.answer.text || '').slice(0, 1500)}]);
   let doneShown = false;
   const done = out => {
+    lastAnswer = out;
     if(steps[0] && steps[0].t === 'Starting') steps.shift();
     finish(el, q, out, steps, traces);
     const imgs = out.images || [];
@@ -1079,6 +1094,47 @@ if(SR){
     rec.onerror = e => { if(e.error === 'not-allowed') toast('Allow the microphone for this page to speak'); else if(e.error !== 'no-speech' && e.error !== 'aborted') toast('Voice: ' + e.error); };
     mic.classList.add('on'); rec.start();
   };
+}
+/* VOICE MODE (like ChatGPT's): you talk, it answers out loud, then listens again — hands-free.
+   Tap the orb while it speaks to interrupt; End (or Esc) stops. English or Hindi (the EN button). The answer is read
+   in a short spoken form — code, tables and links stay on the screen. */
+if(SR && 'speechSynthesis' in window){
+  const bar = $('#voicebar'); $('#talk').hidden = false;
+  let on = false, rec = null, quiet = 0, lang = store.get('ai.voiceLang', 'en-IN');
+  const setLang = l => { lang = l; store.set('ai.voiceLang', l); $('#vlang').textContent = l === 'hi-IN' ? 'हिं' : 'EN'; };
+  setLang(lang);
+  const state = (k, t, sub) => { bar.className = 'voicebar ' + k; $('#vstate').textContent = t; if(sub != null) $('#vheard').textContent = sub; };
+  const voice = () => { const vs = speechSynthesis.getVoices(), want = lang === 'hi-IN' ? /^hi/ : /^en-IN|^en-GB|^en-US/;
+    return vs.find(v=>want.test(v.lang) && /natural|premium|enhanced|google/i.test(v.name)) || vs.find(v=>lang === 'hi-IN' ? /^hi/.test(v.lang) : /^en-IN/.test(v.lang)) || vs.find(v=>want.test(v.lang)) || null; };
+  speechSynthesis.onvoiceschanged = () => {};
+  // what is read out: plain sentences, short
+  const spokenText = out => { if(!out) return ''; let t = String(out.text || ''); const code = /```/.test(t);
+    if(out.images && out.images.length) return 'Here is your picture. It is on the screen.';
+    t = t.replace(/```[\s\S]*?```/g, ' ').replace(/^\s*\|.*$/gm, ' ').replace(/\[\d+\]/g, '').replace(/^[⚠✔].*$/gm, ' ').replace(/^#+\s*/gm, '').replace(/\*\*|__|`|\*/g, '').replace(/^\s*[-•]\s+/gm, '').replace(/\(https?:[^)]*\)|https?:\S+/g, '').replace(/₹\s?/g, ' rupees ').replace(/\s*\n+\s*/g, ' ').replace(/\s{2,}/g, ' ').trim();
+    const sents = t.match(/[^.!?]+[.!?]+/g) || [t]; let say = ''; for(const x of sents){ if((say + x).length > 650) break; say += x; }
+    return (say || t.slice(0, 650)).trim() + (say.length < t.length - 20 ? ' The full answer is on the screen.' : '') + (code ? ' The code is on the screen.' : ''); };
+  // spoken sentence by sentence (a long one in one go is cut short by some browsers)
+  const speak = text => new Promise(res=>{ speechSynthesis.cancel(); const parts = text.match(/[^.!?]+[.!?]*/g) || [text]; let i = 0;
+    const next = () => { if(!on || i >= parts.length) return res(); const u = new SpeechSynthesisUtterance(parts[i++].trim()); const v = voice(); if(v) u.voice = v; u.lang = lang; u.rate = 1.04; u.onend = next; u.onerror = () => res(); speechSynthesis.speak(u); };
+    next(); });
+  const listen = () => { if(!on) return; state('listening', 'Listening…', lang === 'hi-IN' ? 'अपना सवाल बोलिए' : 'Say your question');
+    rec = new SR(); rec.lang = lang; rec.interimResults = true; rec.continuous = false; let heard = '';
+    rec.onresult = e => { heard = Array.from(e.results).map(r=>r[0].transcript).join(''); $('#vheard').textContent = heard; };
+    rec.onerror = e => { if(e.error === 'not-allowed'){ toast('Allow the microphone for this page to use voice mode'); stop(); } };
+    rec.onend = async () => { rec = null; if(!on) return;
+      if(!heard.trim()){ if(++quiet >= 2){ state('', 'Paused', 'Tap the orb to talk'); return; } return listen(); }
+      quiet = 0; state('thinking', 'Thinking…', heard);
+      lastAnswer = null; await ask(heard);
+      if(!on) return;
+      state('speaking', 'Speaking…', 'Tap the orb to interrupt'); await speak(spokenText(lastAnswer)); listen(); };
+    rec.start(); };
+  const start = () => { on = true; quiet = 0; bar.hidden = false; $('#talk').classList.add('on'); listen(); };
+  const stop = () => { on = false; try{ rec && rec.abort(); }catch(e){} rec = null; speechSynthesis.cancel(); bar.hidden = true; $('#talk').classList.remove('on'); };
+  $('#talk').onclick = () => on ? stop() : start();
+  $('#vend').onclick = stop;
+  $('#vlang').onclick = () => { setLang(lang === 'hi-IN' ? 'en-IN' : 'hi-IN'); if(rec){ try{ rec.abort(); }catch(e){} } };
+  $('#vorb').onclick = () => { if(speechSynthesis.speaking){ speechSynthesis.cancel(); } else if(!rec && !busy){ quiet = 0; listen(); } };
+  document.addEventListener('keydown', e=>{ if(e.key === 'Escape' && on) stop(); });
 }
 // ⌘K / Ctrl+K: a new chat · /: jump to the box
 document.addEventListener('keydown', e=>{
