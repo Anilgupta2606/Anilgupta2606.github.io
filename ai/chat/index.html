@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>AI</title>
+<title>SmartHomeAI</title>
 <meta name="theme-color" content="#f4f6ff">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@500;600;700&family=Figtree:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap">
@@ -81,7 +81,7 @@ body{padding-left:var(--sb)}
 .chat{display:flex; align-items:center; gap:6px; padding:7px 8px 7px 10px; border-radius:10px; cursor:pointer; font-size:13.8px; color:var(--ink2)}
 .chat:hover{background:var(--page)} .chat.cur{background:var(--think-bg); color:var(--ink); font-weight:600}
 .chat .ct{flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
-.chat .src{font-size:11px; color:var(--mut); flex:none}
+.chat .csrc{font-size:11px; color:var(--mut); flex:none}
 .clearall{display:block; margin:16px 8px 6px; font-size:12.5px; color:var(--mut)} .clearall.danger{color:var(--err); font-weight:600}
 .chat.hit{align-items:flex-start} .chat.hit .ct{white-space:normal} .chat.hit b{display:block; font-weight:600; font-size:13px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap} .chat.hit small{display:block; font-size:12px; color:var(--mut); line-height:1.35; max-height:2.7em; overflow:hidden}
 .chat .del{border:0; background:none; color:var(--mut); cursor:pointer; font-size:15px; width:24px; height:24px; border-radius:7px; visibility:hidden; flex:none}
@@ -97,11 +97,13 @@ body{padding-left:var(--sb)}
 .who2{flex:1; min-width:0} .who2 b{display:block; font-size:14px} .who2 small{display:block; font-size:12px; color:var(--mut); overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
 .dots3{color:var(--mut)}
 .menu.up{top:auto; bottom:54px; left:0; right:auto; width:300px}
+.mname{width:100%; box-sizing:border-box; border:1px solid var(--line); border-radius:10px; padding:7px 10px; font:inherit; font-size:14px; background:var(--page); color:var(--ink); margin:2px 0 10px}
 header.topbar{position:sticky; top:0; z-index:4; display:flex; align-items:center; gap:10px; padding:10px 20px; min-height:56px;
   backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px); background:color-mix(in srgb, var(--page) 80%, transparent); border-bottom:1px solid color-mix(in srgb, var(--line) 70%, transparent)}
 .ctitle{flex:1; min-width:0; font:600 15px var(--body); color:var(--ink2); overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
-.topbar .where{margin-left:auto; flex-wrap:nowrap}
-main{flex:1; width:100%; max-width:820px; margin:0 auto; padding:28px 20px 190px}
+.topbar .where{margin-left:auto; flex-wrap:nowrap; align-items:center}
+.where .pill,.where .pickwrap{height:30px; box-sizing:border-box} .pickwrap{display:inline-flex; align-items:center} .where .pill.model{padding:5px 12px; margin:0}
+main{flex:1; width:100%; max-width:840px; margin:0 auto; padding:28px 20px 190px}
 @media (max-width:900px){
   :root{--sb:0px}
   .sidebar{width:min(300px, 86vw); transform:translateX(-100%); transition:transform .22s ease; box-shadow:20px 0 40px -20px rgb(0 0 0 / .35)}
@@ -232,6 +234,7 @@ code{font-family:var(--mono); font-size:.85em; background:var(--page2); padding:
   border:2px solid transparent; background-image:linear-gradient(var(--card), var(--card)), linear-gradient(90deg, var(--line), var(--line)); background-origin:border-box; background-clip:padding-box, border-box}
 .box:focus-within{background-image:linear-gradient(var(--card), var(--card)), var(--orb)}
 .box textarea{flex:1; border:0; outline:0; background:none; resize:none; max-height:180px; padding:8px 0; line-height:1.5}
+.box textarea::placeholder{white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
 .send{width:42px; height:42px; border-radius:50%; border:0; background:var(--ink); color:var(--page); display:grid; place-items:center; cursor:pointer; flex:none; transition:transform .15s ease}
 .send.stop{background:var(--check)}
 .mic.on{color:var(--check); background:var(--check-bg); animation:pulse 1.2s ease-in-out infinite}
@@ -304,7 +307,7 @@ code{font-family:var(--mono); font-size:.85em; background:var(--page2); padding:
 .cform .two{display:flex; gap:8px} .cform .two > *{flex:1}
 .cform{display:flex; flex-direction:column; gap:8px; margin-top:10px}
 .cform input{background:var(--page); border:1px solid var(--line); border-radius:10px; padding:8px 10px; font-size:14px}
-.toast{position:fixed; left:calc(50% + var(--sb) / 2); bottom:120px; transform:translateX(-50%); background:var(--ink); color:var(--page); border-radius:999px; padding:9px 18px; font-size:14px; font-weight:600; z-index:30; box-shadow:var(--shadow); max-width:90vw}
+.toast{position:fixed; left:calc(50% + var(--sb) / 2); top:68px; bottom:auto; transform:translateX(-50%); background:var(--ink); color:var(--page); border-radius:999px; padding:9px 18px; font-size:14px; font-weight:600; z-index:30; box-shadow:var(--shadow); max-width:90vw}
 
 /* what it has learned */
 .scrim{position:fixed; inset:0; z-index:11; background:rgb(20 18 50 / .3); opacity:0; pointer-events:none; transition:opacity .2s; z-index:5}
@@ -332,7 +335,7 @@ code{font-family:var(--mono); font-size:.85em; background:var(--page2); padding:
 </head>
 <body>
 <aside class="sidebar" id="sidebar" aria-label="Chats and settings">
-  <div class="sbtop"><div class="brand"><div class="orb" id="orb"></div>AI</div><button class="iconbtn sbx" id="sbClose" type="button" aria-label="Close the menu">×</button></div>
+  <div class="sbtop"><div class="brand"><div class="orb" id="orb"></div>SmartHomeAI</div><button class="iconbtn sbx" id="sbClose" type="button" aria-label="Close the menu">×</button></div>
   <button class="newchat" id="newChat" type="button"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>New chat</button>
   <input class="sbsearch" id="chatSearch" type="search" placeholder="Search chats" aria-label="Search chats">
   <nav class="chatlist" id="chats" aria-label="Your chats"></nav>
@@ -343,9 +346,11 @@ code{font-family:var(--mono); font-size:.85em; background:var(--page2); padding:
     <button class="navbtn" id="openLearned" type="button"><i>✦</i><span>What it learned</span><b class="count" id="learnedCount" hidden></b></button>
   </div>
   <div class="acct">
-    <button class="acctrow" id="acctBtn" type="button" aria-haspopup="true" aria-expanded="false"><span class="avatar" id="avatarLetter">A</span><span class="who2"><b id="whoName">admin</b><small id="sbStatus">Starting…</small></span><span class="dots3">⋯</span></button>
+    <button class="acctrow" id="acctBtn" type="button" aria-haspopup="true" aria-expanded="false"><span class="avatar" id="avatarLetter">A</span><span class="who2"><b id="whoName">Anil</b><small id="sbStatus">Starting…</small></span><span class="dots3">⋯</span></button>
     <div class="menu up" id="acctMenu" hidden>
-      <div class="who">Signed in as <b id="whoName">admin</b></div>
+      <div class="who">Signed in as <b id="whoName2">Anil</b></div>
+      <label class="mlabel" for="meName">Your name</label>
+      <input class="mname" id="meName" maxlength="40" autocomplete="name">
       <div class="mlabel">Theme</div>
       <div class="seg" id="themeSeg" role="radiogroup" aria-label="Theme"><button data-t="auto" role="radio">Auto</button><button data-t="light" role="radio">Light</button><button data-t="dark" role="radio">Dark</button></div>
       <label class="tog"><input type="checkbox" id="cloudTog"><span><b>Cloud AI for hard questions</b><small>Long code, deep analysis, or when its checks fail twice: a bigger free model (your keys in Setup) writes the answer from what was found here. Off: everything stays on this Mac.</small></span></label>
@@ -363,8 +368,8 @@ code{font-family:var(--mono); font-size:.85em; background:var(--page2); padding:
 <section class="login" id="login" hidden>
   <form class="lcard" id="loginForm" autocomplete="on">
     <div class="orb" style="--s:52px"></div>
-    <h1>Sign in</h1>
-    <p class="sub">Your AI — the same sign-in as your other apps.</p>
+    <h1>Sign in to SmartHomeAI</h1>
+    <p class="sub">The same sign-in as the terminal (ai login) and your other apps.</p>
     <label>Username<input id="lu" autocomplete="username" required></label>
     <label>Password<input id="lp" type="password" autocomplete="current-password" required></label>
     <p class="err" id="lerr" hidden>That username or password is not right.</p>
@@ -722,7 +727,7 @@ async function ask(q, opt){
       if(d) d.hidden = true;
       busy = false; sendState(false); $('#orb').classList.remove('busy'); $('#q').focus(); return;
     }
-    el.querySelector('.slot').innerHTML = `<div class="a"><p class="err">${esc(e.message)}</p>${mode === 'mac' ? '<p class="sub">Is the helper running? In Terminal: <code>launchctl kickstart -k gui/$(id -u)/com.moneyai.local</code></p>' : ''}</div>`;
+    el.querySelector('.slot').innerHTML = `<div class="a"><p class="err">${esc(e.message)}</p>${mode === 'mac' && /failed to fetch|load failed|network|ECONNREFUSED/i.test(e.message) ? '<p class="sub">Is the helper running? In Terminal: <code>launchctl kickstart -k gui/$(id -u)/com.moneyai.local</code></p>' : ''}</div>`;
   }
   busy = false; sendState(false); $('#orb').classList.remove('busy'); $('#q').focus();
 }
@@ -871,6 +876,8 @@ async function detect(){
     pill('#stWhere', 'On this Mac', 'on');
     pill('#stSearch', 'Your search engine', 'on');
     showModel(d.model || 'No model (ollama pull qwen3:4b-instruct)', !!d.model);
+    // with Apple Intelligence set up, Auto mostly writes with ChatGPT and Private Cloud — the label says so
+    fetch(HELPER + '/models').then(r=>r.json()).then(m=>{ if(m && m.apple && (m.apple.chatgpt || m.apple.pcc)) showModel([m.apple.chatgpt ? 'ChatGPT' : '', m.apple.pcc ? 'Private Cloud' : '', 'this Mac'].filter(Boolean).join(' + '), true); }).catch(()=>{});
     if(!LOCAL_PAGE && typeof MoneyAI !== 'undefined' && Object.keys(browserKeys()).length) $('#keysRow').hidden = false;
     fetch(HELPER + '/warm', {method: 'POST', headers: {'content-type': 'application/json'}, body: '{}'}).catch(()=>{});     // load the model now, not on the first question
     swap();
@@ -1005,7 +1012,7 @@ $('#ask').addEventListener('click', e=>{ if(busy){ e.preventDefault(); e.stopImm
 // this chat as a Markdown file
 $('#exportChat').onclick = () => {
   if(!history.length) return;
-  const md = '# ' + history[0].q + '\n\n' + history.map(h=>'**You:** ' + h.q + '\n\n**AI** (' + ((h.answer || {}).model || 'AI') + '):\n\n' + ((h.answer || {}).text || '') +
+  const md = '# ' + history[0].q + '\n\n' + history.map(h=>'**You:** ' + h.q + '\n\n**SmartHomeAI** (' + ((h.answer || {}).model || 'AI') + '):\n\n' + ((h.answer || {}).text || '') +
     (((h.answer || {}).sources || []).length ? '\n\nSources:\n' + h.answer.sources.map((x, i)=>'- [' + (x.i || i + 1) + '] ' + (x.title || '') + (x.url ? ' — ' + x.url : '')).join('\n') : '')).join('\n\n---\n\n') + '\n';
   const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([md], {type: 'text/markdown'}));
   a.download = (String(history[0].q).replace(/[^\w\s-]/g, '').trim().slice(0, 40).replace(/\s+/g, '-') || 'chat') + '.md';
@@ -1131,7 +1138,7 @@ async function openChat(id){
   goal = x.goal || ''; store.set('ai.goal', goal); showGoal();
   $('#turns').innerHTML = ''; $('#hello').hidden = history.length > 0;
   history.forEach(h=>{ const el = turnEl(h.q); finish(el, h.q, h.answer, h.steps || [], h.traces || []); });
-  openChats(false); setTitle(); drawChats(); toast('Resumed: ' + String(x.title || '').slice(0, 50));
+  openChats(false); setTitle(); drawChats();
   const last = $('#turns').lastElementChild; if(last) last.scrollIntoView({block: 'start'});
 }
 const ago = iso => { const m = Math.round((Date.now() - new Date(iso)) / 60000); return m < 1 ? 'just now' : m < 60 ? m + ' min ago' : m < 1440 ? Math.round(m / 60) + ' h ago' : Math.round(m / 1440) + ' d ago'; };
@@ -1148,7 +1155,7 @@ function drawChats(){
   for(const c of list){
     const g = dayGroup(c.updated);
     if(g !== last){ html += `<h6>${g}</h6>`; last = g; }
-    html += `<div class="chat${c.id === sessionId ? ' cur' : ''}" data-id="${esc(c.id)}" title="${esc(c.title || '')}${c.source === 'terminal' ? ' (from the terminal)' : ''}"><span class="ct">${esc(c.title || 'Untitled')}</span>${c.source === 'terminal' ? '<span class="src" title="From the terminal">⌘</span>' : c.source === 'task' ? '<span class="src" title="A scheduled task">⏰</span>' : ''}<button class="del" type="button" aria-label="Delete this chat" data-del="${esc(c.id)}">×</button></div>`;
+    html += `<div class="chat${c.id === sessionId ? ' cur' : ''}" data-id="${esc(c.id)}" title="${esc(c.title || '')}${c.source === 'terminal' ? ' (from the terminal)' : ''}"><span class="ct">${esc(c.title || 'Untitled')}</span>${c.source === 'terminal' ? '<span class="csrc" title="From the terminal">⌘</span>' : c.source === 'task' ? '<span class="csrc" title="A scheduled task">⏰</span>' : ''}<button class="del" type="button" aria-label="Delete this chat" data-del="${esc(c.id)}">×</button></div>`;
   }
   box.innerHTML = html + (f ? '' : `<button class="link clearall" id="clearAll" type="button">Delete all chats</button>`);
   const ca = box.querySelector('#clearAll');
@@ -1189,7 +1196,7 @@ function newChat(quiet){
   drawChats(); $('#q').focus();
   if(!quiet) toast('New chat — the last one is in the list');
 }
-const setTitle = () => { $('#exportChat').hidden = !history.length; $('#chatTitle').textContent = history.length ? history[0].q : 'New chat'; document.title = history.length ? String(history[0].q).slice(0, 50) + ' — AI' : 'AI'; };
+const setTitle = () => { $('#exportChat').hidden = !history.length; $('#chatTitle').textContent = history.length ? history[0].q : 'New chat'; document.title = history.length ? String(history[0].q).slice(0, 50) + ' — SmartHomeAI' : 'SmartHomeAI'; };
 // on a phone the sidebar slides in; on a wide screen it is always there
 const openChats = on => { document.body.classList.toggle('sbOpen', !!on && innerWidth <= 900); $('#scrim').classList.toggle('open', !!on && innerWidth <= 900); if(on) loadChats(); };
 $('#sbOpen').onclick = () => openChats(true);
@@ -1281,7 +1288,7 @@ const signedIn = () => { try{ return sessionStorage.getItem(SESSION) === 'yes'; 
 async function checkLogin(u, p){
   if(!LOCAL_PAGE && typeof MoneyShared === 'undefined'){ try{ await loadScript('/ai/ai.js'); }catch(e){} }
   if(typeof MoneyShared !== 'undefined') return MoneyShared.checkLogin(u, p);
-  return String(u).trim().toLowerCase() === 'admin' && p === 'admin';
+  try{ const r = await fetch(HELPER + '/login', {method: 'POST', headers: {'content-type': 'application/json'}, body: JSON.stringify({user: u, password: p})}).then(r=>r.json()); return !!r.ok; }catch(e){ return false; }
 }
 $('#loginForm').onsubmit = async e => {
   e.preventDefault();
@@ -1300,9 +1307,13 @@ $('#logout').onclick = () => { try{ sessionStorage.removeItem(SESSION); }catch(_
 let started = false, ready = null;
 function start(){
   if(started) return; started = true;
-  try{ const u = sessionStorage.getItem('ai.user') || 'you'; $('#whoName').textContent = u; $('#avatarLetter').textContent = u.slice(0, 1).toUpperCase(); }catch(_){}
-  // the conversation so far comes back after a reload
-  history.forEach(h=>{ if(h && h.answer){ const el = turnEl(h.q); finish(el, h.q, h.answer, h.steps || [], h.traces || []); } });
+  // your name: this Mac's (ai name, or "Your name" in the account menu); else what you signed in with
+  const showName = n => { n = String(n || '').trim() || 'You'; $('#whoName').textContent = n; $('#whoName2').textContent = n; $('#meName').value = n; $('#avatarLetter').textContent = n.slice(0, 1).toUpperCase(); };
+  try{ showName(store.get('ai.name', '') || sessionStorage.getItem('ai.user')); }catch(_){}
+  fetch(HELPER + '/me').then(r=>r.json()).then(d=>{ if(d && d.name){ store.set('ai.name', d.name); showName(d.name); } }).catch(()=>{});
+  $('#meName').onchange = () => { const n = $('#meName').value.trim().slice(0, 40); if(!n) return; store.set('ai.name', n); showName(n); post('/me', {name: n}).catch(()=>{}); toast('Name saved'); };
+  // a fresh chat every time the page opens; earlier ones are in the list on the left
+  if(history.length) newChat(true);
   ready = detect(); showGoal(); setTitle(); ready.then(loadChats); $('#q').focus();
   // ?q=… (from a Siri Shortcut or a link): ask it at once, then tidy the address
   const qs = new URLSearchParams(location.search).get('q');
