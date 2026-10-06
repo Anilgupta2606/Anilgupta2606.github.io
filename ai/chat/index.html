@@ -506,7 +506,8 @@ main{max-width:800px; padding:22px 20px 170px}
    anywhere else (a phone, the Mac asleep) -> the engine in this browser (/ai/*.js): your relay searches and reads, your AI keys
    or the Private AI answer, held to the same rules. Lessons are swapped with the Mac whenever it is reachable, and the
    settings sync carries them to your other devices. */
-const LOCAL_PAGE = /^(127\.0\.0\.1|localhost)$/.test(location.hostname);
+// served by the helper: on this Mac, or from your other devices through Tailscale (https://<your Mac>.<tailnet>.ts.net:8443)
+const LOCAL_PAGE = /^(127\.0\.0\.1|localhost)$/.test(location.hostname) || /\.ts\.net$/.test(location.hostname);
 const HELPER = LOCAL_PAGE ? '' : 'http://127.0.0.1:8899';
 let mode = null;                                            // 'mac' | 'browser'
 const $ = s => document.querySelector(s);
@@ -1395,10 +1396,11 @@ const signedIn = () => { try{ return sessionStorage.getItem(SESSION) === 'yes'; 
 async function checkLogin(u, p){
   if(!LOCAL_PAGE && typeof MoneyShared === 'undefined'){ try{ await loadScript('/ai/ai.js'); }catch(e){} }
   if(typeof MoneyShared !== 'undefined') return MoneyShared.checkLogin(u, p);
-  try{ const r = await fetch(HELPER + '/login', {method: 'POST', headers: {'content-type': 'application/json'}, body: JSON.stringify({user: u, password: p})}).then(r=>r.json()); return !!r.ok; }catch(e){ return false; }
+  try{ const r = await fetch(HELPER + '/login', {method: 'POST', headers: {'content-type': 'application/json'}, body: JSON.stringify({user: u, password: p})}).then(r=>r.json()); if(r.error) $('#lerr').textContent = r.error; return !!r.ok; }catch(e){ return false; }
 }
 $('#loginForm').onsubmit = async e => {
   e.preventDefault();
+  $('#lerr').textContent = 'That username or password is not right.';
   if(!(await checkLogin($('#lu').value, $('#lp').value))){ $('#lerr').hidden = false; $('#lp').select(); return; }
   try{ sessionStorage.setItem(SESSION, 'yes'); sessionStorage.setItem('ai.user', $('#lu').value.trim()); }catch(_){}
   $('#login').hidden = true; $('#lp').value = ''; start();
@@ -1410,7 +1412,7 @@ $('#copyKeys').onclick = async () => {
   $('#keysNote').textContent = names.length ? 'Saved on this Mac: ' + names.join(', ') + '. In Terminal: ai cloud on (always) or ai --cloud "…" (once).' : 'Nothing was saved — is the helper running?';
   toast(names.length ? 'AI keys saved on this Mac: ' + names.join(', ') : 'Could not save the keys');
 };
-$('#logout').onclick = () => { try{ sessionStorage.removeItem(SESSION); }catch(_){} menuOpen(false); location.reload(); };
+$('#logout').onclick = async () => { try{ sessionStorage.removeItem(SESSION); }catch(_){} if(LOCAL_PAGE) await fetch('/logout', {method: 'POST', headers: {'content-type': 'application/json'}, body: '{}'}).catch(()=>{}); menuOpen(false); location.reload(); };
 let started = false, ready = null;
 function start(){
   if(started) return; started = true;
