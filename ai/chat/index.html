@@ -367,6 +367,8 @@ main{max-width:800px; padding:22px 20px 170px}
 .send{width:34px; height:34px}
 .hint{font-size:11.5px; margin-top:6px}
 .menu.up{width:280px}
+.gengrid{display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:10px; margin:0 0 12px} .gen.many{margin:0} .gen.many img{width:100%}
+.glabel{font-size:12px; color:var(--mut); margin:4px 2px 0}
 .foot{margin-top:10px; padding-top:8px; font-size:12px} .foot .by{font-family:var(--body); font-size:11.5px; line-height:1.45}
 .foot .ghost{padding:3px 10px; font-size:12px}
 </style>
@@ -565,8 +567,8 @@ function chartSvg(ch){
   <div class="legend"><span><i style="background:var(--ink)"></i>Close ${fmtN(last)}</span><span><i style="background:var(--search)"></i>20-${esc(ch.unit)}</span><span><i style="background:var(--calc)"></i>50-${esc(ch.unit)}</span><span><i style="background:var(--check)"></i>200-${esc(ch.unit)}</span><span><i class="dash" style="border-color:var(--read)"></i>Support</span><span><i class="dash" style="border-color:var(--check)"></i>Resistance</span></div></figure>`;
 }
 // pictures in an answer (made from a description): shown, with a Download button
-const imagesHtml = out => (out.images || []).map((im, i)=>{ const mime = /^image\/(png|jpeg|webp|gif)$/.test(im.mime || '') ? im.mime : 'image/jpeg', src = im.b64 && /^[A-Za-z0-9+/=]+$/.test(im.b64.slice(0, 200)) ? 'data:' + mime + ';base64,' + im.b64 : /^data:image\//.test(im.thumb || '') ? im.thumb : '';
-  return src ? `<figure class="gen"><img src="${src}" alt="A generated picture">${im.b64 ? `<a class="ghost dl" download="ai-picture-${Date.now()}-${i}.${mime === 'image/png' ? 'png' : 'jpg'}" href="${src}">Download</a>` : '<figcaption class="sub">Preview (the full picture is in ~/Pictures/AI Images on your Mac)</figcaption>'}</figure>` : ''; }).join('');
+const imagesHtml = out => ((out.images || []).length > 1 ? '<div class="gengrid">' : '') + (out.images || []).map((im, i)=>{ const mime = /^image\/(png|jpeg|webp|gif)$/.test(im.mime || '') ? im.mime : 'image/jpeg', src = im.b64 && /^[A-Za-z0-9+/=]+$/.test(im.b64.slice(0, 200)) ? 'data:' + mime + ';base64,' + im.b64 : /^data:image\//.test(im.thumb || '') ? im.thumb : '';
+  return src ? `<figure class="gen${(out.images || []).length > 1 ? ' many' : ''}"><img src="${src}" alt="A generated picture">${im.label ? `<figcaption class="glabel">${esc(im.label)}</figcaption>` : ''}${im.b64 ? `<a class="ghost dl" download="ai-picture-${Date.now()}-${i}.${mime === 'image/png' ? 'png' : 'jpg'}" href="${src}">Download</a>` : '<figcaption class="sub">Preview (the full picture is in ~/Pictures/AI Images on your Mac)</figcaption>'}</figure>` : ''; }).join('') + ((out.images || []).length > 1 ? '</div>' : '');
 // a small preview to keep in the chat (the full picture is big)
 function preview(b64){ return new Promise(res=>{ const i = new Image(); i.onload = () => { const k = Math.min(1, 384 / Math.max(i.width, i.height)), c = document.createElement('canvas'); c.width = Math.round(i.width * k); c.height = Math.round(i.height * k); c.getContext('2d').drawImage(i, 0, 0, c.width, c.height); res(c.toDataURL('image/jpeg', 0.7)); }; i.onerror = () => res(''); i.src = 'data:image/jpeg;base64,' + b64; }); }
 function render(out){
@@ -685,7 +687,7 @@ async function ask(q, opt){
     if(steps[0] && steps[0].t === 'Starting') steps.shift();
     finish(el, q, out, steps, traces);
     const imgs = out.images || [];
-    if(imgs.length) Promise.all(imgs.map(im=>preview(im.b64))).then(p=>{ const h = history.find(x=>x.answer && x.answer.text === out.text); if(h){ h.answer.images = p.filter(Boolean).map(t=>({thumb: t})); store.set('moneyai.history', history); saveChat(); } });
+    if(imgs.length) Promise.all(imgs.map(im=>preview(im.b64))).then(p=>{ const h = history.find(x=>x.answer && x.answer.text === out.text); if(h){ h.answer.images = p.map((t, i)=>t ? {thumb: t, label: imgs[i].label} : null).filter(Boolean); store.set('moneyai.history', history); saveChat(); } });
     history.push({q, answer: {kind: out.kind, text: out.text, sources: out.sources, read: out.read, by: out.by, secs: out.secs, model: out.model, chart: out.chart, trust: out.trust ? {confidence: out.trust.confidence, checked: out.trust.checked, ok: out.trust.ok} : undefined, saved: out.saved}, steps, traces: slim(traces)});
     history = history.slice(-40).map((h, i, all)=>i < all.length - 8 ? Object.assign({}, h, {traces: (h.traces || []).map(t=>({kind: t.kind, title: t.title}))}) : h);
     store.set('moneyai.history', history);
@@ -731,7 +733,7 @@ async function ask(q, opt){
       out.secs = Math.round((Date.now() - t0) / 1000);
       done(out);
     } else {
-      const r = await fetch(HELPER + '/ask', {method: 'POST', headers: {'content-type': 'application/json'}, signal: ctl.signal, body: JSON.stringify({question: q, deep: !!opt.deep, deepLocal: !!opt.deepLocal, model: pick.kind === 'local' ? pick.model : undefined, provider: pick.kind === 'cloud' ? pick.provider : pick.kind === 'council' ? 'council' : undefined, history: turns, cloud: cloudKeys(), fresh: !!opt.fresh, attachments: files.map(f=>f.image ? {name: f.name, image: f.image} : f), goal, disabled, lastKind: (history.length && history[history.length - 1].answer.kind) || ''})});
+      const r = await fetch(HELPER + '/ask', {method: 'POST', headers: {'content-type': 'application/json'}, signal: ctl.signal, body: JSON.stringify({question: q, deep: !!opt.deep, deepLocal: !!opt.deepLocal, imageModel: opt.imageModel || store.get('ai.imageModel', 'auto'), model: pick.kind === 'local' ? pick.model : undefined, provider: pick.kind === 'cloud' ? pick.provider : pick.kind === 'council' ? 'council' : undefined, history: turns, cloud: cloudKeys(), fresh: !!opt.fresh, attachments: files.map(f=>f.image ? {name: f.name, image: f.image} : f), goal, disabled, lastKind: (history.length && history[history.length - 1].answer.kind) || ''})});
       if(!r.ok) throw new Error((await r.json().catch(()=>({}))).error || 'It answered ' + r.status);
       const reader = r.body.getReader(), dec = new TextDecoder();
       let buf = '', out = null;
@@ -794,6 +796,10 @@ const pill = (id, text, cls) => { const p = $(id); p.hidden = false; p.className
 let pick = store.get('ai.pick', {kind: 'auto'});
 const CLOUD_NAMES = {apple: 'Apple Intelligence (on this Mac)', chatgpt: 'ChatGPT (through Siri)', pcc: 'Apple Private Cloud', gemini: 'Google Gemini', groq: 'Groq — gpt-oss-120b (OpenAI\'s open model)', cerebras: 'Cerebras — gpt-oss-120b', mistral: 'Mistral', openrouter: 'OpenRouter (free models)', anthropic: 'Anthropic Claude'};
 let autoLabel = 'Auto';
+// the picture models (the relay's Cloudflare models, Pollinations, Image Playground) and Compare
+const IMG_PICK = [['auto', 'Auto pictures', 'FLUX.1 schnell; styles by Image Playground; backups when Cloudflare cannot'], ['compare', 'Compare 4 models', 'FLUX.1 schnell, FLUX.2 klein 4B, SDXL Lightning, Pollinations — side by side'], ['compare-best', 'Compare the 4 best', 'FLUX.2 klein 9B, FLUX.2 dev, Phoenix, Lucid Origin — most of a day\'s free allowance'],
+  ['flux-1-schnell', 'FLUX.1 schnell', 'good and cheap (~125 a day free)'], ['flux-2-klein-9b', 'FLUX.2 klein 9B', 'excellent and fast; ~7 a day free'], ['flux-2-dev', 'FLUX.2 dev', 'the most detailed; ~2–3 a day free'], ['phoenix', 'Leonardo Phoenix', 'follows the description closely; ~4 a day free'], ['lucid-origin', 'Leonardo Lucid Origin', 'rich, polished; ~3 a day free'],
+  ['flux-2-klein-4b', 'FLUX.2 klein 4B', 'cheap; can be slow'], ['sdxl-lightning', 'SDXL Lightning', 'fast; loose'], ['dreamshaper', 'DreamShaper 8', 'fast, painterly; loose'], ['pollinations', 'Pollinations', 'free, no key; a small mark'], ['playground', 'Apple Image Playground', 'illustration styles (its Shortcut needed)']];
 const pickLabel = () => pick.kind === 'auto' ? autoLabel : pick.kind === 'local' ? pick.model : pick.kind === 'private' ? 'Private AI (in this browser)' : pick.kind === 'council' ? 'Best answer (council)' : (CLOUD_NAMES[pick.provider] || pick.provider);
 async function openPicker(){
   const box = $('#picker');
@@ -811,8 +817,10 @@ async function openPicker(){
         + (info.apple.chatgpt ? item({kind: 'cloud', provider: 'chatgpt'}, '', 'ChatGPT (through Siri)', 'Siri\'s ChatGPT extension, through your Shortcut; research is done here') : '')
         + (info.apple.pcc ? item({kind: 'cloud', provider: 'pcc'}, '', 'Apple Private Cloud', 'Apple\'s Private Cloud Compute, through your Shortcut') : '') : '')
     + (privateOk ? '<h6>In this browser</h6>' + item({kind: 'private'}, '🔒', 'Private AI', 'Runs inside this browser (WebGPU) — nothing leaves the device; set up in Setup') : '')
-    + (cloud.length ? '<h6>Cloud (your free keys)</h6>' + cloud.map(c=>item({kind: 'cloud', provider: c}, '☁', CLOUD_NAMES[c] || c, 'Research on this device, written by this model')).join('') : '');
+    + (cloud.length ? '<h6>Cloud (your free keys)</h6>' + cloud.map(c=>item({kind: 'cloud', provider: c}, '☁', CLOUD_NAMES[c] || c, 'Research on this device, written by this model')).join('') : '')
+    + (mode === 'mac' ? '<h6>Pictures</h6>' + IMG_PICK.map(([k, t, sub])=>`<button type="button" role="menuitemradio" data-img="${k}" class="${(store.get('ai.imageModel', 'auto')) === k ? 'on' : ''}"><i>🎨</i><span><b>${esc(t)}</b><small>${esc(sub)}</small></span></button>`).join('') : '');
   box.hidden = false;
+  box.querySelectorAll('[data-img]').forEach(b=>b.onclick = () => { store.set('ai.imageModel', b.dataset.img); box.hidden = true; toast('Pictures now: ' + (IMG_PICK.find(x=>x[0] === b.dataset.img) || [, b.dataset.img])[1]); });
   box.querySelectorAll('[data-p]').forEach(b=>b.onclick = () => { pick = JSON.parse(b.dataset.p); store.set('ai.pick', pick); box.hidden = true; showModel(null, true); toast('Answers now: ' + pickLabel()); });
 }
 $('#stModel').onclick = e => { e.stopPropagation(); openPicker(); };
@@ -1090,7 +1098,8 @@ const COMMANDS = [
   {c: '/cloud', a: 'on | off', d: 'Let a bigger cloud model write the hard answers'},
   {c: '/theme', a: 'auto | light | dark', d: 'Change the look'},
   {c: '/schedule', a: '', d: 'Scheduled tasks — a question asked for you every day at a time'},
-  {c: '/image', a: 'a description', d: 'Make a picture from a description'},
+  {c: '/image', a: 'a description', d: 'Make a picture from a description (the model: ✦ menu → Pictures)'},
+  {c: '/compare', a: 'a description', d: 'The same picture by 4 models side by side ("/compare best …": the 4 best)'},
   {c: '/deep', a: 'a hard question', d: 'Deep mode: deeper research, then ChatGPT and Apple Private Cloud each write it and ChatGPT merges them ("/deep local …": only on this Mac)'},
   {c: '/chats', a: '', d: 'Your past chats — open one to carry on (also /resume)'},
   {c: '/new', a: '', d: 'Start a new chat (the last one stays in Chats)'},
@@ -1135,6 +1144,7 @@ async function runCommand(line){
   else if(c === '/schedule') openTasks(true);
   else if(c === '/data-usage' || c === '/usage') openUsage(true);
   else if(c === '/deep'){ const local = /^local\b/i.test(arg || ''), qq = String(arg || '').replace(/^local\b\s*/i, ''); if(qq) ask(qq, {deep: true, deepLocal: local}); else toast('Write the question after /deep (or /deep local …)'); }
+  else if(c === '/compare'){ const best = /^best\b/i.test(arg || ''), d0 = String(arg || '').replace(/^best\b\s*/i, ''); if(d0) ask('Generate an image of ' + d0, {imageModel: best ? 'compare-best' : 'compare'}); else toast('Describe the picture after /compare'); }
   else if(c === '/image'){ if(arg) ask('Generate an image of ' + arg); else toast('Describe the picture after /image'); }
   else if(c === '/help'){ const el = turnEl('/help'); finish(el, '/help', {text: COMMANDS.map(x=>'- `' + x.c + (x.a ? ' ' + x.a : '') + '` — ' + x.d).join('\n'), model: 'Commands', by: 'Type / in the box to see these'}, []); }
   else { toast('No such command — type / to see them'); return true; }
