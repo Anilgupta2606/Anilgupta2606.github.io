@@ -102,6 +102,10 @@ main{max-width:1120px;margin:0 auto;padding-inline:20px;padding-block:0 60px}
 .empty{font-size:13px;color:var(--ink2);background:var(--card2);border-radius:12px;padding:12px 14px;line-height:1.45}
 .open{margin-top:auto;display:inline-flex;align-items:center;gap:8px;align-self:flex-start;padding:9px 15px;border-radius:11px;background:var(--c);color:#fff;text-decoration:none;font-weight:600;font-size:13.5px;transition:transform .15s}
 .open:hover{transform:translateY(-1px)}
+.opens{margin-top:auto;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.opens .open{margin-top:0}
+.open.alt{background:transparent;color:var(--c);box-shadow:inset 0 0 0 1.5px var(--c)}
+.opens .edit{background:none;border:0;color:var(--ink2);font:inherit;font-size:12.5px;text-decoration:underline;cursor:pointer;padding:4px}
 .open:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
 
 .row2{display:grid;grid-template-columns:1.5fr 1fr;gap:16px;margin-top:16px}
@@ -189,6 +193,19 @@ const ym = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'
 const ymLabel = (m, style = 'long') => new Date(+m.slice(0, 4), +m.slice(5, 7) - 1, 1).toLocaleDateString('en-IN', {month: style, year: style === 'long' ? 'numeric' : undefined});
 const ago = ms => { const s = (Date.now() - ms) / 1000; return s < 90 ? 'just now' : s < 3600 ? Math.round(s / 60) + ' min ago' : s < 86400 ? Math.round(s / 3600) + ' h ago' : Math.round(s / 86400) + ' d ago'; };
 /* ATS's address on this device: the one it was linked from (your Mac's Tailscale address on the phone), else this Mac */
+/* ATS away from the Mac: its Tailscale address, set once (here, or by linking a device through it) and carried,
+   encrypted, to your other devices with the settings - never written into this public page */
+const MOBILE = /iPhone|iPad|Android/i.test(navigator.userAgent);
+const atsRemote = () => { try{ const r = MoneyShared.atsRemote && MoneyShared.atsRemote(); if(r) return r.url;
+  const l = typeof Cloud !== 'undefined' && Cloud.atsLink(); if(l && /^https:\/\//.test(l.url || '')){ MoneyShared.setAtsRemote(l.url); return l.url.replace(/\/+$/, ''); } }catch(e){} return ''; };
+function askAtsRemote(){
+  const cur = atsRemote();
+  const v = prompt('ATS address for your other devices - your Mac\'s Tailscale address (https://…ts.net).\nLeave empty to remove it.', cur || 'https://');
+  if(v === null) return;
+  try{ MoneyShared.setAtsRemote(v === 'https://' ? '' : v); }catch(e){ alert(e.message); return; }
+  try{ if(MoneyShared.status().setup) MoneyShared.sync().catch(()=>{}); }catch(e){}       // on to your other devices now
+  render();
+}
 const atsUrl = () => { const l = typeof Cloud !== 'undefined' && Cloud.atsLink(); return l && /^https?:\/\//.test(l.url || '') ? l.url.replace(/\/+$/, '') + '/' : LINKS.ats; };
 const LINKS = {ats:'http://localhost:8765/', exp:'/expenseTracker/', led:'/InvestmentPlan/', trip:'/tripManangement/'};
 /* Trip Vault's personal documents (its Document Vault): everything that is not a travel paper */
@@ -564,7 +581,16 @@ function draw(et, ats, tv){
 
   const card = (k, name, sub, status, body, cta) => `<section class="card" style="--c:var(--${k})">
     <div class="apphead"><span class="glyph">${ICON[k]}</span><div><h2>${name}</h2><p>${sub}</p></div>${status}</div>${body}
-    <a class="open" href="${esc(k === 'ats' ? atsUrl() : LINKS[k])}" ${k === 'ats' ? 'target="_blank" rel="noopener"' : ''}>${cta} <span aria-hidden="true">→</span></a></section>`;
+    ${k === 'ats' ? atsButtons() : `<a class="open" href="${esc(LINKS[k])}">${cta} <span aria-hidden="true">→</span></a>`}</section>`;
+  /* ATS: on this Mac (localhost), and remote (Tailscale) - the remote one first on a phone */
+  function atsButtons(){
+    const remote = atsRemote(), local = LINKS.ats;
+    const mac = `<a class="open${MOBILE ? ' alt' : ''}" href="${esc(MOBILE ? local : atsUrl())}" target="_blank" rel="noopener" title="ATS on the Mac it runs on">Open ATS · this Mac <span aria-hidden="true">→</span></a>`;
+    const away = remote
+      ? `<a class="open${MOBILE ? '' : ' alt'}" href="${esc(remote + '/')}" target="_blank" rel="noopener" title="${esc(remote)} - through Tailscale (it must be on, on this device)">Open ATS · Remote <span aria-hidden="true">→</span></a><button class="edit" id="atsRemoteEdit" type="button">change</button>`
+      : `<button class="open alt" id="atsRemoteEdit" type="button" title="Your Mac's Tailscale address, to open ATS from your phone">＋ Remote address</button>`;
+    return `<div class="opens">${MOBILE ? away + mac : mac + away}</div>`;
+  }
 
   $('app').innerHTML = hero + `<main>
     <div class="apps">
@@ -578,6 +604,7 @@ function draw(et, ats, tv){
       <span style="display:flex;gap:8px"><button class="btn" id="re">Refresh</button><button class="btn" id="out">Sign out</button></span></div>
   </main>`;
   $('re').onclick = render;
+  if($('atsRemoteEdit')) $('atsRemoteEdit').onclick = askAtsRemote;
   $('out').onclick = () => { try{ sessionStorage.removeItem(SESSION); }catch(_){} showLogin(); };
 }
 

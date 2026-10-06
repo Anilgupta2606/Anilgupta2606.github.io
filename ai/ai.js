@@ -550,7 +550,15 @@ const MoneyAI = (function(){
 const MoneyShared = (function(){
   const lsGet = (k, d) => { try{ const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; }catch(e){ return d; } };
   const lsSet = (k, v) => { try{ if(v === undefined) localStorage.removeItem(k); else localStorage.setItem(k, JSON.stringify(v)); }catch(e){} };
-  const AUTH = 'money-auth', CFG = 'money-setup', FILE = 'money-home.settings.json';
+  const AUTH = 'money-auth', CFG = 'money-setup', FILE = 'money-home.settings.json', ATS_REMOTE = 'money-ats-remote';
+  /* ATS's address away from its Mac (e.g. the Mac's Tailscale address): travels to your other devices with the
+     settings - encrypted, never in the site's code. {url, at} */
+  const atsRemote = () => { const r = lsGet(ATS_REMOTE, null); return r && /^https:\/\/[^\s/]+\/?$/.test(r.url || '') ? r : null; };
+  function setAtsRemote(url){
+    url = String(url || '').trim().replace(/\/+$/, '');
+    if(url && !/^https:\/\/[a-z0-9.-]+(:\d+)?$/i.test(url)) throw new Error('Use the full address, starting https:// (e.g. https://your-mac.your-tailnet.ts.net)');
+    lsSet(ATS_REMOTE, url ? {url, at: Date.now()} : undefined); markChanged();
+  }
   /* each app's own sync settings in this browser */
   const APPS = [
     {id: 'trip', name: 'Trip Vault', key: 'tripvault-sync-config', url: '/tripManangement/'},
@@ -628,7 +636,7 @@ const MoneyShared = (function(){
   async function mine(){
     const hub = MoneyAI.aiLocal(), shared = MoneyAI.shareableAi();
     return {ai: {keys: shared.keys, first: hub.first || 'auto', fallback: hub.fallback !== false, model: hub.model || {}, off: hub.off || [], relay: hub.relay || null},
-            auth: (await etAuth()) || lsGet(AUTH, null), updatedAt: lsGet(CFG + '-changed', 0),
+            auth: (await etAuth()) || lsGet(AUTH, null), updatedAt: lsGet(CFG + '-changed', 0), atsRemote: atsRemote(),
             brain: typeof MoneyBrain !== 'undefined' ? MoneyBrain.exportAll() : (lsGet('money-brain', null) ? {lessons: lsGet('money-brain', {}).lessons || {}, forgotten: lsGet('money-brain', {}).forgotten || {}} : undefined)};
   }
 
@@ -657,7 +665,8 @@ const MoneyShared = (function(){
       const newer = (remote.updatedAt || 0) > (here.updatedAt || 0);
       const a = newer ? remote.ai : here.ai, b = newer ? here.ai : remote.ai;
       out = {ai: Object.assign({}, b, a, {keys: Object.assign({}, b.keys, a.keys), model: Object.assign({}, b.model, a.model)}),
-             auth: hasEt ? here.auth : (remote.auth || here.auth), updatedAt: Math.max(remote.updatedAt || 0, here.updatedAt || 0)};
+             auth: hasEt ? here.auth : (remote.auth || here.auth), updatedAt: Math.max(remote.updatedAt || 0, here.updatedAt || 0),
+             atsRemote: ((here.atsRemote || {}).at || 0) >= ((remote.atsRemote || {}).at || 0) ? (here.atsRemote || remote.atsRemote || null) : remote.atsRemote};
       // what the Brain has learned on each device: both kept, the lesson changed last wins
       if(remote.brain && typeof MoneyBrain !== 'undefined'){ MoneyBrain.merge(remote.brain); out.brain = MoneyBrain.exportAll(); }
       else out.brain = here.brain || remote.brain;
@@ -668,6 +677,7 @@ const MoneyShared = (function(){
       if(out.ai.relay && out.ai.relay.url) hub.relay = out.ai.relay;                  // web search: the same relay on every device
       MoneyAI.saveAiLocal(hub);
       if(out.auth && !hasEt) lsSet(AUTH, out.auth);
+      if(out.atsRemote && out.atsRemote.url) lsSet(ATS_REMOTE, out.atsRemote);
     }
     const files = {}; files[FILE] = {content: JSON.stringify(await seal(out, cfg.pass))};
     if(cfg.gistId) await gh(cfg.token, '/gists/' + cfg.gistId, {method: 'PATCH', body: JSON.stringify({files})});
@@ -700,7 +710,7 @@ const MoneyShared = (function(){
     if(!c || (c.syncedAt && Date.now() - c.syncedAt < 600000)) return null;
     try{ return await sync(); }catch(e){ lsSet(CFG, Object.assign(c, {lastError: e.message})); return null; }
   }
-  return {checkLogin, loginSource, setUp, sync, quiet, status, existing, forget, markChanged, APPS};
+  return {checkLogin, loginSource, setUp, sync, quiet, status, existing, forget, markChanged, APPS, atsRemote, setAtsRemote};
 })();
 
 /* =========================================================
