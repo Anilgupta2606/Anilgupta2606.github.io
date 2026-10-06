@@ -711,6 +711,7 @@ async function ask(q, opt){
           if(m.draft != null){ const d = el.querySelector('.draft'); if(d){ d.hidden = !String(m.draft).trim(); d.innerHTML = '<div class="dlabel">Writing…</div>' + markdown(m.draft, {}); } }
           if(m.error) throw new Error(m.error);
           if(m.answer){ out = m.answer; done(out); doneShown = true; }
+          if(m.title){ chatName = String(m.title).slice(0, 80); store.set('ai.chatName', chatName); setTitle(); saveChat().then(loadChats); }
           if(m.followups && doneShown) showFollow(el, m.followups);
           if(m.verify && doneShown) showVerify(el, m.verify);
         }
@@ -1117,7 +1118,7 @@ let sessionId = store.get('ai.session', '') || newId(); store.set('ai.session', 
 const localChats = () => store.get('ai.sessions', {});
 async function saveChat(){
   if(!history.length) return;
-  const x = {id: sessionId, title: history[0].q, goal, source: 'page', turns: history};
+  const x = {id: sessionId, title: chatName || history[0].q, goal, source: 'page', turns: history};
   if(mode === 'mac'){ try{ await post('/session', x); return; }catch(e){} }
   const all = localChats(); all[sessionId] = Object.assign({}, x, {updated: new Date().toISOString(), created: (all[sessionId] || {}).created || new Date().toISOString(),
     turns: history.map((h, i, a)=>i < a.length - 8 ? Object.assign({}, h, {traces: []}) : h)});
@@ -1133,7 +1134,7 @@ async function openChat(id){
   if(mode === 'mac'){ try{ x = await fetch(HELPER + '/session?id=' + encodeURIComponent(id)).then(r=>r.ok ? r.json() : null); }catch(e){} }
   if(!x) x = localChats()[id];
   if(!x) return toast('That chat could not be opened');
-  sessionId = x.id; store.set('ai.session', sessionId);
+  sessionId = x.id; store.set('ai.session', sessionId); chatName = x.title || ''; store.set('ai.chatName', chatName);
   history = (x.turns || []).filter(t=>t && t.answer); store.set('moneyai.history', history);
   goal = x.goal || ''; store.set('ai.goal', goal); showGoal();
   $('#turns').innerHTML = ''; $('#hello').hidden = history.length > 0;
@@ -1190,13 +1191,14 @@ async function searchChats(){
 }
 $('#chatSearch').oninput = () => { clearTimeout(searchT); searchT = setTimeout(searchChats, 250); };
 function newChat(quiet){
-  sessionId = newId(); store.set('ai.session', sessionId);
+  sessionId = newId(); store.set('ai.session', sessionId); chatName = ''; store.set('ai.chatName', '');
   history = []; store.set('moneyai.history', []); goal = ''; store.set('ai.goal', ''); showGoal();
   $('#turns').innerHTML = ''; $('#hello').hidden = false; openChats(false); setTitle();
   drawChats(); $('#q').focus();
   if(!quiet) toast('New chat — the last one is in the list');
 }
-const setTitle = () => { $('#exportChat').hidden = !history.length; $('#chatTitle').textContent = history.length ? history[0].q : 'New chat'; document.title = history.length ? String(history[0].q).slice(0, 50) + ' — SmartHomeAI' : 'SmartHomeAI'; };
+let chatName = store.get('ai.chatName', '');
+const setTitle = () => { const t = history.length ? chatName || history[0].q : 'New chat'; $('#exportChat').hidden = !history.length; $('#chatTitle').textContent = t; document.title = history.length ? String(t).slice(0, 50) + ' — SmartHomeAI' : 'SmartHomeAI'; };
 // on a phone the sidebar slides in; on a wide screen it is always there
 const openChats = on => { document.body.classList.toggle('sbOpen', !!on && innerWidth <= 900); $('#scrim').classList.toggle('open', !!on && innerWidth <= 900); if(on) loadChats(); };
 $('#sbOpen').onclick = () => openChats(true);
