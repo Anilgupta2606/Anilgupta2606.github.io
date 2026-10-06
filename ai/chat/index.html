@@ -307,6 +307,7 @@ code{font-family:var(--mono); font-size:.85em; background:var(--page2); padding:
 .cform .two{display:flex; gap:8px} .cform .two > *{flex:1}
 .cform{display:flex; flex-direction:column; gap:8px; margin-top:10px}
 .cform input{background:var(--page); border:1px solid var(--line); border-radius:10px; padding:8px 10px; font-size:14px}
+#pwForm label{display:flex; flex-direction:column; gap:4px; font-size:13px; font-weight:600; color:var(--ink2)} #pwForm label small{font-weight:400; color:var(--mut)} #pwForm .err{margin:0}
 .toast{position:fixed; left:calc(50% + var(--sb) / 2); top:68px; bottom:auto; transform:translateX(-50%); background:var(--ink); color:var(--page); border-radius:999px; padding:9px 18px; font-size:14px; font-weight:600; z-index:30; box-shadow:var(--shadow); max-width:90vw}
 
 /* what it has learned */
@@ -401,6 +402,7 @@ main{max-width:800px; padding:22px 20px 170px}
       <div class="seg" id="themeSeg" role="radiogroup" aria-label="Theme"><button data-t="auto" role="radio">Auto</button><button data-t="light" role="radio">Light</button><button data-t="dark" role="radio">Dark</button></div>
       <label class="tog"><input type="checkbox" id="cloudTog"><span><b>Cloud AI for hard questions</b><small>Long code, deep analysis, or when its checks fail twice: a bigger free model (your keys in Setup) writes the answer from what was found here. Off: everything stays on this Mac.</small></span></label>
       <div class="keysrow" id="keysRow" hidden><button class="ghost wide" id="copyKeys" type="button">Copy my AI keys to this Mac</button><small id="keysNote">So the terminal (ai --cloud) and this Mac can use the cloud AIs from your Setup. Saved only on this Mac, readable only by you.</small></div>
+      <button class="ghost wide" id="openPw" type="button" hidden>Change password</button>
       <button class="ghost wide" id="logout">Sign out</button>
     </div>
   </div>
@@ -478,6 +480,19 @@ main{max-width:800px; padding:22px 20px 170px}
   <h2>Scheduled</h2>
   <p class="sub">A question asked for you at a time — "every weekday at 9:15, a Nifty summary". Each result lands in its own chat (⏰) with a notification on your Mac. Runs while the Mac is awake; a time it slept through runs when it wakes.</p>
   <div id="tasks"></div>
+</aside>
+<aside class="panel" id="pwPanel" aria-label="Change password">
+  <button class="ghost close" id="closePw">Close</button>
+  <h2>Change password</h2>
+  <p class="sub">The same sign-in as the terminal (ai passwd) and your other devices through Tailscale. After a change, other devices are signed out.</p>
+  <form class="cform" id="pwForm" autocomplete="off">
+    <label>Current password<input id="pwCur" type="password" autocomplete="current-password" required></label>
+    <label>Username <small>(leave empty to keep it)</small><input id="pwUser" autocomplete="username" maxlength="40"></label>
+    <label>New password <small>(8 or more characters)</small><input id="pwNew" type="password" autocomplete="new-password" minlength="8" required></label>
+    <label>New password again<input id="pwNew2" type="password" autocomplete="new-password" minlength="8" required></label>
+    <p class="err" id="pwErr" hidden></p>
+    <button class="btn wide" type="submit">Change password</button>
+  </form>
 </aside>
 <aside class="panel" id="usagePanel" aria-label="Model usage">
   <button class="ghost close" id="closeUsage">Close</button>
@@ -973,8 +988,8 @@ document.querySelectorAll('.tries button').forEach(b=>b.onclick = () => ask(b.da
 const openPanel = on => { $('#panel').classList.toggle('open', on); $('#scrim').classList.toggle('open', on); if(on) loadLearned(); };
 $('#openLearned').onclick = () => openPanel(true);
 $('#closeLearned').onclick = () => openPanel(false);
-$('#scrim').onclick = () => { openUsage(false); openPanel(false); openConn(false); openChats(false); openTasks(false); };
-document.addEventListener('keydown', e=>{ if(e.key === 'Escape'){ openUsage(false); openPanel(false); openConn(false); openChats(false); openTasks(false); } });
+$('#scrim').onclick = () => { openPw(false); openUsage(false); openPanel(false); openConn(false); openChats(false); openTasks(false); };
+document.addEventListener('keydown', e=>{ if(e.key === 'Escape'){ openPw(false); openUsage(false); openPanel(false); openConn(false); openChats(false); openTasks(false); } });
 $('#clear').onclick = () => newChat();
 /* ---------------------------------------------------------------- files you attach: read here, in this browser
    (text as it is; a PDF's text with Mozilla's pdf.js), then sent with the question as numbered sources */
@@ -1339,6 +1354,19 @@ const openUsage = on => { $('#usagePanel').classList.toggle('open', on); $('#scr
 $('#openUsage').onclick = () => openUsage(true);
 $('#closeUsage').onclick = () => openUsage(false);
 $('#usageDays').onchange = loadUsage;
+// change password (the helper's sign-in; the published page signs in with Money Home's)
+const openPw = on => { $('#pwPanel').classList.toggle('open', on); $('#scrim').classList.toggle('open', on); if(on){ menuOpen(false); $('#pwForm').reset(); $('#pwErr').hidden = true; setTimeout(()=>$('#pwCur').focus(), 50); } };
+if(LOCAL_PAGE) $('#openPw').hidden = false;
+$('#openPw').onclick = () => openPw(true);
+$('#closePw').onclick = () => openPw(false);
+$('#pwForm').onsubmit = async e => {
+  e.preventDefault();
+  const err = t => { $('#pwErr').textContent = t; $('#pwErr').hidden = false; };
+  if($('#pwNew').value !== $('#pwNew2').value) return err('The two new passwords are not the same.');
+  const r = await post('/passwd', {current: $('#pwCur').value, user: $('#pwUser').value.trim(), password: $('#pwNew').value}).catch(()=>({error: 'The helper did not answer.'}));
+  if(!r || !r.ok) return err((r && r.error) || 'Not changed.');
+  $('#pwForm').reset(); openPw(false); toast('Password changed' + (r.user ? ' — username: ' + r.user : '') + '. Other devices are signed out.');
+};
 const openTasks = on => { $('#taskPanel').classList.toggle('open', on); $('#scrim').classList.toggle('open', on); if(on){ openChats(false); loadTasks(); } };
 $('#openTasks').onclick = () => openTasks(true);
 $('#closeTasks').onclick = () => openTasks(false);
