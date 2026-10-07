@@ -150,6 +150,7 @@ details.how summary .dots i{width:8px; height:8px; border-radius:50%; background
 .dots i.search{background:var(--search)!important} .dots i.read{background:var(--read)!important} .dots i.calc{background:var(--calc)!important} .dots i.check{background:var(--check)!important}
 details.how .steps{margin:10px 0 4px}
 .gen{margin:0 0 14px; display:flex; flex-direction:column; gap:8px; align-items:flex-start}
+.gen video{display:block; max-width:100%; width:520px; border-radius:16px; border:1px solid var(--line); box-shadow:var(--shadow)}
 .gen img{max-width:100%; width:520px; border-radius:16px; border:1px solid var(--line); box-shadow:var(--shadow)}
 .gen .dl{text-decoration:none}
 .chart{margin:0 0 14px; background:var(--page); border:1px solid var(--line); border-radius:16px; padding:12px 12px 8px}
@@ -628,7 +629,8 @@ function chartSvg(ch){
   <div class="legend"><span><i style="background:var(--ink)"></i>Close ${fmtN(last)}</span><span><i style="background:var(--search)"></i>20-${esc(ch.unit)}</span><span><i style="background:var(--calc)"></i>50-${esc(ch.unit)}</span><span><i style="background:var(--check)"></i>200-${esc(ch.unit)}</span><span><i class="dash" style="border-color:var(--read)"></i>Support</span><span><i class="dash" style="border-color:var(--check)"></i>Resistance</span></div></figure>`;
 }
 // pictures in an answer (made from a description): shown, with a Download button
-const imagesHtml = out => ((out.images || []).length > 1 ? '<div class="gengrid">' : '') + (out.images || []).map((im, i)=>{ const mime = /^image\/(png|jpeg|webp|gif)$/.test(im.mime || '') ? im.mime : 'image/jpeg', src = im.b64 && /^[A-Za-z0-9+/=]+$/.test(im.b64.slice(0, 200)) ? 'data:' + mime + ';base64,' + im.b64 : /^data:image\//.test(im.thumb || '') ? im.thumb : '';
+const videosHtml = out => (out.videos || []).map((v, i)=>v.b64 && /^[A-Za-z0-9+/=]+$/.test(v.b64.slice(0, 200)) ? `<figure class="gen"><video src="data:video/mp4;base64,${v.b64}" autoplay loop muted playsinline controls></video><a class="ghost dl" download="cygnus-video-${Date.now()}-${i}.mp4" href="data:video/mp4;base64,${v.b64}">Download</a></figure>` : v.note ? `<figure class="gen"><figcaption class="sub">${esc(v.note)}</figcaption></figure>` : '').join('');
+const imagesHtml = out => videosHtml(out) + ((out.images || []).length > 1 ? '<div class="gengrid">' : '') + (out.images || []).map((im, i)=>{ const mime = /^image\/(png|jpeg|webp|gif)$/.test(im.mime || '') ? im.mime : 'image/jpeg', src = im.b64 && /^[A-Za-z0-9+/=]+$/.test(im.b64.slice(0, 200)) ? 'data:' + mime + ';base64,' + im.b64 : /^data:image\//.test(im.thumb || '') ? im.thumb : '';
   return src ? `<figure class="gen${(out.images || []).length > 1 ? ' many' : ''}"><img src="${src}" alt="A generated picture">${im.label ? `<figcaption class="glabel">${esc(im.label)}</figcaption>` : ''}${im.b64 ? `<a class="ghost dl" download="ai-picture-${Date.now()}-${i}.${mime === 'image/png' ? 'png' : 'jpg'}" href="${src}">Download</a>` : '<figcaption class="sub">Preview (the full picture is in ~/Pictures/AI Images on your Mac)</figcaption>'}</figure>` : ''; }).join('') + ((out.images || []).length > 1 ? '</div>' : '');
 // a small preview to keep in the chat (the full picture is big)
 function preview(b64){ return new Promise(res=>{ const i = new Image(); i.onload = () => { const k = Math.min(1, 384 / Math.max(i.width, i.height)), c = document.createElement('canvas'); c.width = Math.round(i.width * k); c.height = Math.round(i.height * k); c.getContext('2d').drawImage(i, 0, 0, c.width, c.height); res(c.toDataURL('image/jpeg', 0.7)); }; i.onerror = () => res(''); i.src = 'data:image/jpeg;base64,' + b64; }); }
@@ -750,8 +752,9 @@ async function ask(q, opt){
     if(steps[0] && steps[0].t === 'Starting') steps.shift();
     finish(el, q, out, steps, traces);
     const imgs = out.images || [];
+    const vids = out.videos || [];
     if(imgs.length) Promise.all(imgs.map(im=>preview(im.b64))).then(p=>{ const h = history.find(x=>x.answer && x.answer.text === out.text); if(h){ h.answer.images = p.map((t, i)=>t ? {thumb: t, label: imgs[i].label} : null).filter(Boolean); store.set('moneyai.history', history); saveChat(); } });
-    history.push({q, answer: {kind: out.kind, text: out.text, sources: out.sources, read: out.read, by: out.by, secs: out.secs, model: out.model, chart: out.chart, trust: out.trust ? {confidence: out.trust.confidence, checked: out.trust.checked, ok: out.trust.ok} : undefined, saved: out.saved}, steps, traces: slim(traces)});
+    history.push({q, answer: {kind: out.kind, videos: vids.length ? vids.map(v=>({note: 'The video is saved on your Mac: ' + String(v.file || '').replace(/^\/Users\/[^/]+/, '~')})) : undefined, text: out.text, sources: out.sources, read: out.read, by: out.by, secs: out.secs, model: out.model, chart: out.chart, trust: out.trust ? {confidence: out.trust.confidence, checked: out.trust.checked, ok: out.trust.ok} : undefined, saved: out.saved}, steps, traces: slim(traces)});
     history = history.slice(-40).map((h, i, all)=>i < all.length - 8 ? Object.assign({}, h, {traces: (h.traces || []).map(t=>({kind: t.kind, title: t.title}))}) : h);
     store.set('moneyai.history', history);
     setTitle();
@@ -1205,6 +1208,7 @@ const COMMANDS = [
   {c: '/theme', a: 'auto | light | dark', d: 'Change the look'},
   {c: '/schedule', a: '', d: 'Scheduled tasks — a question asked for you every day at a time'},
   {c: '/image', a: 'a description', d: 'Make a picture from a description (the model: ✦ menu → Pictures)'},
+  {c: '/video', a: 'a description', d: 'A short video (a slow zoom across a picture), made free on your Mac — "/gif …" for a GIF'},
   {c: '/compare', a: 'a description', d: 'The same picture by 4 models side by side ("/compare best …": the 4 best)'},
   {c: '/deep', a: 'a hard question', d: 'Deep mode: deeper research, then ChatGPT and Apple Private Cloud each write it and ChatGPT merges them ("/deep local …": only on this Mac)'},
   {c: '/chats', a: '', d: 'Your past chats — open one to carry on (also /resume)'},
@@ -1250,6 +1254,7 @@ async function runCommand(line){
   else if(c === '/schedule') openTasks(true);
   else if(c === '/data-usage' || c === '/usage') openUsage(true);
   else if(c === '/deep'){ const local = /^local\b/i.test(arg || ''), qq = String(arg || '').replace(/^local\b\s*/i, ''); if(qq) ask(qq, {deep: true, deepLocal: local}); else toast('Write the question after /deep (or /deep local …)'); }
+  else if(c === '/video' || c === '/gif'){ if(arg) ask((c === '/gif' ? 'Make a GIF of ' : 'Make a video of ') + arg); else toast('Describe it after ' + c); }
   else if(c === '/compare'){ const best = /^best\b/i.test(arg || ''), d0 = String(arg || '').replace(/^best\b\s*/i, ''); if(d0) ask('Generate an image of ' + d0, {imageModel: best ? 'compare-best' : 'compare'}); else toast('Describe the picture after /compare'); }
   else if(c === '/image'){ if(arg) ask('Generate an image of ' + arg); else toast('Describe the picture after /image'); }
   else if(c === '/help'){ const el = turnEl('/help'); finish(el, '/help', {text: COMMANDS.map(x=>'- `' + x.c + (x.a ? ' ' + x.a : '') + '` — ' + x.d).join('\n'), model: 'Commands', by: 'Type / in the box to see these'}, []); }
