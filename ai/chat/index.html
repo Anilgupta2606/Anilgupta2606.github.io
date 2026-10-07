@@ -509,7 +509,7 @@ main{max-width:800px; padding:22px 20px 170px}
       <button type="button" data-mode="video" role="menuitem"><i>🎞</i><span><b>Make a video</b><small>A short video, made free on your Mac</small></span></button>
       <button type="button" data-mode="deep" role="menuitem"><i>🧠</i><span><b>Deep think</b><small>Deeper research; ChatGPT and Private Cloud write it, merged</small></span></button>
       <button type="button" data-mode="research" role="menuitem"><i>🔎</i><span><b>Research</b><small>More searches and pages read, with sources — for current topics</small></span></button>
-      <button type="button" data-mode="council" role="menuitem"><i>🏛</i><span><b>Best answer</b><small>Two cloud models write it, an editor merges</small></span></button>
+      <button type="button" data-mode="council" role="menuitem"><i>💭</i><span><b>Thinking</b><small>Two cloud models write it, an editor merges</small></span></button>
     </div>
     <span class="modechip" id="modeChip" hidden><span id="modeName"></span><button type="button" id="modeOff" aria-label="Turn this mode off">×</button></span>
     <textarea id="q" rows="1" placeholder="Ask anything…  ( / for commands)" aria-label="Your question"></textarea>
@@ -880,7 +880,7 @@ let autoLabel = 'Auto';
 const IMG_PICK = [['auto', 'Auto pictures', 'FLUX.1 schnell; styles by Image Playground; backups when Cloudflare cannot (then Draw Things, DiffusionBee on this Mac)'], ['compare', 'Compare 4 models', 'FLUX.1 schnell, FLUX.2 klein 4B, SDXL Lightning, Pollinations — side by side'], ['compare-best', 'Compare the 4 best', 'FLUX.2 klein 9B, FLUX.2 dev, Phoenix, Lucid Origin — most of a day\'s free allowance'],
   ['flux-1-schnell', 'FLUX.1 schnell', 'good and cheap (~125 a day free)'], ['flux-2-klein-9b', 'FLUX.2 klein 9B', 'excellent and fast; ~7 a day free'], ['flux-2-dev', 'FLUX.2 dev', 'the most detailed; ~2–3 a day free'], ['phoenix', 'Leonardo Phoenix', 'follows the description closely; ~4 a day free'], ['lucid-origin', 'Leonardo Lucid Origin', 'rich, polished; ~3 a day free'],
   ['flux-2-klein-4b', 'FLUX.2 klein 4B', 'cheap; can be slow'], ['sdxl-lightning', 'SDXL Lightning', 'fast; loose'], ['dreamshaper', 'DreamShaper 8', 'fast, painterly; loose'], ['gemini', 'Gemini 3.1 Flash Image', 'Google; needs billing on your key'], ['pollinations', 'Pollinations', 'free, no key; a small mark'], ['playground', 'Apple Image Playground', 'illustration styles (its Shortcut needed)'], ['drawthings', 'Draw Things', 'on this Mac, its chosen model (API Server on)'], ['diffusionbee', 'DiffusionBee', 'on this Mac: private, offline; slower (~40 s)']];
-const pickLabel = () => pick.kind === 'auto' ? autoLabel : pick.kind === 'local' ? pick.model : pick.kind === 'private' ? 'Private AI (in this browser)' : pick.kind === 'council' ? 'Best answer (council)' : (CLOUD_NAMES[pick.provider] || pick.provider);
+const pickLabel = () => pick.kind === 'auto' ? autoLabel : pick.kind === 'local' ? pick.model : pick.kind === 'private' ? 'Private AI (in this browser)' : pick.kind === 'council' ? 'Thinking' : (CLOUD_NAMES[pick.provider] || pick.provider);
 async function openPicker(){
   const box = $('#picker');
   if(!box.hidden){ box.hidden = true; return; }
@@ -890,7 +890,7 @@ async function openPicker(){
   const privateOk = typeof MoneyAI !== 'undefined' && !LOCAL_PAGE;
   const item = (p, icon, title, sub) => `<button type="button" role="menuitem" data-p='${esc(JSON.stringify(p))}' class="${JSON.stringify(p) === JSON.stringify(pick) ? 'on' : ''}"><i>${icon}</i><span><b>${esc(title)}</b><small>${esc(sub)}</small></span></button>`;
   box.innerHTML = item({kind: 'auto'}, '✦', 'Auto (recommended)', info.apple && info.apple.chatgpt ? 'The right model for each question: ChatGPT (through Siri) for money, hard questions and code; Apple Private Cloud for web answers; this Mac for your files, chat and pictures' : 'The right model for each question: general, code, pictures, hard questions')
-    + (cloud.length >= 2 ? item({kind: 'council'}, '🏛', 'Best answer (council)', 'Research here, then two top cloud models write it and an editor merges them — the most reliable') : '')
+    + (cloud.length >= 2 ? item({kind: 'council'}, '💭', 'Thinking', 'Research here, then two top cloud models write it and an editor merges them — the most reliable') : '')
     + (info.local.length ? '<h6>On this Mac</h6>' + info.local.map(m=>item({kind: 'local', model: m.name}, '💻', m.name, (m.role ? m.role + ' · ' : '') + m.gb + ' GB')).join('') : '')
     + (info.apple && (info.apple.apple || info.apple.chatgpt || info.apple.pcc) ? '<h6>Apple Intelligence</h6>'
         + (info.apple.apple ? item({kind: 'cloud', provider: 'apple'}, '', 'Apple Intelligence (on this Mac)', 'Apple\'s on-device model — private and free; research is done here') : '')
@@ -1033,7 +1033,7 @@ document.addEventListener('click', e=>{ const b = e.target.closest && e.target.c
   (navigator.clipboard ? navigator.clipboard.writeText(code) : Promise.reject()).then(()=>{ b.textContent = 'Copied'; setTimeout(()=>{ b.textContent = 'Copy'; }, 1500); }).catch(()=>{ b.textContent = 'Select and copy'; }); });
 /* TOOLS: a mode for your next questions (it stays until you take it off): picture, video, deep think, research, best answer */
 let toolMode = null;
-const MODES = {image: '🎨 Create image', video: '🎞 Make a video', deep: '🧠 Deep think', research: '🔎 Research', council: '🏛 Best answer'};
+const MODES = {image: '🎨 Create image', video: '🎞 Make a video', deep: '🧠 Deep think', research: '🔎 Research', council: '💭 Thinking'};
 const setMode = m => { toolMode = MODES[m] ? m : null; $('#modeChip').hidden = !toolMode; $('#modeName').textContent = toolMode ? MODES[toolMode] : ''; $('#toolsBtn').classList.toggle('on', !!toolMode);
   $('#q').placeholder = toolMode === 'image' ? 'Describe the picture…' : toolMode === 'video' ? 'Describe the video…' : matchMedia('(max-width: 600px)').matches ? 'Ask anything…' : 'Ask anything… ( / for commands)'; $('#q').focus(); };
 const toolsMenu = on => { $('#toolsMenu').hidden = !on; if(on) attachMenu(false); };
