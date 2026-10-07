@@ -585,6 +585,8 @@ if(LOCAL_PAGE){ const _fetch = window.fetch.bind(window); let out = false;
     if(r.status === 401 && !out && !/\/login$/.test(String(u))){ out = true; try{ sessionStorage.removeItem('money-home-session'); }catch(e){} location.reload(); }
     return r; }; }
 let mode = null;                                            // 'mac' | 'browser'
+// an answer sent back with the next question: 1500 characters, and the line naming its picture (so "edit it" finds it)
+const keepText = (t, n) => { t = String(t || ''); const s = (/Saved on this Mac: `[^`]+`/.exec(t) || [''])[0]; const c = t.slice(0, n); return s && !c.includes(s) ? c + '\n\n' + s : c; };
 const $ = s => document.querySelector(s);
 const webUrl = u => /^https?:\/\//i.test(String(u || '')) ? String(u) : '';     // only web addresses become links (never javascript: and the like)
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -772,7 +774,7 @@ async function ask(q, opt){
     box.innerHTML = stepHtml(steps[steps.length - 1], true);                   // the step it is on now
   };
   step('Starting');
-  const turns = history.slice(-3).flatMap(h=>[{role: 'user', content: h.q}, {role: 'assistant', content: String(h.answer.text || '').slice(0, 1500)}]);
+  const turns = history.slice(-3).flatMap(h=>[{role: 'user', content: h.q}, {role: 'assistant', content: keepText(h.answer.text, 1500)}]);
   let doneShown = false;
   const done = out => {
     lastAnswer = out;
