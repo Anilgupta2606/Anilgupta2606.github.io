@@ -376,6 +376,11 @@ main{max-width:800px; padding:22px 20px 170px}
 @keyframes vpulse{50%{transform:scale(1.12)}} @keyframes spin{to{transform:rotate(360deg)}}
 .vtext{flex:1; min-width:0} .vtext b{display:block; font-size:14px} .vtext small{display:block; font-size:12.5px; color:var(--mut); overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
 .vlang,.vend{padding:4px 12px; font-size:12.5px} .talk.on{color:var(--think)}
+.toolsMenu{left:48px; width:310px}
+@media (max-width:600px){ .toolsMenu{left:4px; width:calc(100vw - 28px)} .box{position:relative} .modechip{position:absolute; left:8px; top:-34px; box-shadow:var(--shadow); background:var(--card); border:1px solid var(--line)} }
+.modechip{display:inline-flex; align-items:center; gap:4px; flex:none; background:var(--think-bg); color:var(--think); border-radius:999px; padding:3px 4px 3px 10px; font-size:12.5px; font-weight:600; white-space:nowrap; align-self:center}
+.modechip button{border:0; background:none; color:inherit; cursor:pointer; font-size:15px; line-height:1; width:20px; height:20px; border-radius:50%} .modechip button:hover{background:rgb(0 0 0 / .08)}
+.tools.on{color:var(--think)}
 .glabel{font-size:12px; color:var(--mut); margin:4px 2px 0}
 .foot{margin-top:10px; padding-top:8px; font-size:12px} .foot .by{font-family:var(--body); font-size:11.5px; line-height:1.45}
 .foot .ghost{padding:3px 10px; font-size:12px}
@@ -498,6 +503,15 @@ main{max-width:800px; padding:22px 20px 170px}
       <button type="button" data-in="imageIn" role="menuitem"><i>🖼</i><span><b>Images</b><small>Photos, screenshots, receipts, charts</small></span></button>
       <button type="button" data-in="cameraIn" role="menuitem" class="phoneOnly"><i>📷</i><span><b>Take a photo</b><small>With the camera</small></span></button>
     </div>
+    <button class="clip tools" type="button" id="toolsBtn" aria-label="Tools: image, video, deep think, research" title="Tools — image, video, deep think, research, best answer"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg></button>
+    <div class="attachMenu toolsMenu" id="toolsMenu" hidden role="menu">
+      <button type="button" data-mode="image" role="menuitem"><i>🎨</i><span><b>Create image</b><small>A picture from your words (model: ✦ menu → Pictures)</small></span></button>
+      <button type="button" data-mode="video" role="menuitem"><i>🎞</i><span><b>Make a video</b><small>A short video, made free on your Mac</small></span></button>
+      <button type="button" data-mode="deep" role="menuitem"><i>🧠</i><span><b>Deep think</b><small>Deeper research; ChatGPT and Private Cloud write it, merged</small></span></button>
+      <button type="button" data-mode="research" role="menuitem"><i>🔎</i><span><b>Research</b><small>More searches and pages read, with sources — for current topics</small></span></button>
+      <button type="button" data-mode="council" role="menuitem"><i>🏛</i><span><b>Best answer</b><small>Two cloud models write it, an editor merges</small></span></button>
+    </div>
+    <span class="modechip" id="modeChip" hidden><span id="modeName"></span><button type="button" id="modeOff" aria-label="Turn this mode off">×</button></span>
     <textarea id="q" rows="1" placeholder="Ask anything…  ( / for commands)" aria-label="Your question"></textarea>
     <button class="clip talk" type="button" id="talk" aria-label="Voice mode: talk with Cygnus AI" title="Voice mode — talk, and hear the answer" hidden><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 10v4M8 7v10M12 4v16M16 7v10M20 10v4"/></svg></button>
     <button class="clip mic" type="button" id="mic" aria-label="Speak your question" title="Speak (🎤)" hidden><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0014 0M12 18v3"/></svg></button>
@@ -799,7 +813,7 @@ async function ask(q, opt){
       out.secs = Math.round((Date.now() - t0) / 1000);
       done(out);
     } else {
-      const r = await fetch(HELPER + '/ask', {method: 'POST', headers: {'content-type': 'application/json'}, signal: ctl.signal, body: JSON.stringify({question: q, deep: !!opt.deep, deepLocal: !!opt.deepLocal, imageModel: opt.imageModel || store.get('ai.imageModel', 'auto'), model: pick.kind === 'local' ? pick.model : undefined, provider: pick.kind === 'cloud' ? pick.provider : pick.kind === 'council' ? 'council' : undefined, history: turns, cloud: cloudKeys(), fresh: !!opt.fresh, attachments: files.map(f=>f.image ? {name: f.name, image: f.image} : f), goal, disabled, lastKind: (history.length && history[history.length - 1].answer.kind) || ''})});
+      const r = await fetch(HELPER + '/ask', {method: 'POST', headers: {'content-type': 'application/json'}, signal: ctl.signal, body: JSON.stringify({question: q, deep: !!opt.deep, deepLocal: !!opt.deepLocal, research: !!opt.research, imageModel: opt.imageModel || store.get('ai.imageModel', 'auto'), model: pick.kind === 'local' ? pick.model : undefined, provider: opt.provider || (pick.kind === 'cloud' ? pick.provider : pick.kind === 'council' ? 'council' : undefined), history: turns, cloud: cloudKeys(), fresh: !!opt.fresh, attachments: files.map(f=>f.image ? {name: f.name, image: f.image} : f), goal, disabled, lastKind: (history.length && history[history.length - 1].answer.kind) || ''})});
       if(!r.ok) throw new Error((await r.json().catch(()=>({}))).error || 'It answered ' + r.status);
       const reader = r.body.getReader(), dec = new TextDecoder();
       let buf = '', out = null;
@@ -1017,8 +1031,28 @@ $('#q').addEventListener('input', grow);
 document.addEventListener('click', e=>{ const b = e.target.closest && e.target.closest('.copy'); if(!b) return;
   const code = b.closest('.code').querySelector('code').textContent;
   (navigator.clipboard ? navigator.clipboard.writeText(code) : Promise.reject()).then(()=>{ b.textContent = 'Copied'; setTimeout(()=>{ b.textContent = 'Copy'; }, 1500); }).catch(()=>{ b.textContent = 'Select and copy'; }); });
-$('#q').addEventListener('keydown', e=>{ if(e.key === 'Enter' && !e.shiftKey && !e.isComposing){ e.preventDefault(); const v = $('#q').value; if(/^\/\w/.test(v.trim())) runCommand(v); else ask(v); } });
-$('#form').onsubmit = e => { e.preventDefault(); const v = $('#q').value; if(/^\/\w/.test(v.trim())) runCommand(v); else ask(v); };
+/* TOOLS: a mode for your next questions (it stays until you take it off): picture, video, deep think, research, best answer */
+let toolMode = null;
+const MODES = {image: '🎨 Create image', video: '🎞 Make a video', deep: '🧠 Deep think', research: '🔎 Research', council: '🏛 Best answer'};
+const setMode = m => { toolMode = MODES[m] ? m : null; $('#modeChip').hidden = !toolMode; $('#modeName').textContent = toolMode ? MODES[toolMode] : ''; $('#toolsBtn').classList.toggle('on', !!toolMode);
+  $('#q').placeholder = toolMode === 'image' ? 'Describe the picture…' : toolMode === 'video' ? 'Describe the video…' : matchMedia('(max-width: 600px)').matches ? 'Ask anything…' : 'Ask anything… ( / for commands)'; $('#q').focus(); };
+const toolsMenu = on => { $('#toolsMenu').hidden = !on; if(on) attachMenu(false); };
+$('#toolsBtn').onclick = e => { e.stopPropagation(); toolsMenu($('#toolsMenu').hidden); };
+$('#toolsMenu').querySelectorAll('[data-mode]').forEach(b=>b.onclick = () => { setMode(b.dataset.mode); toolsMenu(false); });
+$('#modeOff').onclick = () => setMode(null);
+document.addEventListener('click', e=>{ if(!$('#toolsMenu').hidden && !e.target.closest('#toolsMenu, #toolsBtn')) toolsMenu(false); });
+const send = v => {
+  if(/^\/\w/.test(v.trim())) return runCommand(v);
+  if(!v.trim()) return;
+  if(toolMode === 'image') return ask(/^\s*(draw|paint|sketch|generate|create|make)\b/i.test(v) ? v : 'Generate an image of ' + v);
+  if(toolMode === 'video') return ask(/\b(video|gif|animat)/i.test(v) ? v : 'Make a video of ' + v);
+  if(toolMode === 'deep') return ask(v, {deep: true});
+  if(toolMode === 'research') return ask(v, {research: true});
+  if(toolMode === 'council') return ask(v, {provider: 'council'});
+  return ask(v);
+};
+$('#q').addEventListener('keydown', e=>{ if(e.key === 'Enter' && !e.shiftKey && !e.isComposing){ e.preventDefault(); send($('#q').value); } });
+$('#form').onsubmit = e => { e.preventDefault(); send($('#q').value); };
 document.querySelectorAll('.tries button').forEach(b=>b.onclick = () => ask(b.dataset.q));
 const openPanel = on => { $('#panel').classList.toggle('open', on); $('#scrim').classList.toggle('open', on); if(on) loadLearned(); };
 $('#openLearned').onclick = () => openPanel(true);
@@ -1062,7 +1096,7 @@ function showFiles(){
   box.querySelectorAll('button').forEach(b=>b.onclick = () => { attachments.splice(+b.dataset.i, 1); showFiles(); });
 }
 const attachMenu = on => { $('#attachMenu').hidden = !on; };
-$('#clip').onclick = e => { e.stopPropagation(); attachMenu($('#attachMenu').hidden); };
+$('#clip').onclick = e => { e.stopPropagation(); toolsMenu(false); attachMenu($('#attachMenu').hidden); };
 document.querySelectorAll('#attachMenu [data-in]').forEach(b=>b.onclick = () => { attachMenu(false); $('#' + b.dataset.in).click(); });
 document.addEventListener('click', e=>{ if(!$('#attachMenu').hidden && !e.target.closest('#attachMenu') && !e.target.closest('#clip')) attachMenu(false); });
 // pictures: made smaller here (at most 1600 px, JPEG) before they are sent
