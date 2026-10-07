@@ -813,7 +813,7 @@ async function ask(q, opt){
       out.secs = Math.round((Date.now() - t0) / 1000);
       done(out);
     } else {
-      const r = await fetch(HELPER + '/ask', {method: 'POST', headers: {'content-type': 'application/json'}, signal: ctl.signal, body: JSON.stringify({question: q, deep: !!opt.deep, deepLocal: !!opt.deepLocal, research: !!opt.research, imageModel: opt.imageModel || store.get('ai.imageModel', 'auto'), model: pick.kind === 'local' ? pick.model : undefined, provider: opt.provider || (pick.kind === 'cloud' ? pick.provider : pick.kind === 'council' ? 'council' : undefined), history: turns, cloud: cloudKeys(), fresh: !!opt.fresh, attachments: files.map(f=>f.image ? {name: f.name, image: f.image} : f), goal, disabled, lastKind: (history.length && history[history.length - 1].answer.kind) || ''})});
+      const r = await fetch(HELPER + '/ask', {method: 'POST', headers: {'content-type': 'application/json'}, signal: ctl.signal, body: JSON.stringify({question: q, deep: !!opt.deep, deepLocal: !!opt.deepLocal, research: !!opt.research, imageModel: opt.imageModel || store.get('ai.imageModel', 'auto'), videoModel: store.get('ai.videoModel', 'auto') !== 'auto' ? store.get('ai.videoModel') : undefined, model: pick.kind === 'local' ? pick.model : undefined, provider: opt.provider || (pick.kind === 'cloud' ? pick.provider : pick.kind === 'council' ? 'council' : undefined), history: turns, cloud: cloudKeys(), fresh: !!opt.fresh, attachments: files.map(f=>f.image ? {name: f.name, image: f.image} : f), goal, disabled, lastKind: (history.length && history[history.length - 1].answer.kind) || ''})});
       if(!r.ok) throw new Error((await r.json().catch(()=>({}))).error || 'It answered ' + r.status);
       const reader = r.body.getReader(), dec = new TextDecoder();
       let buf = '', out = null;
@@ -880,6 +880,8 @@ let autoLabel = 'Auto';
 const IMG_PICK = [['auto', 'Auto pictures', 'FLUX.1 schnell; styles by Image Playground; backups when Cloudflare cannot (then Draw Things, DiffusionBee on this Mac)'], ['compare', 'Compare 4 models', 'FLUX.1 schnell, FLUX.2 klein 4B, SDXL Lightning, Pollinations — side by side'], ['compare-best', 'Compare the 4 best', 'FLUX.2 klein 9B, FLUX.2 dev, Phoenix, Lucid Origin — most of a day\'s free allowance'],
   ['flux-1-schnell', 'FLUX.1 schnell', 'good and cheap (~125 a day free)'], ['flux-2-klein-9b', 'FLUX.2 klein 9B', 'excellent and fast; ~7 a day free'], ['flux-2-dev', 'FLUX.2 dev', 'the most detailed; ~2–3 a day free'], ['phoenix', 'Leonardo Phoenix', 'follows the description closely; ~4 a day free'], ['lucid-origin', 'Leonardo Lucid Origin', 'rich, polished; ~3 a day free'],
   ['flux-2-klein-4b', 'FLUX.2 klein 4B', 'cheap; can be slow'], ['sdxl-lightning', 'SDXL Lightning', 'fast; loose'], ['dreamshaper', 'DreamShaper 8', 'fast, painterly; loose'], ['gemini', 'Gemini 3.1 Flash Image', 'Google; needs billing on your key'], ['pollinations', 'Pollinations', 'free, no key; a small mark'], ['playground', 'Apple Image Playground', 'illustration styles (its Shortcut needed)'], ['drawthings', 'Draw Things', 'on this Mac, its chosen model (API Server on)'], ['diffusionbee', 'DiffusionBee', 'on this Mac: private, offline; slower (~40 s)']];
+// the video models (cli/animatediff.mjs): AnimateDiff for real motion, the zoom or pan as the fallback
+const VID_PICK = [['auto', 'Auto videos', 'AnimateDiff online (real motion, seconds), then AnimateDiff on this Mac, then a zoom or pan'], ['animatediff', 'AnimateDiff', 'online, then this Mac — never the zoom or pan'], ['animatediff-online', 'AnimateDiff online', 'ByteDance\'s free Hugging Face Space — seconds'], ['animatediff-mac', 'AnimateDiff on this Mac', 'private, offline — about 7 minutes on 8 GB (ai animatediff install)'], ['kenburns', 'Zoom or pan', 'the older way: a slow camera move across one picture, 6 s']];
 const pickLabel = () => pick.kind === 'auto' ? autoLabel : pick.kind === 'local' ? pick.model : pick.kind === 'private' ? 'Private AI (in this browser)' : pick.kind === 'council' ? 'Thinking' : (CLOUD_NAMES[pick.provider] || pick.provider);
 async function openPicker(){
   const box = $('#picker');
@@ -898,9 +900,11 @@ async function openPicker(){
         + (info.apple.pcc ? item({kind: 'cloud', provider: 'pcc'}, '', 'Apple Private Cloud', 'Apple\'s Private Cloud Compute, through your Shortcut') : '') : '')
     + (privateOk ? '<h6>In this browser</h6>' + item({kind: 'private'}, '🔒', 'Private AI', 'Runs inside this browser (WebGPU) — nothing leaves the device; set up in Setup') : '')
     + (cloud.length ? '<h6>Cloud (your free keys)</h6>' + cloud.map(c=>item({kind: 'cloud', provider: c}, '☁', CLOUD_NAMES[c] || c, 'Research on this device, written by this model')).join('') : '')
-    + (mode === 'mac' ? '<h6>Pictures</h6>' + IMG_PICK.map(([k, t, sub])=>`<button type="button" role="menuitemradio" data-img="${k}" class="${(store.get('ai.imageModel', 'auto')) === k ? 'on' : ''}"><i>🎨</i><span><b>${esc(t)}</b><small>${esc(sub)}</small></span></button>`).join('') : '');
+    + (mode === 'mac' ? '<h6>Pictures</h6>' + IMG_PICK.map(([k, t, sub])=>`<button type="button" role="menuitemradio" data-img="${k}" class="${(store.get('ai.imageModel', 'auto')) === k ? 'on' : ''}"><i>🎨</i><span><b>${esc(t)}</b><small>${esc(sub)}</small></span></button>`).join('')
+        + '<h6>Videos</h6>' + VID_PICK.map(([k, t, sub])=>`<button type="button" role="menuitemradio" data-vid="${k}" class="${(store.get('ai.videoModel', 'auto')) === k ? 'on' : ''}"><i>🎬</i><span><b>${esc(t)}</b><small>${esc(sub)}</small></span></button>`).join('') : '');
   box.hidden = false;
   box.querySelectorAll('[data-img]').forEach(b=>b.onclick = () => { store.set('ai.imageModel', b.dataset.img); box.hidden = true; toast('Pictures now: ' + (IMG_PICK.find(x=>x[0] === b.dataset.img) || [, b.dataset.img])[1]); });
+  box.querySelectorAll('[data-vid]').forEach(b=>b.onclick = () => { store.set('ai.videoModel', b.dataset.vid); box.hidden = true; toast('Videos now: ' + (VID_PICK.find(x=>x[0] === b.dataset.vid) || [, b.dataset.vid])[1]); });
   box.querySelectorAll('[data-p]').forEach(b=>b.onclick = () => { pick = JSON.parse(b.dataset.p); store.set('ai.pick', pick); box.hidden = true; showModel(null, true); toast('Answers now: ' + pickLabel()); });
 }
 $('#stModel').onclick = e => { e.stopPropagation(); openPicker(); };
@@ -1242,7 +1246,7 @@ const COMMANDS = [
   {c: '/theme', a: 'auto | light | dark', d: 'Change the look'},
   {c: '/schedule', a: '', d: 'Scheduled tasks — a question asked for you every day at a time'},
   {c: '/image', a: 'a description', d: 'Make a picture from a description (the model: ✦ menu → Pictures)'},
-  {c: '/video', a: 'a description', d: 'A short video (a slow zoom across a picture), made free on your Mac — "/gif …" for a GIF'},
+  {c: '/video', a: 'a description', d: 'A short video with real motion (AnimateDiff), free — "/gif …" for a GIF (the model: ✦ menu → Videos)'},
   {c: '/compare', a: 'a description', d: 'The same picture by 4 models side by side ("/compare best …": the 4 best)'},
   {c: '/deep', a: 'a hard question', d: 'Deep mode: deeper research, then ChatGPT and Apple Private Cloud each write it and ChatGPT merges them ("/deep local …": only on this Mac)'},
   {c: '/chats', a: '', d: 'Your past chats — open one to carry on (also /resume)'},
