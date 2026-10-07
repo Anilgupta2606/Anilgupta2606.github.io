@@ -129,8 +129,8 @@ const MoneyAI = (function(){
   const backAt = t => { const d = new Date(t); return (d.toDateString() === new Date().toDateString() ? 'at ' : 'tomorrow at ') + d.toTimeString().slice(0, 5); };
   function Unavailable(message, status, limit){ const e = new Error(message); e.unavailable = true; e.status = status; e.limit = !!limit; return e; }
   async function post(url, headers, body, signal, wait){
-    const ctl = new AbortController(), timer = setTimeout(()=>ctl.abort(), wait || 120000);
-    if(signal) signal.addEventListener('abort', ()=>ctl.abort());
+    const ctl = new AbortController(), timer = setTimeout(()=>ctl.abort(), wait || 120000), stop = ()=>ctl.abort();
+    if(signal) signal.addEventListener('abort', stop);
     try{
       const res = await fetch(url, {method:'POST', headers:Object.assign({'Content-Type':'application/json'}, headers), body:JSON.stringify(body), signal:ctl.signal});
       // the time limit covers the whole answer: OpenRouter sends its headers at once and then waits minutes before the body
@@ -141,7 +141,7 @@ const MoneyAI = (function(){
       if(signal && signal.aborted){ const c = new Error('Stopped.'); c.code = 'cancelled'; throw c; }
       if(e.name === 'AbortError') throw Unavailable('No answer in time.', 504);
       throw Unavailable('Could not reach the service (offline, or it blocked the request).', 503);
-    } finally { clearTimeout(timer); }
+    } finally { clearTimeout(timer); if(signal) signal.removeEventListener('abort', stop); }
   }
   async function failure(name, res, id){
     const body = await res.text().catch(()=>'');
@@ -314,7 +314,7 @@ const MoneyAI = (function(){
     }
     const base = OPENAI_BASE[id];
     const headers = {Authorization:'Bearer ' + key};
-    if(id === 'openrouter'){ headers['HTTP-Referer'] = location.origin; headers['X-Title'] = 'Trip Vault'; }
+    if(id === 'openrouter'){ headers['HTTP-Referer'] = location.origin; headers['X-Title'] = 'Money Home'; }
     const body = json => Object.assign({model, temperature: temp(opts), max_tokens:8192, messages:[{role:'system', content:system}].concat(turns)}, json ? {response_format: {type: 'json_object'}} : {});
     let res = await post(base + '/chat/completions', headers, body(!!opts.schema), signal, 90000);
     // some models refuse the JSON switch: ask again without it (the instructions still ask for JSON)
