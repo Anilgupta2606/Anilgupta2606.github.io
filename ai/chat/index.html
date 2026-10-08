@@ -560,7 +560,7 @@ button, a, summary, label{touch-action:manipulation}
 <aside class="panel" id="projectPanel" aria-label="Coding projects">
   <button class="ghost close" id="closeProjects">Close</button>
   <h2>Coding projects</h2>
-  <p class="sub">Choose a local project folder and its test command. In a selected project, the AI reads code, edits files, runs that command, and keeps edits only when tests pass.</p>
+  <p class="sub">Import an existing local project or add one manually. In a selected project, the AI reads code, edits files, runs its test command, and keeps edits only when tests pass.</p>
   <div id="projects"></div>
 </aside>
 <aside class="panel" id="pwPanel" aria-label="Change password">
@@ -1574,10 +1574,16 @@ async function loadProjects(){
   if(mode !== 'mac'){ box.innerHTML = '<p class="sub">Coding projects run on your Mac. Open this page through your Mac or Tailscale.</p>'; return; }
   let list = []; try{ list = (await fetch(HELPER + '/projects').then(r=>r.json())).list || []; }catch(e){}
   const active = store.get('ai.project', '');
-  box.innerHTML = (list.length ? list.map(p=>`<label class="trow2"><input type="radio" name="project" data-use="${esc(p.id)}" ${p.id === active ? 'checked' : ''}><span class="tt"><b>${esc(p.name)}</b><small>${esc(p.path)} · test: ${esc(p.test)}</small></span><button class="ghost" type="button" data-project-del="${esc(p.id)}">Remove</button></label>`).join('') : '<p class="sub">No project selected. Add one below.</p>') +
-    `<h3>Add a project</h3><form class="cform" id="projectForm"><input id="projectName" placeholder="Name, e.g. My website" maxlength="60" required><input id="projectPath" placeholder="Local folder, e.g. /Users/anilgupta/AI" required><input id="projectTest" placeholder="Test command, e.g. npm test" maxlength="300" required><button class="btn">Add project</button></form>`;
+  box.innerHTML = (list.length ? list.map(p=>`<label class="trow2"><input type="radio" name="project" data-use="${esc(p.id)}" ${p.id === active ? 'checked' : ''}><span class="tt"><b>${esc(p.name)}</b><small>${esc(p.path)} · test: ${esc(p.test)}</small></span><button class="ghost" type="button" data-project-del="${esc(p.id)}">Remove</button></label>`).join('') : '<p class="sub">No project selected. Import or add one below.</p>') +
+    `<h3>Import an existing project</h3><button class="btn" type="button" id="findProjects">Find local projects</button><div id="projectImports"></div><h3>Add manually</h3><form class="cform" id="projectForm"><input id="projectName" placeholder="Name, e.g. My website" maxlength="60" required><input id="projectPath" placeholder="Local folder, e.g. /Users/anilgupta/AI" required><input id="projectTest" placeholder="Test command, e.g. npm test" maxlength="300" required><button class="btn">Add project</button></form>`;
   box.querySelectorAll('[data-use]').forEach(i=>i.onchange = () => { store.set('ai.project', i.dataset.use); toast('Coding project selected'); });
   box.querySelectorAll('[data-project-del]').forEach(b=>b.onclick = async () => { await post('/projects', {id: b.dataset.projectDel, delete: true}); if(store.get('ai.project', '') === b.dataset.projectDel) store.set('ai.project', ''); loadProjects(); });
+  $('#findProjects').onclick = async () => {
+    const target = $('#projectImports'); target.innerHTML = '<p class="sub">Looking in common local development folders…</p>';
+    let found = []; try{ found = (await fetch(HELPER + '/projects?discover=1').then(r=>r.json())).list || []; }catch(e){}
+    target.innerHTML = found.length ? found.map((p,i)=>`<div class="trow2"><span class="tt"><b>${esc(p.name)}</b><small>${esc(p.path)}${p.test ? ' · suggested: ' + esc(p.test) : ' · add a test command'}</small></span>${p.imported ? '<small>Imported</small>' : `<button class="ghost" type="button" data-import="${i}">Import</button>`}</div>`).join('') : '<p class="sub">No projects found in common development folders. You can still add one manually.</p>';
+    target.querySelectorAll('[data-import]').forEach(b=>b.onclick = () => { const p = found[Number(b.dataset.import)]; $('#projectName').value = p.name; $('#projectPath').value = p.path; $('#projectTest').value = p.test; $('#projectTest').focus(); toast(p.test ? 'Review the suggested test command, then add the project.' : 'Enter the project test command, then add it.'); });
+  };
   $('#projectForm').onsubmit = async e => { e.preventDefault(); const r = await post('/projects', {name: $('#projectName').value, path: $('#projectPath').value, test: $('#projectTest').value}).catch(()=>null); if(r && r.project){ store.set('ai.project', r.project.id); toast('Project added and selected'); loadProjects(); } else toast('Could not add this project — check its folder and test command.'); };
 }
 const openProjects = on => { $('#projectPanel').classList.toggle('open', on); $('#scrim').classList.toggle('open', on); if(on){ openChats(false); loadProjects(); } };
