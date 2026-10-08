@@ -737,12 +737,12 @@ function turnEl(q, files){
   $('#hello').hidden = true;
   return el;
 }
-function finish(el, q, out, steps, traces){
+function finish(el, q, out, steps, traces, pending){
   steps = steps || []; traces = traces || [];
   const n = traces.length || steps.length, dots = traces.length ? traces.map(t=>`<i class="${KIND[t.kind] || 'think'}"></i>`) : steps.map(s=>`<i class="${s.k}"></i>`);
   el.querySelector('.work').outerHTML = n ? `<details class="how"><summary><span class="dots">${dots.join('')}</span>How it got here · ${n} step${n === 1 ? '' : 's'}${out.secs ? ' · ' + out.secs + ' s' : ''}</summary>${traces.length ? timeline(traces) : `<div class="steps">${steps.map(s=>stepHtml(s)).join('')}</div>`}</details>` : '';
   const model = out.model || (/no AI/.test(out.by || '') ? 'Worked out exactly (no AI)' : '');
-  const badge = out.verify ? trustBadge(out.verify) : out.trust && !out.saved && busy ? `<span class="conf pending" title="A second model is checking each claim against the sources">Checking claims…</span>` : '';
+  const badge = out.verify ? trustBadge(out.verify) : out.trust && !out.saved && pending ? `<span class="conf pending" title="A second model is checking each claim against the sources">Checking claims…</span>` : '';
   el.querySelector('.slot').innerHTML = `<div class="a"><div class="badges">${model ? `<span class="model" title="The AI model that wrote this answer">✦ ${esc(model)}</span>` : ''}${badge}</div>${render(out)}
     <div class="foot"><span class="by">${esc(out.by || '')}</span>${out.saved ? '<button class="ghost fresh" type="button">Ask fresh</button>' : ''}<button class="ghost cp" type="button" title="Copy the answer">Copy</button><button class="ghost rt" type="button" title="Ask again from scratch">Retry</button><button class="ghost up" type="button" title="Good answer — keep it">👍</button><button class="ghost down" type="button" title="Wrong — tell it what is right">👎</button></div></div>`;
   el.querySelector('.foot .down').onclick = () => teachBox(el, q);
@@ -764,20 +764,22 @@ const trustWords = v => (v.opinions === undefined ? v.supported + '/' + v.checke
 const trustBadge = v => v.confidence === 'Unchecked'
   ? `<span class="conf unchecked" tabindex="0" title="${esc('Not checked: ' + (v.why || 'nothing to check it against'))}">○ Not checked</span>`
   : `<span class="conf ${esc(String(v.confidence).toLowerCase())}" tabindex="0" title="${esc(trustWords(v) + (v.opinions ? ' · ' + v.opinions + ' opinion' + (v.opinions === 1 ? '' : 's') + ' not counted' : '') + (v.by ? ' — checked by ' + v.by : ''))}">${v.confidence === 'High' ? '✓' : v.confidence === 'Low' ? '⚠' : '~'} ${esc(v.confidence)} confidence · ${esc(trustWords(v))}</span>`;
-function showVerify(el, v){
+function showVerify(el, v, chatHistory, save){
   const a = el.querySelector('.a'); if(!a) return;
   const b = a.querySelector('.conf'); if(b) b.outerHTML = trustBadge(v); else { const bs = a.querySelector('.badges'); if(bs) bs.insertAdjacentHTML('beforeend', trustBadge(v)); }
   if(v.contradicted && v.contradicted.length) a.querySelector('.badges').insertAdjacentHTML('afterend', `<div class="warn">⚠ The sources say otherwise about: ${v.contradicted.map(c=>'“' + esc(c.claim.replace(/\[\d+\]/g, '').slice(0, 140)) + '”' + (c.why ? ' (' + esc(c.why) + ')' : '')).join('; ')}</div>`);
-  const qd = el.querySelector('.q div'), h = history.find(x=>x.answer && qd && x.q === qd.firstChild.textContent);
-  if(h){ h.answer.verify = v; store.set('moneyai.history', history); saveChat(); }
+  chatHistory = chatHistory || history;
+  const qd = el.querySelector('.q div'), h = chatHistory.find(x=>x.answer && qd && x.q === qd.firstChild.textContent);
+  if(h){ h.answer.verify = v; if(chatHistory === history) store.set('moneyai.history', history); (save || saveChat)(); }
 }
 // suggested next questions under an answer: one tap asks it
-function showFollow(el, list){
+function showFollow(el, list, chatHistory, save){
   const a = el.querySelector('.a'); if(!a || !list.length || a.querySelector('.follow')) return;
   a.insertAdjacentHTML('beforeend', `<div class="follow">${list.map(f=>`<button type="button" class="fchip2">${esc(f)}</button>`).join('')}</div>`);
   a.querySelectorAll('.fchip2').forEach(b=>b.onclick = () => ask(b.textContent));
-  const h = history.find(x=>x.answer && x.answer.text && el.querySelector('.q div') && x.q === el.querySelector('.q div').firstChild.textContent);
-  if(h){ h.answer.followups = list; store.set('moneyai.history', history); saveChat(); }
+  chatHistory = chatHistory || history;
+  const h = chatHistory.find(x=>x.answer && x.answer.text && el.querySelector('.q div') && x.q === el.querySelector('.q div').firstChild.textContent);
+  if(h){ h.answer.followups = list; if(chatHistory === history) store.set('moneyai.history', history); (save || saveChat)(); }
 }
 function teachBox(el, q){
   if(el.querySelector('.teach')) return el.querySelector('.teach input').focus();
@@ -800,10 +802,18 @@ let lastAnswer = null;
 async function ask(q, opt){
   opt = opt || {};
   q = q.trim();
-  if(!q || busy) return;
+  // A request belongs to the chat that started it.  Do not use the selected chat's
+  // global state after an await: the user may have switched to another chat meanwhile.
+  const requestSessionId = sessionId;
+  if(!q || activeRequests.has(requestSessionId)) return;
+  const requestHistory = history;
+  const requestGoal = goal;
+  let requestChatName = chatName;
+  const request = {sessionId: requestSessionId, controller: new AbortController()};
   const files = attachments.filter(a=>!a.busy && (a.text || a.image)).map(a=>a.image ? {name: a.name, image: a.image, thumb: a.thumb} : {name: a.name, text: a.text});
+  request.q = q; request.files = files;
   attachments = []; showFiles();
-  busy = true; ctl = new AbortController(); sendState(true); $('#q').value = ''; grow(); $('#orb').classList.add('busy');
+  activeRequests.set(requestSessionId, request); syncRequestUI(); $('#q').value = ''; grow();
   const el = turnEl(q, files), box = el.querySelector('.steps'), live = el.querySelector('.live'), steps = [], traces = [];
   const addTrace = t => { traces.push(t); const open = Array.from(live.querySelectorAll('details')).map(d=>d.open); live.innerHTML = timeline(traces, true); live.querySelectorAll('details').forEach((d, i)=>{ if(open[i]) d.open = true; }); };
   el.scrollIntoView({behavior: 'smooth', block: 'start'});
@@ -814,20 +824,25 @@ async function ask(q, opt){
     box.innerHTML = stepHtml(steps[steps.length - 1], true);                   // the step it is on now
   };
   step('Starting');
-  const turns = history.slice(-3).flatMap(h=>[{role: 'user', content: h.q}, {role: 'assistant', content: keepText(h.answer.text, 1500)}]);
+  const turns = requestHistory.slice(-3).flatMap(h=>[{role: 'user', content: h.q}, {role: 'assistant', content: keepText(h.answer.text, 1500)}]);
   let doneShown = false;
   const done = out => {
     lastAnswer = out;
     if(steps[0] && steps[0].t === 'Starting') steps.shift();
-    finish(el, q, out, steps, traces);
+    finish(el, q, out, steps, traces, true);
     const imgs = out.images || [];
     const vids = out.videos || [];
-    if(imgs.length) Promise.all(imgs.map(im=>preview(im.b64))).then(p=>{ const h = history.find(x=>x.answer && x.answer.text === out.text); if(h){ h.answer.images = p.map((t, i)=>t ? {thumb: t, label: imgs[i].label} : null).filter(Boolean); store.set('moneyai.history', history); saveChat(); } });
-    history.push({q, answer: {kind: out.kind, videos: vids.length ? vids.map(v=>({note: 'The video is saved on your Mac: ' + String(v.file || '').replace(/^\/Users\/[^/]+/, '~')})) : undefined, text: out.text, sources: out.sources, read: out.read, by: out.by, secs: out.secs, model: out.model, chart: out.chart, trust: out.trust ? {confidence: out.trust.confidence, checked: out.trust.checked, ok: out.trust.ok} : undefined, saved: out.saved}, steps, traces: slim(traces)});
-    history = history.slice(-40).map((h, i, all)=>i < all.length - 8 ? Object.assign({}, h, {traces: (h.traces || []).map(t=>({kind: t.kind, title: t.title}))}) : h);
-    store.set('moneyai.history', history);
-    setTitle();
-    saveChat().then(loadChats);
+    if(imgs.length) Promise.all(imgs.map(im=>preview(im.b64))).then(p=>{ const h = requestHistory.find(x=>x.answer && x.answer.text === out.text); if(h){ h.answer.images = p.map((t, i)=>t ? {thumb: t, label: imgs[i].label} : null).filter(Boolean); saveChat({id: requestSessionId, history: requestHistory, goal: requestGoal, chatName: requestChatName}); } });
+    requestHistory.push({q, answer: {kind: out.kind, videos: vids.length ? vids.map(v=>({note: 'The video is saved on your Mac: ' + String(v.file || '').replace(/^\/Users\/[^/]+/, '~')})) : undefined, text: out.text, sources: out.sources, read: out.read, by: out.by, secs: out.secs, model: out.model, chart: out.chart, trust: out.trust ? {confidence: out.trust.confidence, checked: out.trust.checked, ok: out.trust.ok} : undefined, saved: out.saved}, steps, traces: slim(traces)});
+    const kept = requestHistory.slice(-40).map((h, i, all)=>i < all.length - 8 ? Object.assign({}, h, {traces: (h.traces || []).map(t=>({kind: t.kind, title: t.title}))}) : h);
+    requestHistory.splice(0, requestHistory.length, ...kept);
+    if(sessionId === requestSessionId){
+      history = requestHistory; store.set('moneyai.history', history); setTitle();
+      // A chat can have been opened again while its request was running. Its old
+      // placeholder is then detached, so paint the saved reply into that chat only.
+      if(!el.isConnected) drawHistory();
+    }
+    saveChat({id: requestSessionId, history: requestHistory, goal: requestGoal, chatName: requestChatName}).then(loadChats);
   };
   try{
     await ready;
@@ -837,7 +852,7 @@ async function ask(q, opt){
     if(snap && snap.data){
       if(typeof MoneyAsk === 'undefined'){ try{ await loadScript('/ai/ask.js'); }catch(e){} }
       const own = typeof MoneyAsk !== 'undefined' && !files.length ? (()=>{ try{ return MoneyAsk.answer(q, snap.data); }catch(e){ return null; } })() : null;
-      if(own && own.text){ step('📊 Answered from your apps'); done({text: own.text, sources: [], model: 'Your apps — worked out exactly (no AI)', by: (own.by || 'Your apps') + ' · as of ' + String(snap.at).slice(0, 10)}); busy = false; sendState(false); $('#orb').classList.remove('busy'); return; }
+      if(own && own.text){ step('📊 Answered from your apps'); done({text: own.text, sources: [], model: 'Your apps — worked out exactly (no AI)', by: (own.by || 'Your apps') + ' · as of ' + String(snap.at).slice(0, 10)}); activeRequests.delete(requestSessionId); syncRequestUI(); return; }
       if(/\b(my|mine|our|i|me)\b/i.test(q) && /\b(spen[dt]|spending|expenses?|income|salary|invest(ed|ment|ments)?|portfolio|net ?worth|sips?|savings?|budget|loans?|emi|plan|retire(ment)?|corpus|trips?|flights?|hotels?|travel|passport|visa|documents?)\b/i.test(q) && snap.ctx)
         files.push({name: 'Your apps (Money Home, as of ' + String(snap.at).slice(0, 10) + ').txt', text: snap.ctx});
     }
@@ -863,12 +878,11 @@ async function ask(q, opt){
     }
     if(mode === 'browser' || pick.kind === 'private'){
       const t0 = Date.now();
-      opt_fresh = !!opt.fresh; opt_files = files;
-      const out = await browserAnswer(q, turns, step);
+      const out = await browserAnswer(q, turns, step, {signal: request.controller.signal, goal: requestGoal, fresh: !!opt.fresh, files});
       out.secs = Math.round((Date.now() - t0) / 1000);
       done(out);
     } else {
-      const r = await fetch(HELPER + '/ask', {method: 'POST', headers: {'content-type': 'application/json'}, signal: ctl.signal, body: JSON.stringify({question: q, deep: !!opt.deep, deepLocal: !!opt.deepLocal, research: !!opt.research, imageModel: opt.imageModel || store.get('ai.imageModel', 'auto'), videoModel: store.get('ai.videoModel', 'auto') !== 'auto' ? store.get('ai.videoModel') : undefined, model: pick.kind === 'local' ? pick.model : undefined, provider: opt.provider || (pick.kind === 'cloud' ? pick.provider : pick.kind === 'council' ? 'council' : undefined), history: turns, cloud: cloudKeys(), fresh: !!opt.fresh, attachments: files.map(f=>f.image ? {name: f.name, image: f.image} : f), goal, disabled, lastKind: (history.length && history[history.length - 1].answer.kind) || ''})});
+      const r = await fetch(HELPER + '/ask', {method: 'POST', headers: {'content-type': 'application/json'}, signal: request.controller.signal, body: JSON.stringify({question: q, deep: !!opt.deep, deepLocal: !!opt.deepLocal, research: !!opt.research, imageModel: opt.imageModel || store.get('ai.imageModel', 'auto'), videoModel: store.get('ai.videoModel', 'auto') !== 'auto' ? store.get('ai.videoModel') : undefined, model: pick.kind === 'local' ? pick.model : undefined, provider: opt.provider || (pick.kind === 'cloud' ? pick.provider : pick.kind === 'council' ? 'council' : undefined), history: turns, cloud: cloudKeys(), fresh: !!opt.fresh, attachments: files.map(f=>f.image ? {name: f.name, image: f.image} : f), goal: requestGoal, disabled, lastKind: (requestHistory.length && requestHistory[requestHistory.length - 1].answer.kind) || ''})});
       if(!r.ok) throw new Error((await r.json().catch(()=>({}))).error || 'It answered ' + r.status);
       const reader = r.body.getReader(), dec = new TextDecoder();
       let buf = '', out = null;
@@ -886,26 +900,26 @@ async function ask(q, opt){
           if(m.draft != null){ const d = el.querySelector('.draft'); if(d){ d.hidden = !String(m.draft).trim(); d.innerHTML = '<div class="dlabel">Writing…</div>' + markdown(m.draft, {}); } }
           if(m.error) throw new Error(m.error);
           if(m.answer){ out = m.answer; done(out); doneShown = true; }
-          if(m.title){ chatName = String(m.title).slice(0, 80); store.set('ai.chatName', chatName); setTitle(); saveChat().then(loadChats); }
-          if(m.followups && doneShown) showFollow(el, m.followups);
-          if(m.verify && doneShown) showVerify(el, m.verify);
+          if(m.title){ requestChatName = String(m.title).slice(0, 80); if(sessionId === requestSessionId){ chatName = requestChatName; store.set('ai.chatName', chatName); setTitle(); } saveChat({id: requestSessionId, history: requestHistory, goal: requestGoal, chatName: requestChatName}).then(loadChats); }
+          if(m.followups && doneShown) showFollow(el, m.followups, requestHistory, () => saveChat({id: requestSessionId, history: requestHistory, goal: requestGoal, chatName: requestChatName}));
+          if(m.verify && doneShown) showVerify(el, m.verify, requestHistory, () => saveChat({id: requestSessionId, history: requestHistory, goal: requestGoal, chatName: requestChatName}));
         }
       }
       if(!out) throw new Error('No answer came back.');
     }
   }catch(e){
     const w = el.querySelector('.work .orb'); if(w) w.classList.remove('busy');
-    if(doneShown){ busy = false; sendState(false); $('#orb').classList.remove('busy'); return; }    // only the suggestions were cut short
-    if(ctl && ctl.signal.aborted){
+    if(doneShown){ activeRequests.delete(requestSessionId); syncRequestUI(); return; }    // only the suggestions were cut short
+    if(request.controller.signal.aborted){
       // stopped: what was written so far stays, marked as stopped
       const d = el.querySelector('.draft'), part = d && !d.hidden ? d.innerHTML.replace('<div class="dlabel">Writing…</div>', '') : '';
       el.querySelector('.slot').innerHTML = `<div class="a">${part}<p class="stopped">■ Stopped.</p></div>`;
       if(d) d.hidden = true;
-      busy = false; sendState(false); $('#orb').classList.remove('busy'); $('#q').focus(); return;
+      activeRequests.delete(requestSessionId); syncRequestUI(); if(sessionId === requestSessionId) $('#q').focus(); return;
     }
     el.querySelector('.slot').innerHTML = `<div class="a"><p class="err">${esc(e.message)}</p>${mode === 'mac' && /failed to fetch|load failed|network|ECONNREFUSED/i.test(e.message) ? '<p class="sub">Is the helper running? In Terminal: <code>launchctl kickstart -k gui/$(id -u)/com.moneyai.local</code></p>' : ''}</div>`;
   }
-  busy = false; sendState(false); $('#orb').classList.remove('busy'); $('#q').focus();
+  activeRequests.delete(requestSessionId); syncRequestUI(); if(sessionId === requestSessionId) $('#q').focus();
 }
 
 /* what it has learned */
@@ -994,33 +1008,32 @@ function browserLearned(){
     cases: L.filter(x=>x.topic === 'case').sort((a, b)=>a.first - b.first).map(x=>{ const r = MoneyBrain.recall('ai', 'case', x.key, {min: 0.001}); return {id: x.id, question: x.label || '', lesson: r ? r.value : '', taught: x.why === 'You corrected it', n: x.n}; })};
 }
 // in this browser: worked out or looked up exactly first, then your relay searches and reads and an AI answers (deep, with the rules)
-let opt_fresh = false, opt_files = [];
-const browserContext = () => [goal ? 'Goal: ' + goal : '', ...MoneyBrain.lessons({app: 'ai', topic: 'profile'}).filter(L=>!L.off).map(L=>'About the user: ' + (L.label || L.key)), ...store.get('ai.rules', []).map(r=>'Rule: ' + r)].filter(Boolean).join('\n');
-async function browserAnswer(q, turns, step){
+const browserContext = goalForChat => [goalForChat ? 'Goal: ' + goalForChat : '', ...MoneyBrain.lessons({app: 'ai', topic: 'profile'}).filter(L=>!L.off).map(L=>'About the user: ' + (L.label || L.key)), ...store.get('ai.rules', []).map(r=>'Rule: ' + r)].filter(Boolean).join('\n');
+async function browserAnswer(q, turns, step, request){
   step('Checking what can be worked out exactly');
   const relayC = (MoneyAI.aiLocal() || {}).relay;
   if(/\b(generate|create|make|draw|design|paint|render|produce|sketch|imagine)\b[\s\S]{0,50}\b(image|picture|photo|illustration|drawing|painting|logo|poster|wallpaper|art(work)?|sketch|icon|banner|portrait|scene)\b|^\s*(an? )?(image|picture|drawing|painting) of\b/i.test(q) && relayC && relayC.url && relayC.token){
     step('🎨 Making the picture');
     const desc = q.replace(/^\s*(please\s+)?(can you\s+)?(generate|create|make|draw|design|paint|render|produce|sketch|imagine)\s+(me\s+)?(an?\s+)?(image|picture|photo|illustration|drawing|painting|artwork|sketch)?\s*(of|showing|with)?\s*/i, '').trim() || q;
-    const r = await fetch(relayC.url.replace(/\/+$/, '') + '/image?steps=6&prompt=' + encodeURIComponent(desc.slice(0, 900)), {headers: {'x-relay-token': relayC.token}, signal: ctl && ctl.signal});
+    const r = await fetch(relayC.url.replace(/\/+$/, '') + '/image?steps=6&prompt=' + encodeURIComponent(desc.slice(0, 900)), {headers: {'x-relay-token': relayC.token}, signal: request.signal});
     const j = await r.json(); if(!r.ok || j.error) throw new Error(j.error || 'The relay answered ' + r.status);
     return {text: 'Here is your picture of **' + desc + '**.', images: [{b64: j.image, mime: j.mime}], sources: [], model: j.model + ', your Cloudflare account', by: 'Made by ' + j.model + ' through your relay'};
   }
-  const g = !opt_fresh && !opt_files.length && MoneyWeb.findGood(q);
+  const g = !request.fresh && !request.files.length && MoneyWeb.findGood(q);
   if(g) return {text: g.text, sources: g.sources || [], saved: true, model: 'Your saved answer', by: 'Your saved answer from ' + g.at + ' (you marked it 👍)'};
   const relayCfg = (MoneyAI.aiLocal() || {}).relay, hasAi = MoneyAI.aiAvailable();
   const only = pick.kind === 'private' ? ['webllm'] : pick.kind === 'cloud' ? [pick.provider] : null;
   if(pick.kind === 'private') step('🔒 Your Private AI (in this browser) is answering — the first time, it takes a minute to load');
-  const chat = hasAi || only ? (sys, t, o) => MoneyAI.chat(sys, t, Object.assign({}, o, only ? {only} : {}), ctl && ctl.signal) : null;
+  const chat = hasAi || only ? (sys, t, o) => MoneyAI.chat(sys, t, Object.assign({}, o, only ? {only} : {}), request.signal) : null;
   let quick = null;
   try{ quick = await MoneyWeb.answer(q, {factsOnly: !!(relayCfg && relayCfg.url)}); }catch(e){}
   if(quick && quick.kind !== 'not-found' && quick.kind !== 'read') return Object.assign({by: 'Worked out exactly · ' + quick.kind + ' (no AI)'}, quick);
-  for(const f of opt_files.filter(f=>f.image)){
+  for(const f of request.files.filter(f=>f.image)){
     step('🖼 Looking at ' + f.name);
     try{ const r = await MoneyAI.chat('Describe this picture in detail so someone who cannot see it can answer the question. Copy any text, numbers, labels, tables or code exactly. Do not guess what is not visible.', [{role: 'user', content: 'The question: ' + q}], {images: [{mime: 'image/jpeg', b64: f.image}]}); f.text = r.text; f.name += ' (picture, read by ' + r.provider + ')'; }
     catch(e){ f.text = '(This picture could not be read here: ' + e.message + ')'; }
   }
-  const extra = opt_files.map(f=>({title: f.name, url: 'file://' + f.name, text: String(f.text || '').slice(0, 60000)}));
+  const extra = request.files.map(f=>({title: f.name, url: 'file://' + f.name, text: String(f.text || '').slice(0, 60000)}));
   let chart = null;
   // a market question: real prices through your relay, analysed here (the same code as on the Mac)
   if(relayCfg && relayCfg.url && relayCfg.token && /\b(stock|stocks|share|shares|market|markets|nifty|sensex|bank nifty|bitcoin|btc|ethereum|crypto|gold price|silver price|crude|index|technical analysis)\b/i.test(q)){
@@ -1034,7 +1047,7 @@ async function browserAnswer(q, turns, step){
   }
   if(relayCfg && relayCfg.url && relayCfg.token){
     const relay = MoneyWeb.relay(relayCfg, {local: false});
-    const out = await MoneyWeb.deep(q, {search: disabled.includes('web') ? null : relay.search, read: relay.read, chat, onStep: step, extra, context: browserContext()});
+    const out = await MoneyWeb.deep(q, {search: disabled.includes('web') ? null : relay.search, read: relay.read, chat, onStep: step, extra, context: browserContext(request.goal)});
     return Object.assign(out, chart ? {chart} : {});
   }
   if(extra.length && chat) return Object.assign(await MoneyWeb.deep(q, {search: null, read: async () => { throw new Error('no reading here'); }, chat, onStep: step, extra}), chart ? {chart} : {});
@@ -1218,8 +1231,16 @@ $('#fileIn').onchange = async () => {
 
 /* ---------------------------------------------------------------- stop, export, voice, shortcuts */
 let ctl = null;
+// One request may run in each chat. `busy` and `ctl` remain the controls for the
+// selected chat only, so the Stop button never affects work in another chat.
+const activeRequests = new Map();
 const SEND = $('#ask').innerHTML, STOP = '<svg width="14" height="14" viewBox="0 0 24 24"><rect x="5" y="5" width="14" height="14" rx="2" fill="currentColor"/></svg>';
 function sendState(on){ const b = $('#ask'); b.classList.toggle('stop', on); b.innerHTML = on ? STOP : SEND; b.setAttribute('aria-label', on ? 'Stop' : 'Ask'); b.title = on ? 'Stop' : ''; }
+function syncRequestUI(){
+  const request = activeRequests.get(sessionId);
+  busy = !!request; ctl = request ? request.controller : null;
+  sendState(busy); $('#orb').classList.toggle('busy', busy);
+}
 $('#ask').addEventListener('click', e=>{ if(busy){ e.preventDefault(); e.stopImmediatePropagation(); if(ctl) ctl.abort(); } }, true);
 // this chat as a Markdown file
 $('#exportChat').onclick = () => {
@@ -1374,12 +1395,17 @@ $('#q').addEventListener('keydown', e=>{
 const newId = () => new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14) + '-' + Math.random().toString(36).slice(2, 6);
 let sessionId = store.get('ai.session', '') || newId(); store.set('ai.session', sessionId);
 const localChats = () => store.get('ai.sessions', {});
-async function saveChat(){
-  if(!history.length) return;
-  const x = {id: sessionId, title: chatName || history[0].q, goal, source: 'page', turns: history};
+let chatOpenSeq = 0; // Ignore a slower earlier click after the user selected another chat.
+async function saveChat(state){
+  state = state || {};
+  const savedHistory = state.history || history, savedId = state.id || sessionId;
+  const savedName = state.chatName == null ? chatName : state.chatName;
+  const savedGoal = state.goal == null ? goal : state.goal;
+  if(!savedHistory.length) return;
+  const x = {id: savedId, title: savedName || savedHistory[0].q, goal: savedGoal, source: 'page', turns: savedHistory};
   if(mode === 'mac'){ try{ await post('/session', x); return; }catch(e){} }
-  const all = localChats(); all[sessionId] = Object.assign({}, x, {updated: new Date().toISOString(), created: (all[sessionId] || {}).created || new Date().toISOString(),
-    turns: history.map((h, i, a)=>i < a.length - 8 ? Object.assign({}, h, {traces: []}) : h)});
+  const all = localChats(); all[savedId] = Object.assign({}, x, {updated: new Date().toISOString(), created: (all[savedId] || {}).created || new Date().toISOString(),
+    turns: savedHistory.map((h, i, a)=>i < a.length - 8 ? Object.assign({}, h, {traces: []}) : h)});
   const keep = Object.values(all).sort((a, b)=>String(b.updated).localeCompare(String(a.updated))).slice(0, 30);
   store.set('ai.sessions', Object.fromEntries(keep.map(c=>[c.id, c])));
 }
@@ -1388,17 +1414,25 @@ async function listChats(){
   return Object.values(localChats()).map(c=>({id: c.id, title: c.title, source: 'page', updated: c.updated, turns: (c.turns || []).length})).sort((a, b)=>String(b.updated).localeCompare(String(a.updated)));
 }
 async function openChat(id){
+  const openSeq = ++chatOpenSeq;
   let x = null;
   if(mode === 'mac'){ try{ x = await fetch(HELPER + '/session?id=' + encodeURIComponent(id)).then(r=>r.ok ? r.json() : null); }catch(e){} }
   if(!x) x = localChats()[id];
+  if(openSeq !== chatOpenSeq) return;
   if(!x) return toast('That chat could not be opened');
   sessionId = x.id; store.set('ai.session', sessionId); chatName = x.title || ''; store.set('ai.chatName', chatName);
   history = (x.turns || []).filter(t=>t && t.answer); store.set('moneyai.history', history);
   goal = x.goal || ''; store.set('ai.goal', goal); showGoal();
-  $('#turns').innerHTML = ''; $('#hello').hidden = history.length > 0;
-  history.forEach(h=>{ const el = turnEl(h.q); finish(el, h.q, h.answer, h.steps || [], h.traces || []); });
+  drawHistory(); syncRequestUI();
   openChats(false); setTitle(); drawChats();
   const last = $('#turns').lastElementChild; if(last) last.scrollIntoView({block: 'start'});
+}
+function drawHistory(){
+  $('#turns').innerHTML = ''; $('#hello').hidden = history.length > 0;
+  history.forEach(h=>{ const el = turnEl(h.q); finish(el, h.q, h.answer, h.steps || [], h.traces || []); });
+  // Keep the in-progress question visible if the user returns to its chat.
+  const request = activeRequests.get(sessionId);
+  if(request) turnEl(request.q, request.files);
 }
 const ago = iso => { const m = Math.round((Date.now() - new Date(iso)) / 60000); return m < 1 ? 'just now' : m < 60 ? m + ' min ago' : m < 1440 ? Math.round(m / 60) + ' h ago' : Math.round(m / 1440) + ' d ago'; };
 // the chat list in the sidebar: newest first, grouped by day, searchable
@@ -1449,9 +1483,10 @@ async function searchChats(){
 }
 $('#chatSearch').oninput = () => { clearTimeout(searchT); searchT = setTimeout(searchChats, 250); };
 function newChat(quiet){
+  chatOpenSeq++;
   sessionId = newId(); store.set('ai.session', sessionId); chatName = ''; store.set('ai.chatName', '');
   history = []; store.set('moneyai.history', []); goal = ''; store.set('ai.goal', ''); showGoal();
-  $('#turns').innerHTML = ''; $('#hello').hidden = false; openChats(false); setTitle();
+  $('#turns').innerHTML = ''; $('#hello').hidden = false; syncRequestUI(); openChats(false); setTitle();
   drawChats(); $('#q').focus();
   if(!quiet) toast('New chat — the last one is in the list');
 }
