@@ -68,6 +68,7 @@ input:focus,select:focus{outline:2px solid var(--gold);outline-offset:1px}
 .btn:disabled{opacity:.5}
 .res{grid-column:1/-1;font-size:12.5px;color:var(--mut);margin-top:-4px}
 .res.ok{color:var(--up)} .res.bad{color:var(--dn)}
+.macts summary{cursor:pointer;color:var(--ink2);font-weight:600} .macts .two{margin-top:8px} .macts .row{margin-top:8px} .bad{color:var(--dn)}
 .model{grid-column:1/-1;display:flex;gap:8px;align-items:center;font-size:12.5px;color:var(--mut)}
 .model select{width:auto;max-width:100%;padding:5px 8px;font-size:12.5px}
 .mac{background:color-mix(in srgb,var(--up) 7%,transparent);border-radius:12px;padding-inline:10px}
@@ -240,13 +241,14 @@ const MAC_MODELS = [['auto', 'Auto — ChatGPT when the Mac has it, else the Mac
   ['pcc', 'Apple Private Cloud'], ['apple', 'Apple Intelligence on the Mac'], ['council', 'Best answer — several models, merged']];
 async function macCheck(force){
   MAC.up = await MoneyAI.macUp(MoneyAI.MAC_URL, force);
-  if(MAC.up && !MAC.models){ try{ MAC.models = await (await fetch(MoneyAI.MAC_URL + '/models')).json(); }catch(e){} }
+  if(MAC.up && !MAC.models){ try{ MAC.models = await (await MoneyAI.macFetch('/models')).json(); }catch(e){} }
   render();
 }
 function macRow(s){
   const h = MoneyAI.aiLocal(), on = h.mac !== false, res = results.mac, pinned = (h.model || {}).mac || 'auto';
   const apple = (MAC.models || {}).apple || {};
-  const st = !on ? ['off', ''] : MAC.up === null ? ['checking…', ''] : MAC.up ? ['ready', 'ready'] : ['not here', ''];
+  const viaTs = MoneyAI.macBase() !== MoneyAI.MAC_URL;
+  const st = !on ? ['off', ''] : MAC.up === null ? ['checking…', ''] : MAC.up ? [viaTs ? 'ready · Tailscale' : 'ready', 'ready'] : ['not here', ''];
   return `<div class="prov mac">
     <div class="pname"><b>Your AI on this Mac</b><small>Your own AI (~/AI) — ChatGPT through it, free, no daily limits; used first, as in ATS · no key</small></div>
     <span class="st ${st[1]}">${st[0]}</span>
@@ -255,16 +257,35 @@ function macRow(s){
     <div class="tools">${on ? `<button class="btn" data-test="mac"${MAC.up ? '' : ' disabled'}>Test</button><button class="btn" id="mac-off">Turn off</button>` : `<button class="btn primary" id="mac-on">Turn on</button>`}</div>
     <div class="res">${res ? (res.busy ? '<span class="spin"></span> Asking your Mac…' : res.ok ? `Works · ${esc(res.model)} answered in ${(res.ms / 1000).toFixed(1)} s` : `<span class="bad">${esc(res.error || 'No answer')}</span>`)
       : !on ? 'Off: your apps use the AIs below.'
-      : MAC.up ? `Found on this Mac. Trip Vault, the Expense Tracker, the Ledger and Money Home ask it first${apple.chatgpt ? ', with ChatGPT' : ' (ChatGPT is not set up in Apple Intelligence, so the Mac picks)'}; when it does not answer, the next AI below takes over. <a href="${MoneyAI.MAC_URL}/" target="_blank" rel="noopener">Open its page</a>`
-      : MAC.up === false ? 'Not reachable from this device — on a phone, or the Mac’s helper is off (<code>ai serve</code>). Your apps use the next AI below; it is found again by itself. <button class="btn" id="mac-recheck">Check again</button>'
+      : MAC.up ? `${viaTs ? 'Reached through Tailscale.' : 'Found on this Mac.'} Trip Vault, the Expense Tracker, the Ledger and Money Home ask it first${apple.chatgpt ? ', with ChatGPT' : ' (ChatGPT is not set up in Apple Intelligence, so the Mac picks)'}; when it does not answer, the next AI below takes over. <a href="${MoneyAI.MAC_URL}/" target="_blank" rel="noopener">Open its page</a>`
+      : MAC.up === false ? 'Not reachable from this device. On a phone: sign in to your Mac below (through Tailscale). On the Mac in Chrome: allow <b>Local network access</b> for this site (the icon left of the address → Site settings), or sign in below. Or the Mac’s helper is off (<code>ai serve</code>). Meanwhile your apps use the next AI below. <button class="btn" id="mac-recheck">Check again</button>'
       : 'Looking for it on this device…'}</div>
+    ${on ? macRemoteHtml() : ''}
   </div>`;
+}
+// from a phone or another device: your Mac's Tailscale address and a sign-in (the key stays on this device)
+function macRemoteHtml(){
+  const r = MoneyAI.macRemote(), seen = (()=>{ try{ return JSON.parse(localStorage.getItem('money-ai-mac') || '{}').tailscale || ''; }catch(e){ return ''; } })();
+  if(r.url && r.token) return `<div class="res">Signed in to your Mac through Tailscale (<code>${esc(r.url.replace(/^https:\/\//, ''))}</code>${r.user ? ' as ' + esc(r.user) : ''}) — used when this device cannot reach it directly. <button class="btn" id="mac-ts-out">Sign out</button></div>`;
+  return `<details class="res macts"${r.expired || (MAC.up === false) ? ' open' : ''}><summary>${r.expired ? '<span class="bad">This device’s key has expired — sign in again</span>' : 'Use it from your phone or another device (through Tailscale)'}</summary>
+    <p class="note">Tailscale must be on here and on the Mac. The address is the one you open your AI page with on the phone${seen ? ' — your Mac’s is filled in' : ''}. Your Cygnus AI username and password (set with <code>ai passwd</code>).</p>
+    <div class="two"><label>Your Mac’s Tailscale address<input id="mac-ts-url" value="${esc(r.url || seen)}" placeholder="https://your-mac.your-tailnet.ts.net:8443" autocomplete="off" spellcheck="false" inputmode="url"></label>
+      <label>Username<input id="mac-ts-user" value="${esc(r.user || '')}" autocomplete="username" spellcheck="false" autocapitalize="off"></label>
+      <label>Password<input id="mac-ts-pass" type="password" autocomplete="current-password"></label></div>
+    <div class="row end"><button class="btn primary" id="mac-ts-in">Sign in to your Mac</button><span class="note" id="mac-ts-res"></span></div>
+  </details>`;
 }
 function bindMac(){
   const set = v => { const h = MoneyAI.aiLocal(); h.mac = v; if(!v && h.first === 'mac') h.first = 'auto'; MoneyAI.saveAiLocal(h); changed(); delete results.mac; };
   const off = $('mac-off'); if(off) off.onclick = ()=>{ set(false); render(); toast('Your Mac’s AI is off.'); };
   const on = $('mac-on'); if(on) on.onclick = ()=>{ set(true); macCheck(true); toast('Your Mac’s AI is on — every app asks it first.'); };
   const re = $('mac-recheck'); if(re) re.onclick = ()=>{ MAC.up = null; render(); macCheck(true); };
+  const tin = $('mac-ts-in'); if(tin) tin.onclick = async ()=>{
+    const msg = $('mac-ts-res'); tin.disabled = true; msg.textContent = 'Signing in…';
+    try{ await MoneyAI.macSignIn($('mac-ts-url').value, $('mac-ts-user').value.trim(), $('mac-ts-pass').value); MAC.models = null; await macCheck(true); toast('Signed in to your Mac — your apps can use it from this device.'); }
+    catch(e){ tin.disabled = false; msg.innerHTML = '<span class="bad">' + esc(e.message) + '</span>'; }
+  };
+  const tout = $('mac-ts-out'); if(tout) tout.onclick = ()=>{ MoneyAI.setMacRemote(null); MAC.up = null; MAC.models = null; render(); macCheck(true); toast('Signed out of your Mac on this device.'); };
   const sel = document.querySelector('[data-macmodel]');
   if(sel) sel.onchange = ()=>{ MoneyAI.setModel('mac', sel.value); changed(); delete results.mac; render(); toast(sel.value === 'auto' ? 'Auto: ChatGPT when the Mac has it.' : (MAC_MODELS.find(x=>x[0] === sel.value) || [])[1] + ' goes first.'); };
 }
