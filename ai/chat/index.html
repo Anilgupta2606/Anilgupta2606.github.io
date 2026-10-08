@@ -431,6 +431,7 @@ main{max-width:800px; padding:22px 20px 170px}
 :is(.a,.draft) th.r, :is(.a,.draft) td.r{text-align:right} :is(.a,.draft) th.c, :is(.a,.draft) td.c{text-align:center}
 :is(.a,.draft) hr{border:0; border-top:1px solid var(--line); margin:14px 0}
 :is(.a,.draft) blockquote{margin:0 0 10px; padding:2px 0 2px 12px; border-left:3px solid var(--line); color:var(--ink2)}
+.a.ask{border-color:color-mix(in srgb, var(--search) 45%, var(--line))} .a.ask > p:first-of-type{font-weight:600} .asknote{color:var(--mut); font-size:13px; margin:8px 0 0}
 :is(.a,.draft) a.ln{color:var(--search); text-decoration:underline; text-underline-offset:2px}
 @media (max-width:600px){ :is(.a,.draft) table{font-size:.86em} :is(.a,.draft) th, :is(.a,.draft) td{padding:6px 9px} }
 /* iPhone: no grey flash on a tap and a press you can feel; no zoom when a box is tapped (16 px); scrolling that does not
@@ -747,6 +748,7 @@ function finish(el, q, out, steps, traces){
   el.querySelector('.foot .down').onclick = () => teachBox(el, q);
   el.querySelector('.foot .cp').onclick = e => { const b = e.currentTarget; (navigator.clipboard ? navigator.clipboard.writeText(out.text || '') : Promise.reject()).then(()=>{ b.textContent = 'Copied'; setTimeout(()=>{ b.textContent = 'Copy'; }, 1500); }).catch(()=>toast('Select the text to copy it')); };
   el.querySelector('.foot .rt').onclick = () => ask(q, {fresh: true});
+  if(out.kind === 'clarify'){ const a = el.querySelector('.a'); a.classList.add('ask'); a.querySelector('.foot').insertAdjacentHTML('beforebegin', '<p class="asknote">Tap an answer, or type your own below.</p>'); }
   if(out.followups && out.followups.length) setTimeout(()=>showFollow(el, out.followups));
   el.querySelector('.foot .up').onclick = async e => {
     const b = e.currentTarget; b.disabled = true;

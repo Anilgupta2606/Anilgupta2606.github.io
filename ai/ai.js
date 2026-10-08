@@ -30,6 +30,9 @@ const MoneyAI = (function(){
   }
 
   const PROVIDERS = [
+    // your own AI on the Mac (~/AI, `ai serve`): ChatGPT through it answers in seconds, free and without daily limits,
+    // as it does for ATS. Tried first wherever the Mac's helper answers; skipped quietly everywhere else (a phone).
+    {id:'mac', name:'Your AI on this Mac (ChatGPT)', signupUrl:'https://anilgupta2606.github.io/ai/chat/', placeholder:'http://127.0.0.1:8899', models:['chatgpt', 'auto'], keyless:true},
     {id:'gemini', name:'Google Gemini', signupUrl:'https://aistudio.google.com/apikey', placeholder:'AIza…', models:['gemini-flash-latest','gemini-flash-lite-latest'], vision:true, search:true},
     {id:'groq', name:'Groq', signupUrl:'https://console.groq.com/keys', placeholder:'gsk_…', models:['openai/gpt-oss-120b','llama-3.3-70b-versatile','openai/gpt-oss-20b']},
     {id:'cerebras', name:'Cerebras', signupUrl:'https://cloud.cerebras.ai', placeholder:'csk-…', models:['gpt-oss-120b','llama-3.3-70b','llama3.1-8b']},
@@ -40,7 +43,7 @@ const MoneyAI = (function(){
     {id:'anthropic', name:'Anthropic Claude (paid)', signupUrl:'https://console.anthropic.com/settings/keys', placeholder:'sk-ant-…', models:['claude-haiku-4-5-20251001'], vision:true},
   ];
   const OPENAI_BASE = {groq:'https://api.groq.com/openai/v1', cerebras:'https://api.cerebras.ai/v1', mistral:'https://api.mistral.ai/v1', openrouter:'https://openrouter.ai/api/v1'};
-  const DEVICE_ONLY = {ollama: true, webllm: true};         // this computer's own: not shared with your other devices
+  const DEVICE_ONLY = {ollama: true, webllm: true, mac: true};         // this computer's own: not shared with your other devices
   const SYNCED_AI = 'tripvault-ai-synced';          // keys that came from another device through Trip Vault's encrypted sync
   /* The keys this device uses, to carry to your other devices inside the encrypted sync (not Ollama: it is this computer's). */
   function shareableAi(){
@@ -82,8 +85,11 @@ const MoneyAI = (function(){
         if(k){ keys[p.id] = k; from[p.id] = name; break; }
       }
     });
-    // the order: free services first, then this computer's, then the paid one (as ATS does) - or the Expense Tracker's own order
+    // your Mac's AI needs no key: on unless you turned it off in Setup
+    if(!keys.mac && own.mac !== false){ keys.mac = MAC_URL; from.mac = 'mac'; }
+    // the order: your Mac's AI, the free services, this computer's, then the paid one (as ATS does) - or the Expense Tracker's own order
     let order = (own.order && own.order.length ? own.order : et.order || []).filter(id=>PROVIDERS.some(p=>p.id === id));
+    if(order.indexOf('mac') < 0) order.unshift('mac');           // an order saved before it existed: it still goes first
     PROVIDERS.forEach(p=>{ if(order.indexOf(p.id) < 0) order.push(p.id); });
     const off = own.order && own.order.length ? (own.off || []) : (et.off || []);
     // "which goes first": auto, or one picked by hand; the others follow only if fallback is on
@@ -92,7 +98,7 @@ const MoneyAI = (function(){
     if(first !== 'auto') order = [first].concat(order.filter(id=>id !== first));
     return {keys, from, order, off, first, fallback, model: Object.assign({}, et.model || {}, own.model || {})};
   }
-  const usable = s => { const u = s.order.filter(id=>s.off.indexOf(id) < 0 && s.keys[id]); return s.first !== 'auto' && !s.fallback ? u.filter(id=>id === s.first) : u; };
+  const usable = s => { const u = s.order.filter(id=>s.off.indexOf(id) < 0 && s.keys[id] && (id !== 'mac' || macMaybe())); return s.first !== 'auto' && !s.fallback ? u.filter(id=>id === s.first) : u; };
   const aiAvailable = () => usable(aiSettings()).length > 0;
   const aiNames = () => usable(aiSettings()).map(id=>PROVIDERS.find(p=>p.id === id).name);
   const canSee = () => usable(aiSettings()).some(id=>PROVIDERS.find(p=>p.id === id).vision);
@@ -272,9 +278,74 @@ const MoneyAI = (function(){
     try{ const webllm = await import(WEBLLM_URL); return await webllm.hasModelInCache(model); }catch(e){ return false; }
   }
 
+  /* ---- Your AI on the Mac (~/AI's helper, 127.0.0.1:8899): the way ATS asks it. Its question is capped, so the app's
+     instructions and data go as an attached file and the question points to it. Its reply comes one JSON per line
+     (steps, then the answer, then extras the app does not need: reading stops at the answer). */
+  const MAC_URL = 'http://127.0.0.1:8899', MAC_KEY = 'money-ai-mac';
+  let macCheck = null;
+  // not known to be down (the last check said so): on a phone it drops out of the lists after the first check
+  const macMaybe = () => lsGet(MAC_KEY, {}).up !== false;
+  function macUp(base, force){
+    const was = lsGet(MAC_KEY, {});
+    if(!force && macCheck && Date.now() - macCheck.at < 30000) return macCheck.p;
+    const p = (async ()=>{
+      let up = false;
+      try{ const r = await Promise.race([fetch((base || MAC_URL) + '/health'), new Promise((_, rej)=>setTimeout(()=>rej(new Error('slow')), 1500))]); const d = await r.json(); up = !!(d && d.ok); }catch(e){}
+      lsSet(MAC_KEY, {up, at: Date.now()}); if(up !== was.up) changed();
+      return up;
+    })();
+    macCheck = {at: Date.now(), p};
+    return p;
+  }
+  async function callMac(base, model, system, turns, opts, signal){
+    const app = (typeof document !== 'undefined' && document.title) || 'Money Home';
+    const last = turns[turns.length - 1] || {content: ''};
+    const before = turns.slice(0, -1).map(t=>(t.role === 'assistant' ? 'You answered: ' : 'They asked: ') + t.content).join('\n\n');
+    const file = system + (before ? '\n\nThe conversation so far:\n\n' + before : '') + '\n\nThe request:\n\n' + last.content;
+    const q = 'Answer the request in the attached file "' + app + ' request.txt", following its instructions exactly'
+      + (opts.schema ? ' - reply with the JSON it asks for, and nothing else.' : '.');
+    const body = {question: q, history: [], attachments: [{name: app + ' request.txt', text: file.slice(0, 290000)}],
+      disabled: ['connectors', 'apps'], fresh: true};     // the request carries its own data; never its "same question" answer
+    if(model && model !== 'auto') body.provider = model;                 // ChatGPT; else its own Auto
+    const ctl = new AbortController(), timer = setTimeout(()=>ctl.abort(), 180000), stop = ()=>ctl.abort();
+    if(signal) signal.addEventListener('abort', stop);
+    try{
+      const res = await fetch(base.replace(/\/+$/, '') + '/ask', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body), signal: ctl.signal});
+      if(!res.ok) throw Unavailable('Your Mac\'s AI returned an error (' + res.status + ').', res.status);
+      const reader = res.body.getReader(), dec = new TextDecoder();
+      let buf = '';
+      for(;;){
+        const {done, value} = await reader.read();
+        buf += done ? '' : dec.decode(value, {stream: true});
+        const lines = buf.split('\n'); buf = done ? '' : lines.pop();
+        for(const raw of lines){
+          let j; try{ j = JSON.parse(raw); }catch(e){ continue; }
+          if(j.step && opts.onProgress) try{ opts.onProgress('Your Mac\'s AI: ' + j.step, 'mac'); }catch(e){}
+          if(j.error) throw Unavailable('Your Mac\'s AI: ' + String(j.error).slice(0, 160), 502);
+          if(j.answer && typeof j.answer === 'object'){
+            // its fact-check notes and [1] source marks are for its own web answers: here the app gave the data
+            const text = String(j.answer.text || '').replace(/^\s*⚠.*$/gm, '').replace(/\s*\[\d+(?:,\s*\d+)*\]/g, '').replace(/[ \t]+([.,;:!?])/g, '$1').trim();
+            if(!text) throw Unavailable('Your Mac\'s AI returned an empty answer.', 502);
+            ctl.abort();                                                        // the extras after the answer are not needed
+            return {text, sources: [], by: String(j.answer.by || '').split(' · ')[0]};
+          }
+        }
+        if(done) break;
+      }
+      throw Unavailable('Your Mac\'s AI gave no answer.', 502);
+    }catch(e){
+      if(e.unavailable) throw e;
+      if(signal && signal.aborted){ const c = new Error('Stopped.'); c.code = 'cancelled'; throw c; }
+      if(e.name === 'AbortError') throw Unavailable('Your Mac\'s AI: no answer in time.', 504);
+      lsSet(MAC_KEY, {up: false, at: Date.now()}); macCheck = null;
+      throw Unavailable('Your Mac\'s AI is not reachable.', 503);
+    } finally { clearTimeout(timer); if(signal) signal.removeEventListener('abort', stop); }
+  }
+
   const temp = opts => typeof opts.temperature === 'number' ? opts.temperature : 0.2;
   async function callOne(id, key, model, system, turns, opts, signal){
     if(id === 'webllm') return callPrivate(model, system, turns, opts, signal);
+    if(id === 'mac') return callMac(key, model, system, turns, opts, signal);
     const name = PROVIDERS.find(p=>p.id === id).name;
     const images = opts.images || [];
     if(id === 'gemini'){
@@ -340,6 +411,7 @@ const MoneyAI = (function(){
   function rankModels(id, names, tier){
     const fast = tier === 'fast';
     const uniq = Array.from(new Set(names)).filter(m=>!NOT_CHAT.test(m));
+    if(id === 'mac') return uniq;                  // your Mac's own order: ChatGPT, then its Auto
     if(id === 'gemini'){
       const g = uniq.filter(m=>/^gemini/.test(m) && !/gemma|nano|tuning|image|tts|embedding|live|audio|robotics|computer|deep-research|antigravity/.test(m));
       const kind = m => /lite/.test(m) ? 'lite' : /flash/.test(m) ? 'flash' : /pro/.test(m) ? 'pro' : 'other';
@@ -365,6 +437,7 @@ const MoneyAI = (function(){
   }
   async function listModels(id, key){
     if(id === 'webllm') return [key];              // the one you chose in Setup
+    if(id === 'mac'){ const d = await (await fetch(key.replace(/\/+$/, '') + '/models')).json(); return (d.apple || {}).chatgpt ? ['chatgpt', 'auto'] : ['auto']; }
     let res;
     if(id === 'gemini') res = await fetch('https://generativelanguage.googleapis.com/v1beta/models?pageSize=200&key=' + encodeURIComponent(key));
     else if(id === 'anthropic') res = await fetch('https://api.anthropic.com/v1/models', {headers:{'x-api-key':key, 'anthropic-version':'2023-06-01', 'anthropic-dangerous-direct-browser-access':'true'}});
@@ -381,7 +454,7 @@ const MoneyAI = (function(){
     if(id === 'webllm') return [key];
     const cache = lsGet(MODELS_KEY, {}), c = cache[id], tag = key.slice(-6);
     // a day's cache for the online services; the models on this computer are read fresh (a new one may just have been downloaded)
-    let names = id !== 'ollama' && c && c.key === tag && Date.now() - c.at < 86400000 && c.names && c.names.length ? c.names : null;
+    let names = id !== 'ollama' && id !== 'mac' && c && c.key === tag && Date.now() - c.at < 86400000 && c.names && c.names.length ? c.names : null;
     if(!names){
       try{ names = await listModels(id, key); if(names.length){ cache[id] = {at: Date.now(), key: tag, names}; lsSet(MODELS_KEY, cache); } }catch(e){ names = null; }
     }
@@ -413,6 +486,7 @@ const MoneyAI = (function(){
     const tell = (t, id) => { try{ if(opts.onProgress) opts.onProgress(t, id); }catch(e){} };
     const tier = opts.tier === 'fast' ? 'fast' : 'smart';
     const s = aiSettings();
+    if(s.keys.mac && s.off.indexOf('mac') < 0) await macUp(s.keys.mac);     // is your Mac's AI there? (a phone: no; checked every 30 s)
     let order = usable(s);
     if(opts.images && opts.images.length) order = order.filter(id=>PROVIDERS.find(p=>p.id === id).vision);
     if(opts.search) order = order.filter(id=>PROVIDERS.find(p=>p.id === id).search);
@@ -433,7 +507,7 @@ const MoneyAI = (function(){
       if(r){ skipped.push(pname + ' is resting (' + r.why + ')'); tell(pname + ' is at its free limit — skipping'); continue; }
       const key = s.keys[id];
       const pinned = s.model[id] && s.model[id] !== 'auto' ? [s.model[id]] : [];
-      const last = id === 'ollama' ? null : (working[id] || {})[tier];     // on this computer: always the light model first, not the one that last answered
+      const last = id === 'ollama' || id === 'mac' ? null : (working[id] || {})[tier];     // on this computer: always the light model first, not the one that last answered
       const models = Array.from(new Set(pinned.concat(last ? [last] : [], await bestModels(id, key, tier), PROVIDERS.find(p=>p.id === id).models)))
         .filter(m=>pinned.indexOf(m) >= 0 || !isBad(id, m)).slice(0, 5);
       const free = models.filter(m=>!resting(id + '|' + m));
@@ -535,7 +609,7 @@ const MoneyAI = (function(){
   }
   const setModel = (id, m) => { const h = aiLocal(); h.model = Object.assign({}, h.model, {[id]: m}); saveAiLocal(h); };
 
-  return {PRIVATE_MODELS, trialPrivate, removePrivate, privateCached, PROVIDERS, loadAi, aiSettings, aiLocal, saveAiLocal, adoptAppKeys, aiStatus, rankModels, shareableAi, takeSyncedAi,
+  return {MAC_URL, macUp, PRIVATE_MODELS, trialPrivate, removePrivate, privateCached, PROVIDERS, loadAi, aiSettings, aiLocal, saveAiLocal, adoptAppKeys, aiStatus, rankModels, shareableAi, takeSyncedAi,
           aiAvailable, aiNames, canSee, canSearch, resting, wake, backAt, chat, generate, json, test, setModel, listModels};
 })();
 
