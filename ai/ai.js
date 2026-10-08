@@ -29,7 +29,6 @@ const MoneyAI = (function(){
     }catch(e){ return null; }
   }
 
-  const ON_MAC = typeof location !== 'undefined' && location.hostname === 'cli';     // run by ~/AI on the Mac, not in a browser
   const PROVIDERS = [
     // your own AI on the Mac (~/AI, `ai serve`): ChatGPT through it answers in seconds, free and without daily limits,
     // as it does for ATS. Tried first wherever the Mac's helper answers; skipped quietly everywhere else (a phone).
@@ -39,11 +38,12 @@ const MoneyAI = (function(){
     {id:'cerebras', name:'Cerebras', signupUrl:'https://cloud.cerebras.ai', placeholder:'csk-…', models:['gpt-oss-120b','llama-3.3-70b','llama3.1-8b']},
     {id:'mistral', name:'Mistral', signupUrl:'https://console.mistral.ai/api-keys', placeholder:'key', models:['mistral-small-latest','mistral-medium-latest']},
     {id:'openrouter', name:'OpenRouter', signupUrl:'https://openrouter.ai/keys', placeholder:'sk-or-…', models:['openrouter/free','meta-llama/llama-3.3-70b-instruct:free']},
+    {id:'webllm', name:'Private AI (in this browser)', signupUrl:'https://webllm.mlc.ai', placeholder:'', models:['Qwen3-4B-q4f16_1-MLC'], keyless:true, device:true},
     {id:'ollama', name:'Local (Ollama)', signupUrl:'https://ollama.com', placeholder:'http://localhost:11434', models:['gemma3:4b'], keyless:true},
     {id:'anthropic', name:'Anthropic Claude (paid)', signupUrl:'https://console.anthropic.com/settings/keys', placeholder:'sk-ant-…', models:['claude-haiku-4-5-20251001'], vision:true},
-  ].filter(p=>p.id !== 'ollama' || ON_MAC);   // Ollama: only the Mac's own AI (the terminal and its helper) uses it, not your apps in a browser
+  ];
   const OPENAI_BASE = {groq:'https://api.groq.com/openai/v1', cerebras:'https://api.cerebras.ai/v1', mistral:'https://api.mistral.ai/v1', openrouter:'https://openrouter.ai/api/v1'};
-  const DEVICE_ONLY = {ollama: true, mac: true};         // this computer's own: not shared with your other devices
+  const DEVICE_ONLY = {ollama: true, webllm: true, mac: true};         // this computer's own: not shared with your other devices
   const SYNCED_AI = 'tripvault-ai-synced';          // keys that came from another device through Trip Vault's encrypted sync
   /* The keys this device uses, to carry to your other devices inside the encrypted sync (not Ollama: it is this computer's). */
   function shareableAi(){
@@ -166,6 +166,118 @@ const MoneyAI = (function(){
   }
   /* opts.images: [{mime, b64}] (only services that can see get them); opts.search: Gemini looks on the web.
      -> {text, sources:[{title, url}]} */
+  /* ---- Private AI: an open model running inside this browser, on the computer's (or phone's) graphics chip
+     (WebLLM). Downloaded once and kept by the browser; loaded once per page; nothing leaves the device. */
+  const WEBLLM_URL = 'https://cdn.jsdelivr.net/npm/@mlc-ai/web-llm@0.2.85/+esm';
+  const PRIVATE_MODELS = [
+    {id: 'Qwen3-4B-q4f16_1-MLC', name: 'Qwen3 4B', size: '2.3 GB', memory: '3.4 GB', note: 'the best balance on a laptop'},
+    {id: 'Qwen3.5-4B-q4f16_1-MLC', name: 'Qwen3.5 4B', size: '2.6 GB', memory: '3.9 GB', note: 'newest; needs a little more memory'},
+    {id: 'Phi-4-mini-instruct-q4f16_1-MLC', name: 'Phi-4 mini', size: '2.3 GB', memory: '3.4 GB', note: "Microsoft's small model"},
+    {id: 'Llama-3.2-3B-Instruct-q4f16_1-MLC', name: 'Llama 3.2 3B', size: '1.8 GB', memory: '2.3 GB', note: 'lighter'},
+    {id: 'Qwen3-1.7B-q4f16_1-MLC', name: 'Qwen3 1.7B', size: '1.1 GB', memory: '2.0 GB', note: 'for phones; quickest'},
+  ];
+  let privEngine = null, privModel = '', privCtx = 0, privLoading = null, privQueue = Promise.resolve();
+  // thinking needs room: the model's working memory grows from 4k to 8k tokens (about 0.6 GB more graphics memory)
+  const privateThinking = () => { const t = aiLocal().think; return t === 'on' || t === 'auto' ? t : 'off'; };
+  async function privateEngine(model, tell, ctx){
+    ctx = ctx || (privateThinking() === 'off' ? 4096 : 8192);
+    if(privEngine && privModel === model && privCtx >= ctx) return privEngine;
+    if(privLoading) await privLoading.catch(()=>{});
+    if(privEngine && privModel === model && privCtx >= ctx) return privEngine;
+    if(!navigator.gpu) throw Unavailable('Private AI needs WebGPU (a recent Chrome, Edge or Safari).', 501);
+    privLoading = (async ()=>{
+      const webllm = await import(WEBLLM_URL);
+      if(privEngine){ try{ await privEngine.unload(); }catch(e){} privEngine = null; }
+      const eng = await webllm.CreateMLCEngine(model, {initProgressCallback: p=>{ if(tell) tell(String(p.text || '').replace(/\[.*?\]\s*/, '').slice(0, 120), 'webllm'); }},
+        {context_window_size: ctx});
+      privEngine = eng; privModel = model; privCtx = ctx;
+      return eng;
+    })();
+    try{ return await privLoading; } finally { privLoading = null; }
+  }
+  /* The model answers one question at a time: a second one waits its turn instead of failing.
+     opts.think: let it reason first (Qwen3's thinking mode) - slower, better at rules, times and sums.
+     With "auto" in Setup it thinks when the asking app says the task needs it (opts.reason). */
+  function callPrivate(model, system, turns, opts, signal){
+    const run = privQueue.then(()=>privateAnswer(model, system, turns, opts, signal));
+    privQueue = run.catch(()=>{});
+    return run;
+  }
+  async function privateAnswer(model, system, turns, opts, signal){
+    if(signal && signal.aborted){ const c = new Error('Stopped.'); c.code = 'cancelled'; throw c; }
+    const tell = opts.onProgress ? (t, id)=>opts.onProgress('Private AI: ' + t, id) : null;
+    const mode = privateThinking();
+    const think = opts.think !== undefined ? !!opts.think : mode === 'on' || (mode === 'auto' && !!opts.reason);
+    const eng = await privateEngine(model, tell, think ? 8192 : undefined);
+    const stop = ()=>{ try{ eng.interruptGenerate(); }catch(e){} };
+    if(signal) signal.addEventListener('abort', stop);
+    let text = '', usage = null, last = 0, t0 = Date.now();
+    try{
+      const stream = await eng.chat.completions.create({
+        messages: [{role: 'system', content: system}].concat(turns.map(t=>({role: t.role, content: t.content}))),
+        temperature: think ? 0.6 : 0.2, top_p: think ? 0.95 : 1, max_tokens: opts.maxTokens ? opts.maxTokens + (think ? 2500 : 0) : (think ? 4000 : 1800),
+        extra_body: {enable_thinking: think}, stream: true, stream_options: {include_usage: true},
+      });
+      for await (const ch of stream){
+        text += ((ch.choices || [])[0] || {}).delta ? (ch.choices[0].delta.content || '') : '';
+        if(ch.usage) usage = ch.usage;
+        if(tell && Date.now() - last > 1000){
+          last = Date.now();
+          const thinking = think && text.indexOf('</think>') < 0;
+          const words = (thinking ? text : text.split('</think>').pop()).split(/\s+/).filter(Boolean).length;
+          tell((thinking ? 'thinking… ' : 'writing… ') + words + ' words, ' + Math.round((Date.now() - t0) / 1000) + ' s', 'webllm');
+        }
+      }
+    }catch(e){
+      if(signal && signal.aborted){ const c = new Error('Stopped.'); c.code = 'cancelled'; throw c; }
+      if(/context|too long|exceed|prompt tokens/i.test(e.message)) throw Unavailable('Private AI: this request is too long for the in-browser model', 413);
+      throw Unavailable('Private AI: ' + String(e.message).slice(0, 120), 500);
+    }finally{ if(signal) signal.removeEventListener('abort', stop); }
+    if(signal && signal.aborted){ const c = new Error('Stopped.'); c.code = 'cancelled'; throw c; }
+    const thought = (/<think>([\s\S]*?)<\/think>/.exec(text) || [])[1] || '';
+    text = text.replace(/<think>[\s\S]*?(<\/think>|$)/g, '').trim();
+    if(!text) throw Unavailable('Private AI returned an empty answer' + (think ? ' (it ran out of room while thinking)' : '') + '.', 502);
+    return {text, sources: [], usage, thought: thought.trim()};
+  }
+  /* A short trial on this device: loads the model (downloading it the first time) and times real tasks.
+     think: true runs them with thinking on; the last task needs reasoning (times and a rule). */
+  async function trialPrivate(model, onStep, think){
+    const t0 = Date.now(), out = {model, think: !!think, steps: []};
+    await privateEngine(model, t=>onStep && onStep(t), think ? 8192 : 4096);
+    out.loadSec = (Date.now() - t0) / 1000;
+    const tasks = [
+      ['News summary', 'You brief a traveller. Answer with JSON only: {"status":"clear"|"caution"|"serious","headline":"one line","points":["2-4 short points"]}',
+        'Dubai, 23-28 Dec. Headlines: Dubai airport runs normally after brief fog delays on Monday; Emirates adds flights for the holidays; UK Foreign Office: no restrictions for the UAE; light rain forecast on 25 Dec.', null],
+      ['Reading a document', 'You read documents and answer with JSON only: {"type":"aadhaar|pan|passport|licence|other","person":"","number":"","validUntil":"YYYY-MM-DD or empty"}',
+        'Union of India - Driving Licence\nTransport Department, Maharashtra\nDL No: MH12 20150012345\nName: ANIL GUPTA\nDate of Issue: 14-12-2006\nValid Till: 13-12-2026', null],
+      ['Fixing a plan item', 'You fix travel plans. Answer with JSON only: {"items":[{"start":"HH:MM","end":"HH:MM","title":""}]}. Rule: nothing before 13:30 because the traveller lands at 10:25 and reaches the hotel at 12:55.',
+        'Day 1 items: 10:25-10:25 Land in Dubai; 11:00-12:00 Lunch - Shawarma; 14:00-14:30 Check in; 19:00-20:15 Dinner. Move what breaks the rule and keep the rest.',
+        // right when: landing kept, lunch moved to 13:30 or later without overlapping check-in, dinner kept
+        j=>{ const it = (j.items || []), m = t=>{ const x = /^(\d{1,2}):(\d{2})/.exec(t || ''); return x ? +x[1] * 60 + +x[2] : -1; };
+          const lunch = it.find(i=>/lunch/i.test(i.title)), ci = it.find(i=>/check/i.test(i.title)), din = it.find(i=>/dinner/i.test(i.title));
+          return !!lunch && m(lunch.start) >= 810 && !!ci && (m(lunch.end) <= m(ci.start) || m(lunch.start) >= m(ci.end)) && !!din && din.start === '19:00'; }],
+    ];
+    for(const [name, system, user, right] of tasks){
+      if(onStep) onStep(name + '…');
+      const t = Date.now();
+      try{
+        const r = await callPrivate(model, system, [{role: 'user', content: user}], {think: !!think, onProgress: onStep ? (x)=>onStep(name + ' — ' + x) : null}, null);
+        let ok = true, j = null; try{ j = json(r.text); }catch(e){ ok = false; }
+        const tok = r.usage && r.usage.completion_tokens;
+        out.steps.push({name, sec: (Date.now() - t) / 1000, ok, right: right && j ? right(j) : undefined, tokens: tok, text: r.text.slice(0, 400)});
+      }catch(e){ out.steps.push({name, sec: (Date.now() - t) / 1000, ok: false, error: e.message}); }
+    }
+    return out;
+  }
+  async function removePrivate(model){
+    const webllm = await import(WEBLLM_URL);
+    if(privEngine && privModel === model){ try{ await privEngine.unload(); }catch(e){} privEngine = null; privModel = ''; }
+    await webllm.deleteModelAllInfoInCache(model);
+  }
+  async function privateCached(model){
+    try{ const webllm = await import(WEBLLM_URL); return await webllm.hasModelInCache(model); }catch(e){ return false; }
+  }
+
   /* ---- Your AI on the Mac (~/AI's helper, 127.0.0.1:8899): the way ATS asks it. Its question is capped, so the app's
      instructions and data go as an attached file and the question points to it. Its reply comes one JSON per line
      (steps, then the answer, then extras the app does not need: reading stops at the answer). */
@@ -259,6 +371,7 @@ const MoneyAI = (function(){
 
   const temp = opts => typeof opts.temperature === 'number' ? opts.temperature : 0.2;
   async function callOne(id, key, model, system, turns, opts, signal){
+    if(id === 'webllm') return callPrivate(model, system, turns, opts, signal);
     if(id === 'mac') return callMac(key, model, system, turns, opts, signal);
     const name = PROVIDERS.find(p=>p.id === id).name;
     const images = opts.images || [];
@@ -350,6 +463,7 @@ const MoneyAI = (function(){
     return id === 'openrouter' && list.indexOf('openrouter/free') >= 0 ? ranked.slice(0, 3).concat(['openrouter/free'], ranked.slice(3)) : ranked;
   }
   async function listModels(id, key){
+    if(id === 'webllm') return [key];              // the one you chose in Setup
     if(id === 'mac'){ const d = await (await fetch(key.replace(/\/+$/, '') + '/models')).json(); return (d.apple || {}).chatgpt ? ['chatgpt', 'auto'] : ['auto']; }
     let res;
     if(id === 'gemini') res = await fetch('https://generativelanguage.googleapis.com/v1beta/models?pageSize=200&key=' + encodeURIComponent(key));
@@ -364,6 +478,7 @@ const MoneyAI = (function(){
   }
   /* What a key can use (asked once a day), ranked for the task. */
   async function bestModels(id, key, tier){
+    if(id === 'webllm') return [key];
     const cache = lsGet(MODELS_KEY, {}), c = cache[id], tag = key.slice(-6);
     // a day's cache for the online services; the models on this computer are read fresh (a new one may just have been downloaded)
     let names = id !== 'ollama' && id !== 'mac' && c && c.key === tag && Date.now() - c.at < 86400000 && c.names && c.names.length ? c.names : null;
@@ -521,7 +636,7 @@ const MoneyAI = (function(){
   }
   const setModel = (id, m) => { const h = aiLocal(); h.model = Object.assign({}, h.model, {[id]: m}); saveAiLocal(h); };
 
-  return {MAC_URL, macUp, macFetch, macRemote, setMacRemote, macSignIn, macBase, PROVIDERS, loadAi, aiSettings, aiLocal, saveAiLocal, adoptAppKeys, aiStatus, rankModels, shareableAi, takeSyncedAi,
+  return {MAC_URL, macUp, macFetch, macRemote, setMacRemote, macSignIn, macBase, PRIVATE_MODELS, trialPrivate, removePrivate, privateCached, PROVIDERS, loadAi, aiSettings, aiLocal, saveAiLocal, adoptAppKeys, aiStatus, rankModels, shareableAi, takeSyncedAi,
           aiAvailable, aiNames, canSee, canSearch, resting, wake, backAt, chat, generate, json, test, setModel, listModels};
 })();
 
@@ -658,7 +773,7 @@ const MoneyShared = (function(){
       else out.brain = here.brain || remote.brain;
       // this device takes the result (its own Ollama address stays)
       const hub = MoneyAI.aiLocal();
-      hub.keys = Object.assign({}, out.ai.keys, Object.fromEntries(['ollama'].filter(k=>(hub.keys || {})[k]).map(k=>[k, hub.keys[k]])));   // this device's own stay
+      hub.keys = Object.assign({}, out.ai.keys, Object.fromEntries(['ollama', 'webllm'].filter(k=>(hub.keys || {})[k]).map(k=>[k, hub.keys[k]])));   // this device's own stay
       hub.first = out.ai.first; hub.fallback = out.ai.fallback; hub.model = out.ai.model; hub.off = out.ai.off;
       if(out.ai.relay && out.ai.relay.url) hub.relay = out.ai.relay;                  // web search: the same relay on every device
       MoneyAI.saveAiLocal(hub);

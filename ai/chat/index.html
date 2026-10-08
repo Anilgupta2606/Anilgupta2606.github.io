@@ -608,6 +608,25 @@ if(LOCAL_PAGE){ const _fetch = window.fetch.bind(window); let out = false;
 let mode = null;                                            // 'mac' | 'browser'
 // an answer sent back with the next question: 1500 characters, and the line naming its picture (so "edit it" finds it)
 const keepText = (t, n) => { t = String(t || ''); const s = (/Saved on this Mac: `[^`]+`/.exec(t) || [''])[0]; const c = t.slice(0, n); return s && !c.includes(s) ? c + '\n\n' + s : c; };
+// Every saved turn matters to a conversation, but a long chat cannot be sent to
+// an 8k-context local model verbatim. Keep all questions and a concise answer
+// from every older turn, while retaining much more detail for the latest turns.
+const conversationTurns = saved => {
+  const all = (saved || []).slice(-60), recent = 3, older = Math.max(0, all.length - recent);
+  const oldPair = older ? Math.max(180, Math.min(900, Math.floor(9000 / older))) : 0;
+  const compact = (text, limit) => {
+    const raw = String(text || '').replace(/\s+/g, ' ').trim(), saved = (/Saved on this Mac: `[^`]+`/.exec(raw) || [''])[0];
+    let s = raw.slice(0, limit).trim();
+    if(saved && !s.includes(saved)) s = s.slice(0, Math.max(0, limit - saved.length - 2)).trim() + '\n' + saved;
+    return s.length > limit && !saved ? s.slice(0, Math.max(0, limit - 1)) + '…' : s;
+  };
+  return all.flatMap((turn, i) => {
+    const detailed = i >= older, pair = detailed ? 2400 : oldPair;
+    const question = compact(turn.q, detailed ? 1000 : Math.max(70, Math.floor(pair * .45)));
+    const answer = compact((turn.answer || {}).text, detailed ? 1400 : Math.max(100, pair - question.length));
+    return [{role: 'user', content: question}, {role: 'assistant', content: answer}];
+  });
+};
 const $ = s => document.querySelector(s);
 const webUrl = u => /^https?:\/\//i.test(String(u || '')) ? String(u) : '';     // only web addresses become links (never javascript: and the like)
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -824,7 +843,7 @@ async function ask(q, opt){
     box.innerHTML = stepHtml(steps[steps.length - 1], true);                   // the step it is on now
   };
   step('Starting');
-  const turns = requestHistory.slice(-3).flatMap(h=>[{role: 'user', content: h.q}, {role: 'assistant', content: keepText(h.answer.text, 1500)}]);
+  const turns = conversationTurns(requestHistory);
   let doneShown = false;
   const done = out => {
     lastAnswer = out;
@@ -834,7 +853,7 @@ async function ask(q, opt){
     const vids = out.videos || [];
     if(imgs.length) Promise.all(imgs.map(im=>preview(im.b64))).then(p=>{ const h = requestHistory.find(x=>x.answer && x.answer.text === out.text); if(h){ h.answer.images = p.map((t, i)=>t ? {thumb: t, label: imgs[i].label} : null).filter(Boolean); saveChat({id: requestSessionId, history: requestHistory, goal: requestGoal, chatName: requestChatName}); } });
     requestHistory.push({q, answer: {kind: out.kind, videos: vids.length ? vids.map(v=>({note: 'The video is saved on your Mac: ' + String(v.file || '').replace(/^\/Users\/[^/]+/, '~')})) : undefined, text: out.text, sources: out.sources, read: out.read, by: out.by, secs: out.secs, model: out.model, chart: out.chart, trust: out.trust ? {confidence: out.trust.confidence, checked: out.trust.checked, ok: out.trust.ok} : undefined, saved: out.saved}, steps, traces: slim(traces)});
-    const kept = requestHistory.slice(-40).map((h, i, all)=>i < all.length - 8 ? Object.assign({}, h, {traces: (h.traces || []).map(t=>({kind: t.kind, title: t.title}))}) : h);
+    const kept = requestHistory.slice(-60).map((h, i, all)=>i < all.length - 8 ? Object.assign({}, h, {traces: (h.traces || []).map(t=>({kind: t.kind, title: t.title}))}) : h);
     requestHistory.splice(0, requestHistory.length, ...kept);
     if(sessionId === requestSessionId){
       history = requestHistory; store.set('moneyai.history', history); setTitle();
