@@ -219,7 +219,7 @@ details.also{margin-top:10px} details.also summary{cursor:pointer; font-size:13p
 .badges{display:flex; flex-wrap:wrap; gap:6px; align-items:center; margin:0 0 12px} .badges .model{margin:0}
 .conf{display:inline-flex; align-items:center; gap:4px; font-size:12px; font-weight:600; border-radius:999px; padding:3px 10px}
 .conf.high{background:var(--read-bg); color:var(--ok)} .conf.medium{background:var(--calc-bg); color:var(--warn-ink)} .conf.low{background:var(--check-bg); color:var(--err)}
-.conf.pending{background:var(--page); color:var(--mut)} .conf.pending::before{content:''; width:8px; height:8px; border-radius:50%; background:var(--orb); animation:turn 1.2s linear infinite}
+.conf.pending, .conf.unchecked{background:var(--page); color:var(--mut)} .conf.pending::before{content:''; width:8px; height:8px; border-radius:50%; background:var(--orb); animation:turn 1.2s linear infinite}
 .tr{font-style:normal; font-weight:700} .tr.official{color:var(--ok)} .tr.reference{color:var(--search)} .tr.news{color:var(--think)}
 .follow{display:flex; flex-wrap:wrap; gap:6px; margin-top:12px}
 .fchip2{border:1px solid var(--line); background:var(--page); color:var(--ink2); border-radius:999px; padding:6px 12px; font-size:13px; cursor:pointer; text-align:left}
@@ -423,6 +423,26 @@ main{max-width:800px; padding:22px 20px 170px}
   .chart svg{width:100%; height:auto}
   pre, .code pre{font-size:12.5px}
 }
+/* tables, rules, quotes and links in an answer (ChatGPT writes them often); a wide table scrolls sideways on a phone */
+:is(.a,.draft) .tbl{overflow-x:auto; margin:0 0 12px; border:1px solid var(--line); border-radius:12px; overscroll-behavior-x:contain}
+:is(.a,.draft) table{border-collapse:collapse; width:100%; font-size:.92em; font-variant-numeric:tabular-nums}
+:is(.a,.draft) th, :is(.a,.draft) td{padding:7px 12px; text-align:left; vertical-align:top; border-bottom:1px solid var(--line)}
+:is(.a,.draft) th{background:var(--page); font-weight:600; white-space:nowrap} :is(.a,.draft) tr:last-child td{border-bottom:0}
+:is(.a,.draft) th.r, :is(.a,.draft) td.r{text-align:right} :is(.a,.draft) th.c, :is(.a,.draft) td.c{text-align:center}
+:is(.a,.draft) hr{border:0; border-top:1px solid var(--line); margin:14px 0}
+:is(.a,.draft) blockquote{margin:0 0 10px; padding:2px 0 2px 12px; border-left:3px solid var(--line); color:var(--ink2)}
+:is(.a,.draft) a.ln{color:var(--search); text-decoration:underline; text-underline-offset:2px}
+@media (max-width:600px){ :is(.a,.draft) table{font-size:.86em} :is(.a,.draft) th, :is(.a,.draft) td{padding:6px 9px} }
+/* iPhone: no grey flash on a tap and a press you can feel; no zoom when a box is tapped (16 px); scrolling that does not
+   repaint a blur or a fixed background on every frame */
+html{-webkit-tap-highlight-color:transparent; -webkit-text-size-adjust:100%}
+button, a, summary, label{touch-action:manipulation}
+@media (hover:none){
+  button:active, .pill:active, .chat:active{transform:scale(.97); transition:transform .08s ease}
+  input, select, textarea{font-size:16px !important}
+  body{background-attachment:scroll}
+  header.topbar, header.old{backdrop-filter:none; -webkit-backdrop-filter:none; background:color-mix(in srgb, var(--page) 97%, transparent)}
+}
 </style>
 </head>
 <body>
@@ -605,7 +625,7 @@ const hue = s => { let h = 0; for(const c of String(s)) h = (h * 31 + c.charCode
    and [n] linked to its sources; ⚠ lines become notices. Everything is escaped first — the model's text never runs. */
 function inline(t, urls){
   const keep = [];                                                   // inline code kept as it is (list[2] is not a source mark)
-  return esc(t).replace(/`([^`\n]+)`/g, (m, c)=>{ keep.push('<code>' + c + '</code>'); return '\u0001' + (keep.length - 1) + '\u0001'; }).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>').replace(/(^|[^*])\*([^*\n]+)\*(?!\*)/g, '$1<i>$2</i>')
+  return esc(t).replace(/`([^`\n]+)`/g, (m, c)=>{ keep.push('<code>' + c + '</code>'); return '\u0001' + (keep.length - 1) + '\u0001'; }).replace(/\[([^\]\n]+)\]\((https?:\/\/[^\s)]+)\)/g, (m, x, u)=>{ keep.push('<a class="ln" href="' + u + '" target="_blank" rel="noopener">' + x + '</a>'); return '\u0001' + (keep.length - 1) + '\u0001'; }).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>').replace(/(^|[^*])\*([^*\n]+)\*(?!\*)/g, '$1<i>$2</i>')
     .replace(/\s?\[(\d+)\]/g, (m, n)=>webUrl(urls[n]) ? `<sup><a href="${esc(urls[n])}" target="_blank" rel="noopener">${n}</a></sup>` : `<sup><a>${n}</a></sup>`).replace(/\u0001(\d+)\u0001/g, (m, i)=>keep[+i]);
 }
 function markdown(text, urls){
@@ -615,7 +635,21 @@ function markdown(text, urls){
   let para = [], list = null;
   const flushPara = () => { if(para.length){ const b = para.join('\n').trim(); if(b) out.push(/^⚠/.test(b) ? `<div class="warn">${inline(b, urls).replace(/\n/g, '<br>')}</div>` : /^✔/.test(b) ? `<p class="ok">${inline(b, urls)}</p>` : `<p>${inline(b, urls).replace(/\n/g, '<br>')}</p>`); para = []; } };
   const flushList = () => { if(list){ out.push(`<${list.tag}>${list.items.map(i=>`<li>${inline(i, urls)}</li>`).join('')}</${list.tag}>`); list = null; } };
-  for(const line of lines){
+  const SEP = /^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)*\|?\s*$/, cells = r => r.trim().replace(/^\||\|$/g, '').split('|').map(c=>c.trim());
+  for(let k = 0; k < lines.length; k++){
+    const line = lines[k];
+    // a table: a row of | cells, a | --- | line under it, then its rows
+    if(line.includes('|') && SEP.test(lines[k + 1] || '') && (lines[k + 1] || '').includes('-')){
+      flushPara(); flushList();
+      const al = cells(lines[k + 1]).map(c=>/^:-+:$/.test(c) ? ' class="c"' : /-:$/.test(c) ? ' class="r"' : ''), head = cells(line), rows = [];
+      for(k += 2; k < lines.length && lines[k].includes('|') && lines[k].trim(); k++) rows.push(cells(lines[k]));
+      k--;
+      out.push(`<div class="tbl"><table><thead><tr>${head.map((c, i)=>`<th${al[i] || ''}>${inline(c, urls)}</th>`).join('')}</tr></thead><tbody>${rows.map(r=>`<tr>${head.map((_, i)=>`<td${al[i] || ''}>${inline(r[i] || '', urls)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`);
+      continue;
+    }
+    if(/^\s*([-*_])(\s*\1){2,}\s*$/.test(line)){ flushPara(); flushList(); out.push('<hr>'); continue; }
+    const quote = /^\s*>\s?(.*)/.exec(line);
+    if(quote){ flushPara(); flushList(); const q = [quote[1]]; while(k + 1 < lines.length && /^\s*>/.test(lines[k + 1])) q.push(lines[++k].replace(/^\s*>\s?/, '')); out.push(`<blockquote>${inline(q.join('\n'), urls).replace(/\n/g, '<br>')}</blockquote>`); continue; }
     const code = /^\u0000(\d+)\u0000$/.exec(line.trim());
     const head = /^(#{1,4})\s+(.+)/.exec(line);
     const item = /^\s*(?:([-*•])|(\d+)[.)])\s+(.+)/.exec(line);
@@ -723,7 +757,11 @@ function finish(el, q, out, steps, traces){
   const fr = el.querySelector('.foot .fresh'); if(fr) fr.onclick = () => ask(q, {fresh: true});
 }
 // confidence: how well the claims are backed by what was read (a second model's check)
-const trustBadge = v => `<span class="conf ${esc(String(v.confidence).toLowerCase())}" tabindex="0" title="${esc(v.supported + ' of ' + v.checked + ' claims backed by the sources' + (v.by ? ' — checked by ' + v.by : ''))}">${v.confidence === 'High' ? '✓' : v.confidence === 'Low' ? '⚠' : '~'} ${esc(v.confidence)} confidence · ${v.supported}/${v.checked} claims backed</span>`;
+// only facts count (advice and opinions are skipped); a fact the sources do not mention is Medium, not Low
+const trustWords = v => (v.opinions === undefined ? v.supported + '/' + v.checked + ' claims backed' : v.supported + '/' + v.checked + ' facts backed') + ((v.contradicted || []).length ? ', ' + v.contradicted.length + ' contradicted' : v.confidence === 'Low' && v.figuresOff ? ', figures not in the sources' : (v.notFound || []).length ? ', ' + v.notFound.length + ' not in the sources' : '');
+const trustBadge = v => v.confidence === 'Unchecked'
+  ? `<span class="conf unchecked" tabindex="0" title="${esc('Not checked: ' + (v.why || 'nothing to check it against'))}">○ Not checked</span>`
+  : `<span class="conf ${esc(String(v.confidence).toLowerCase())}" tabindex="0" title="${esc(trustWords(v) + (v.opinions ? ' · ' + v.opinions + ' opinion' + (v.opinions === 1 ? '' : 's') + ' not counted' : '') + (v.by ? ' — checked by ' + v.by : ''))}">${v.confidence === 'High' ? '✓' : v.confidence === 'Low' ? '⚠' : '~'} ${esc(v.confidence)} confidence · ${esc(trustWords(v))}</span>`;
 function showVerify(el, v){
   const a = el.querySelector('.a'); if(!a) return;
   const b = a.querySelector('.conf'); if(b) b.outerHTML = trustBadge(v); else { const bs = a.querySelector('.badges'); if(bs) bs.insertAdjacentHTML('beforeend', trustBadge(v)); }
@@ -1021,7 +1059,7 @@ async function swap(){
 const loadScript = src => new Promise((res, rej)=>{ const s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = rej; document.head.appendChild(s); });
 async function detect(){
   let d = null;
-  try{ d = await Promise.race([fetch(HELPER + '/health').then(r=>r.json()), new Promise((_, rej)=>setTimeout(()=>rej(new Error('slow')), 1500))]); }catch(e){}
+  try{ d = await Promise.race([fetch(HELPER + '/health').then(r=>r.json()), new Promise((_, rej)=>setTimeout(()=>rej(new Error('slow')), LOCAL_PAGE ? 5000 : 1500))]); }catch(e){}     // the phone over Tailscale can take a few seconds to wake
   if(!LOCAL_PAGE){ try{ for(const f of ['ai', 'brain', 'ask', 'web']) await loadScript('/ai/' + f + '.js'); }catch(e){} }
   if(d && d.ok && d.search && d.search.searxng){
     mode = 'mac';
@@ -1548,7 +1586,7 @@ function start(){
   $('#meName').onchange = () => { const n = $('#meName').value.trim().slice(0, 40); if(!n) return; store.set('ai.name', n); showName(n); post('/me', {name: n}).catch(()=>{}); toast('Name saved'); };
   // a fresh chat every time the page opens; earlier ones are in the list on the left
   if(history.length) newChat(true);
-  ready = detect(); showGoal(); setTitle(); ready.then(loadChats); $('#q').focus();
+  ready = detect(); showGoal(); setTitle(); ready.then(loadChats); if(matchMedia('(hover:hover)').matches) $('#q').focus();     // a phone: no lit-up box until you tap it
   // ?q=… (from a Siri Shortcut or a link): ask it at once, then tidy the address
   const qs = new URLSearchParams(location.search).get('q');
   if(qs && qs.trim()){ try{ history.length && newChat(true); }catch(e){} ask(qs.trim()); try{ window.history.replaceState(null, '', location.pathname); }catch(e){} }
