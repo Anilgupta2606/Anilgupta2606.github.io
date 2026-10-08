@@ -152,7 +152,7 @@ details.how .steps{margin:10px 0 4px}
 .gen{margin:0 0 14px; display:flex; flex-direction:column; gap:8px; align-items:flex-start}
 .gen video{display:block; max-width:100%; width:520px; border-radius:16px; border:1px solid var(--line); box-shadow:var(--shadow)}
 .gen img{max-width:100%; width:520px; border-radius:16px; border:1px solid var(--line); box-shadow:var(--shadow)}
-.gen .dl{text-decoration:none}
+.gen .dl{text-decoration:none}.genactions{display:flex;gap:8px;flex-wrap:wrap}.save-edit.on{border-color:var(--check);color:var(--check)}
 .chart{margin:0 0 14px; background:var(--page); border:1px solid var(--line); border-radius:16px; padding:12px 12px 8px}
 .chart figcaption{font-size:13px; color:var(--ink2); margin:0 0 6px}
 .chart svg{width:100%; height:auto; display:block}
@@ -639,6 +639,7 @@ const webUrl = u => /^https?:\/\//i.test(String(u || '')) ? String(u) : '';     
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const store = {get(k, d){ try{ return JSON.parse(localStorage.getItem(k)) ?? d; }catch(e){ return d; } }, set(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }};
 let history = store.get('moneyai.history', []);          // [{q, answer, steps}] — this conversation
+let savedEditFile = '';                                      // one explicit picture chosen for editing, shared across chats
 let busy = false;
 
 /* a step's kind (its colour), from what the engine says it is doing */
@@ -721,7 +722,12 @@ function chartSvg(ch){
 // pictures in an answer (made from a description): shown, with a Download button
 const videosHtml = out => (out.videos || []).map((v, i)=>v.b64 && /^[A-Za-z0-9+/=]+$/.test(v.b64.slice(0, 200)) ? `<figure class="gen"><video src="data:video/mp4;base64,${v.b64}" autoplay loop muted playsinline controls></video><a class="ghost dl" download="cygnus-video-${Date.now()}-${i}.mp4" href="data:video/mp4;base64,${v.b64}">Download</a></figure>` : v.note ? `<figure class="gen"><figcaption class="sub">${esc(v.note)}</figcaption></figure>` : '').join('');
 const imagesHtml = out => videosHtml(out) + ((out.images || []).length > 1 ? '<div class="gengrid">' : '') + (out.images || []).map((im, i)=>{ const mime = /^image\/(png|jpeg|webp|gif)$/.test(im.mime || '') ? im.mime : 'image/jpeg', src = im.b64 && /^[A-Za-z0-9+/=]+$/.test(im.b64.slice(0, 200)) ? 'data:' + mime + ';base64,' + im.b64 : /^data:image\//.test(im.thumb || '') ? im.thumb : '';
-  return src ? `<figure class="gen${(out.images || []).length > 1 ? ' many' : ''}"><img src="${src}" alt="A generated picture">${im.label ? `<figcaption class="glabel">${esc(im.label)}</figcaption>` : ''}${im.b64 ? `<a class="ghost dl" download="ai-picture-${Date.now()}-${i}.${mime === 'image/png' ? 'png' : 'jpg'}" href="${src}">Download</a>` : '<figcaption class="sub">Preview (the full picture is in ~/Pictures/AI Images on your Mac)</figcaption>'}</figure>` : ''; }).join('') + ((out.images || []).length > 1 ? '</div>' : '');
+  const file = String(im.file || '');
+  const saved = file && savedEditFile && file === savedEditFile;
+  const saveButton = file ? `<button type="button" class="ghost save-edit${saved ? ' on' : ''}" data-save-edit="${esc(file)}" data-label="${esc(im.label || '')}">${saved ? 'Saved for edit' : 'Save for edit'}</button>` : '';
+  const downloadHref = im.b64 ? src : (file ? `${HELPER}/picture?file=${encodeURIComponent(file)}` : '');
+  const downloadName = file ? String(file).split('/').pop() : `ai-picture-${Date.now()}-${i}.${mime === 'image/png' ? 'png' : 'jpg'}`;
+  return src ? `<figure class="gen${(out.images || []).length > 1 ? ' many' : ''}"><img src="${src}" alt="A generated picture">${im.label ? `<figcaption class="glabel">${esc(im.label)}</figcaption>` : ''}<div class="genactions">${downloadHref ? `<a class="ghost dl" download="${esc(downloadName)}" href="${downloadHref}">Download</a>` : ''}${saveButton}</div>${!im.b64 ? '<figcaption class="sub">Preview (the full picture is in ~/Pictures/AI Images on your Mac)</figcaption>' : ''}</figure>` : ''; }).join('') + ((out.images || []).length > 1 ? '</div>' : '');
 // a small preview to keep in the chat (the full picture is big)
 function preview(b64){ return new Promise(res=>{ const i = new Image(); i.onload = () => { const k = Math.min(1, 384 / Math.max(i.width, i.height)), c = document.createElement('canvas'); c.width = Math.round(i.width * k); c.height = Math.round(i.height * k); c.getContext('2d').drawImage(i, 0, 0, c.width, c.height); res(c.toDataURL('image/jpeg', 0.7)); }; i.onerror = () => res(''); i.src = 'data:image/jpeg;base64,' + b64; }); }
 function render(out){
@@ -858,8 +864,8 @@ async function ask(q, opt){
     finish(el, q, out, steps, traces, true);
     const imgs = out.images || [];
     const vids = out.videos || [];
-    if(imgs.length) Promise.all(imgs.map(im=>preview(im.b64))).then(p=>{ const h = requestHistory.find(x=>x.answer && x.answer.text === out.text); if(h){ h.answer.images = p.map((t, i)=>t ? {thumb: t, label: imgs[i].label} : null).filter(Boolean); saveChat({id: requestSessionId, history: requestHistory, goal: requestGoal, chatName: requestChatName}); } });
-    requestHistory.push({q, answer: {kind: out.kind, videos: vids.length ? vids.map(v=>({note: 'The video is saved on your Mac: ' + String(v.file || '').replace(/^\/Users\/[^/]+/, '~')})) : undefined, text: out.text, sources: out.sources, read: out.read, by: out.by, secs: out.secs, model: out.model, chart: out.chart, trust: out.trust ? {confidence: out.trust.confidence, checked: out.trust.checked, ok: out.trust.ok} : undefined, saved: out.saved}, steps, traces: slim(traces)});
+    if(imgs.length) Promise.all(imgs.map(im=>preview(im.b64))).then(p=>{ const h = requestHistory.find(x=>x.answer && x.answer.text === out.text); if(h){ h.answer.images = p.map((t, i)=>t ? {thumb: t, label: imgs[i].label, file: imgs[i].file, mime: imgs[i].mime} : null).filter(Boolean); saveChat({id: requestSessionId, history: requestHistory, goal: requestGoal, chatName: requestChatName}); } });
+    requestHistory.push({q, answer: {kind: out.kind, videos: vids.length ? vids.map(v=>({note: 'The video is saved on your Mac: ' + String(v.file || '').replace(/^\/Users\/[^/]+/, '~')})) : undefined, images: imgs.length ? imgs.map(im=>({file: im.file, label: im.label, mime: im.mime})).filter(im=>im.file) : undefined, text: out.text, sources: out.sources, read: out.read, by: out.by, secs: out.secs, model: out.model, chart: out.chart, trust: out.trust ? {confidence: out.trust.confidence, checked: out.trust.checked, ok: out.trust.ok} : undefined, saved: out.saved}, steps, traces: slim(traces)});
     const kept = requestHistory.slice(-60).map((h, i, all)=>i < all.length - 8 ? Object.assign({}, h, {traces: (h.traces || []).map(t=>({kind: t.kind, title: t.title}))}) : h);
     requestHistory.splice(0, requestHistory.length, ...kept);
     if(sessionId === requestSessionId){
@@ -1126,11 +1132,35 @@ async function detect(){
     pill('#stWhere', d && d.ok ? 'Search engine off' : 'Helper not running', 'off');
   }
   loadLearned();
+  loadSavedEdit();
 }
 const grow = () => { const t = $('#q'); t.style.height = 'auto'; t.style.height = Math.min(180, t.scrollHeight) + 'px'; };
 const hour = new Date().getHours();
 $('#greet').firstChild.textContent = hour < 5 ? 'Up late?' : hour < 12 ? 'Good morning.' : hour < 17 ? 'Good afternoon.' : 'Good evening.';
 $('#q').addEventListener('input', grow);
+async function loadSavedEdit(){
+  try{ const r = await fetch(HELPER + '/saved-picture'); if(!r.ok) return; const x = await r.json(); savedEditFile = String(x.file || '');
+    document.querySelectorAll('[data-save-edit]').forEach(b=>{ const on = b.dataset.saveEdit === savedEditFile; b.classList.toggle('on', on); b.textContent = on ? 'Saved for edit' : 'Save for edit'; });
+  }catch(e){}
+}
+async function savePictureForEdit(button){
+  const file = String(button.dataset.saveEdit || '');
+  if(!file) return;
+  button.disabled = true;
+  try{
+    const isCurrent = !!savedEditFile && savedEditFile === file;
+    const payload = isCurrent ? {clear: true} : {file, label: button.dataset.label || ''};
+    const r = await fetch(HELPER + '/saved-picture', {method: 'POST', headers: {'content-type': 'application/json'}, body: JSON.stringify(payload)});
+    const x = await r.json();
+    if(!r.ok || x.error) throw new Error(x.error || (isCurrent ? 'Could not clear the saved picture.' : 'Could not save the picture for editing.'));
+    savedEditFile = isCurrent ? '' : String(x.file || file);
+    document.querySelectorAll('[data-save-edit]').forEach(b=>{ const on = !!savedEditFile && b.dataset.saveEdit === savedEditFile; b.classList.toggle('on', on); b.textContent = on ? 'Saved for edit' : 'Save for edit'; });
+    showToast(isCurrent ? 'Saved-for-edit picture cleared.' : 'Picture saved for edit — it will be used for the next image edit, even in another chat.');
+  }catch(e){ showToast(String(e.message || e), true); }
+  finally{ button.disabled = false; }
+}
+document.addEventListener('click', e=>{ const b = e.target.closest && e.target.closest('[data-save-edit]'); if(b){ e.preventDefault(); savePictureForEdit(b); return; } });
+
 document.addEventListener('click', e=>{ const b = e.target.closest && e.target.closest('.copy'); if(!b) return;
   const code = b.closest('.code').querySelector('code').textContent;
   (navigator.clipboard ? navigator.clipboard.writeText(code) : Promise.reject()).then(()=>{ b.textContent = 'Copied'; setTimeout(()=>{ b.textContent = 'Copy'; }, 1500); }).catch(()=>{ b.textContent = 'Select and copy'; }); });
