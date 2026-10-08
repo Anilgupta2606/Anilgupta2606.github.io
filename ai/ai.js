@@ -281,17 +281,42 @@ const MoneyAI = (function(){
   /* ---- Your AI on the Mac (~/AI's helper, 127.0.0.1:8899): the way ATS asks it. Its question is capped, so the app's
      instructions and data go as an attached file and the question points to it. Its reply comes one JSON per line
      (steps, then the answer, then extras the app does not need: reading stops at the answer). */
-  const MAC_URL = 'http://127.0.0.1:8899', MAC_KEY = 'money-ai-mac';
+  const MAC_URL = 'http://127.0.0.1:8899', MAC_KEY = 'money-ai-mac', MAC_REMOTE = 'money-ai-mac-remote';
   let macCheck = null;
+  /* FROM ANOTHER DEVICE (a phone), or when the browser keeps a site away from 127.0.0.1: your Mac's Tailscale address
+     (https://your-mac.your-tailnet.ts.net:8443) and the key this device got by signing in to it - kept on this device
+     only, never synced. Tried after 127.0.0.1. */
+  const macRemote = () => lsGet(MAC_REMOTE, {});
+  const setMacRemote = r => { lsSet(MAC_REMOTE, r && r.url ? {url: String(r.url).replace(/\/+$/, ''), token: r.token || '', user: r.user || ''} : undefined); macCheck = null; changed(); };
+  const tsUrl = u => { u = String(u || '').trim().replace(/\/+$/, ''); if(!u) return ''; if(!/^https?:\/\//i.test(u)) u = 'https://' + u; return /^https:\/\/[a-z0-9-]+\.[a-z0-9-]+\.ts\.net(:\d+)?$/i.test(u) ? u : ''; };
+  // where the Mac's AI answers from this device now (127.0.0.1 or the Tailscale address), and the headers it needs
+  const macBase = () => lsGet(MAC_KEY, {}).base || MAC_URL;
+  const macHeaders = base => { const r = macRemote(); return base !== MAC_URL && r.token && base === r.url ? {'x-cyg-token': r.token} : {}; };
+  const macFetch = (p, o) => { const b = macBase(); o = Object.assign({}, o); o.headers = Object.assign({}, o.headers || {}, macHeaders(b)); return fetch(b + p, o); };
+  // sign in to your Mac from this device (your Cygnus AI username and password): the key is kept here
+  async function macSignIn(url, user, password){
+    const base = tsUrl(url);
+    if(!base) throw new Error('That is not a Tailscale address (it looks like https://your-mac.your-tailnet.ts.net:8443).');
+    let d = {};
+    try{ d = await (await fetch(base + '/login', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({user, password, device: true})})).json(); }
+    catch(e){ throw new Error('Could not reach your Mac at that address - is Tailscale on, here and on the Mac?'); }
+    if(!d.ok || !d.token) throw new Error(d.error || 'Wrong username or password.');
+    setMacRemote({url: base, token: d.token, user});
+    await macUp(MAC_URL, true);
+    return true;
+  }
   // not known to be down (the last check said so): on a phone it drops out of the lists after the first check
   const macMaybe = () => lsGet(MAC_KEY, {}).up !== false;
   function macUp(base, force){
     const was = lsGet(MAC_KEY, {});
     if(!force && macCheck && Date.now() - macCheck.at < 30000) return macCheck.p;
     const p = (async ()=>{
-      let up = false;
-      try{ const r = await Promise.race([fetch((base || MAC_URL) + '/health'), new Promise((_, rej)=>setTimeout(()=>rej(new Error('slow')), 1500))]); const d = await r.json(); up = !!(d && d.ok); }catch(e){}
-      lsSet(MAC_KEY, {up, at: Date.now()}); if(up !== was.up) changed();
+      let up = false, at = '', tailscale = '';
+      const ping = async (b, ms, h) => { try{ const r = await Promise.race([fetch(b + '/health', {headers: h || {}}), new Promise((_, rej)=>setTimeout(()=>rej(new Error('slow')), ms))]); const d = await r.json(); if(d && d.tailscale) tailscale = d.tailscale; return d; }catch(e){ return null; } };
+      const local = await ping(base || MAC_URL, 1500);
+      if(local && local.ok){ up = true; at = base || MAC_URL; }
+      else { const r = macRemote(); if(r.url && r.token){ const d = await ping(r.url, 4000, {'x-cyg-token': r.token}); if(d && d.ok && d.signedIn !== false){ up = true; at = r.url; } else if(d && d.signedIn === false) lsSet(MAC_REMOTE, Object.assign({}, r, {token: '', expired: true})); } }
+      lsSet(MAC_KEY, {up, at: Date.now(), base: at || undefined, tailscale: tailscale || was.tailscale}); if(up !== was.up || at !== (was.base || '')) changed();
       return up;
     })();
     macCheck = {at: Date.now(), p};
@@ -310,7 +335,9 @@ const MoneyAI = (function(){
     const ctl = new AbortController(), timer = setTimeout(()=>ctl.abort(), 180000), stop = ()=>ctl.abort();
     if(signal) signal.addEventListener('abort', stop);
     try{
-      const res = await fetch(base.replace(/\/+$/, '') + '/ask', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body), signal: ctl.signal});
+      const b = macBase();                                                // 127.0.0.1, or the Tailscale address with this device's key
+      const res = await fetch(b + '/ask', {method: 'POST', headers: Object.assign({'Content-Type': 'application/json'}, macHeaders(b)), body: JSON.stringify(body), signal: ctl.signal});
+      if(res.status === 401){ const r = macRemote(); lsSet(MAC_REMOTE, Object.assign({}, r, {token: '', expired: true})); lsSet(MAC_KEY, {up: false, at: Date.now()}); macCheck = null; changed(); throw Unavailable('Your Mac\'s AI: sign in to it again in Setup (this device\'s key has expired).', 401); }
       if(!res.ok) throw Unavailable('Your Mac\'s AI returned an error (' + res.status + ').', res.status);
       const reader = res.body.getReader(), dec = new TextDecoder();
       let buf = '';
@@ -609,7 +636,7 @@ const MoneyAI = (function(){
   }
   const setModel = (id, m) => { const h = aiLocal(); h.model = Object.assign({}, h.model, {[id]: m}); saveAiLocal(h); };
 
-  return {MAC_URL, macUp, PRIVATE_MODELS, trialPrivate, removePrivate, privateCached, PROVIDERS, loadAi, aiSettings, aiLocal, saveAiLocal, adoptAppKeys, aiStatus, rankModels, shareableAi, takeSyncedAi,
+  return {MAC_URL, macUp, macFetch, macRemote, setMacRemote, macSignIn, macBase, PRIVATE_MODELS, trialPrivate, removePrivate, privateCached, PROVIDERS, loadAi, aiSettings, aiLocal, saveAiLocal, adoptAppKeys, aiStatus, rankModels, shareableAi, takeSyncedAi,
           aiAvailable, aiNames, canSee, canSearch, resting, wake, backAt, chat, generate, json, test, setModel, listModels};
 })();
 
