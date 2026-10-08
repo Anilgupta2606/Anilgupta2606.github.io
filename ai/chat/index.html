@@ -454,6 +454,7 @@ button, a, summary, label{touch-action:manipulation}
   <nav class="chatlist" id="chats" aria-label="Your chats"></nav>
   <div class="sbnav">
     <button class="navbtn" id="openTasks" type="button"><i>⏰</i>Scheduled</button>
+    <button class="navbtn" id="openProjects" type="button"><i>⌘</i>Projects</button>
     <button class="navbtn" id="openConn" type="button"><i>🔌</i>Connectors</button>
     <button class="navbtn" id="openUsage" type="button"><i>📊</i>Usage</button>
     <button class="navbtn" id="openLearned" type="button"><i>✦</i><span>What it learned</span><b class="count" id="learnedCount" hidden></b></button>
@@ -555,6 +556,12 @@ button, a, summary, label{touch-action:manipulation}
   <h2>Scheduled</h2>
   <p class="sub">A question asked for you at a time — "every weekday at 9:15, a Nifty summary". Each result lands in its own chat (⏰) with a notification on your Mac. Runs while the Mac is awake; a time it slept through runs when it wakes.</p>
   <div id="tasks"></div>
+</aside>
+<aside class="panel" id="projectPanel" aria-label="Coding projects">
+  <button class="ghost close" id="closeProjects">Close</button>
+  <h2>Coding projects</h2>
+  <p class="sub">Choose a local project folder and its test command. In a selected project, the AI reads code, edits files, runs that command, and keeps edits only when tests pass.</p>
+  <div id="projects"></div>
 </aside>
 <aside class="panel" id="pwPanel" aria-label="Change password">
   <button class="ghost close" id="closePw">Close</button>
@@ -901,7 +908,7 @@ async function ask(q, opt){
       out.secs = Math.round((Date.now() - t0) / 1000);
       done(out);
     } else {
-      const r = await fetch(HELPER + '/ask', {method: 'POST', headers: {'content-type': 'application/json'}, signal: request.controller.signal, body: JSON.stringify({question: q, deep: !!opt.deep, deepLocal: !!opt.deepLocal, research: !!opt.research, imageModel: opt.imageModel || store.get('ai.imageModel', 'auto'), videoModel: store.get('ai.videoModel', 'auto') !== 'auto' ? store.get('ai.videoModel') : undefined, model: pick.kind === 'local' ? pick.model : undefined, provider: opt.provider || (pick.kind === 'cloud' ? pick.provider : pick.kind === 'council' ? 'council' : undefined), history: turns, cloud: cloudKeys(), fresh: !!opt.fresh, attachments: files.map(f=>f.image ? {name: f.name, image: f.image} : f), goal: requestGoal, disabled, lastKind: (requestHistory.length && requestHistory[requestHistory.length - 1].answer.kind) || ''})});
+      const r = await fetch(HELPER + '/ask', {method: 'POST', headers: {'content-type': 'application/json'}, signal: request.controller.signal, body: JSON.stringify({question: q, deep: !!opt.deep, deepLocal: !!opt.deepLocal, research: !!opt.research, imageModel: opt.imageModel || store.get('ai.imageModel', 'auto'), videoModel: store.get('ai.videoModel', 'auto') !== 'auto' ? store.get('ai.videoModel') : undefined, model: pick.kind === 'local' ? pick.model : undefined, provider: opt.provider || (pick.kind === 'cloud' ? pick.provider : pick.kind === 'council' ? 'council' : undefined), history: turns, cloud: cloudKeys(), fresh: !!opt.fresh, attachments: files.map(f=>f.image ? {name: f.name, image: f.image} : f), goal: requestGoal, disabled, project: store.get('ai.project', ''), lastKind: (requestHistory.length && requestHistory[requestHistory.length - 1].answer.kind) || ''})});
       if(!r.ok) throw new Error((await r.json().catch(()=>({}))).error || 'It answered ' + r.status);
       const reader = r.body.getReader(), dec = new TextDecoder();
       let buf = '', out = null;
@@ -1153,8 +1160,8 @@ document.querySelectorAll('.tries button').forEach(b=>b.onclick = () => ask(b.da
 const openPanel = on => { $('#panel').classList.toggle('open', on); $('#scrim').classList.toggle('open', on); if(on) loadLearned(); };
 $('#openLearned').onclick = () => openPanel(true);
 $('#closeLearned').onclick = () => openPanel(false);
-$('#scrim').onclick = () => { openPw(false); openUsage(false); openPanel(false); openConn(false); openChats(false); openTasks(false); };
-document.addEventListener('keydown', e=>{ if(e.key === 'Escape'){ openPw(false); openUsage(false); openPanel(false); openConn(false); openChats(false); openTasks(false); } });
+$('#scrim').onclick = () => { openPw(false); openUsage(false); openPanel(false); openConn(false); openChats(false); openTasks(false); openProjects(false); };
+document.addEventListener('keydown', e=>{ if(e.key === 'Escape'){ openPw(false); openUsage(false); openPanel(false); openConn(false); openChats(false); openTasks(false); openProjects(false); } });
 $('#clear').onclick = () => newChat();
 /* ---------------------------------------------------------------- files you attach: read here, in this browser
    (text as it is; a PDF's text with Mozilla's pdf.js), then sent with the question as numbered sources */
@@ -1561,6 +1568,21 @@ $('#pwForm').onsubmit = async e => {
 const openTasks = on => { $('#taskPanel').classList.toggle('open', on); $('#scrim').classList.toggle('open', on); if(on){ openChats(false); loadTasks(); } };
 $('#openTasks').onclick = () => openTasks(true);
 $('#closeTasks').onclick = () => openTasks(false);
+
+async function loadProjects(){
+  const box = $('#projects');
+  if(mode !== 'mac'){ box.innerHTML = '<p class="sub">Coding projects run on your Mac. Open this page through your Mac or Tailscale.</p>'; return; }
+  let list = []; try{ list = (await fetch(HELPER + '/projects').then(r=>r.json())).list || []; }catch(e){}
+  const active = store.get('ai.project', '');
+  box.innerHTML = (list.length ? list.map(p=>`<label class="trow2"><input type="radio" name="project" data-use="${esc(p.id)}" ${p.id === active ? 'checked' : ''}><span class="tt"><b>${esc(p.name)}</b><small>${esc(p.path)} · test: ${esc(p.test)}</small></span><button class="ghost" type="button" data-project-del="${esc(p.id)}">Remove</button></label>`).join('') : '<p class="sub">No project selected. Add one below.</p>') +
+    `<h3>Add a project</h3><form class="cform" id="projectForm"><input id="projectName" placeholder="Name, e.g. My website" maxlength="60" required><input id="projectPath" placeholder="Local folder, e.g. /Users/anilgupta/AI" required><input id="projectTest" placeholder="Test command, e.g. npm test" maxlength="300" required><button class="btn">Add project</button></form>`;
+  box.querySelectorAll('[data-use]').forEach(i=>i.onchange = () => { store.set('ai.project', i.dataset.use); toast('Coding project selected'); });
+  box.querySelectorAll('[data-project-del]').forEach(b=>b.onclick = async () => { await post('/projects', {id: b.dataset.projectDel, delete: true}); if(store.get('ai.project', '') === b.dataset.projectDel) store.set('ai.project', ''); loadProjects(); });
+  $('#projectForm').onsubmit = async e => { e.preventDefault(); const r = await post('/projects', {name: $('#projectName').value, path: $('#projectPath').value, test: $('#projectTest').value}).catch(()=>null); if(r && r.project){ store.set('ai.project', r.project.id); toast('Project added and selected'); loadProjects(); } else toast('Could not add this project — check its folder and test command.'); };
+}
+const openProjects = on => { $('#projectPanel').classList.toggle('open', on); $('#scrim').classList.toggle('open', on); if(on){ openChats(false); loadProjects(); } };
+$('#openProjects').onclick = () => openProjects(true);
+$('#closeProjects').onclick = () => openProjects(false);
 
 /* ---------------------------------------------------------------- connectors: what it may use */
 const BUILTIN = [
