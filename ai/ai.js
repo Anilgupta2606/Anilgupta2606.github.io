@@ -325,7 +325,7 @@ const MoneyAI = (function(){
     return p;
   }
   /* THE MODELS OF YOUR OWN AI, as one list for Setup and every app: from what the Mac's helper says it has (/models).
-       auto · chatgpt · pcc · apple (through Siri / on the Mac) · council (Thinking) · deep · deep-local
+       auto · chatgpt · pcc · apple (through Siri / on the Mac) · council (Thinking) · deep
        cloud:<service> (a key on the Mac) · local:<model> (a model on the Mac)      -> [[id, label]]
      Picture and video models are not in it: an app asks your AI for words. */
   const MAC_CLOUD = {gemini: 'Google Gemini', groq: 'Groq — gpt-oss-120b', cerebras: 'Cerebras — gpt-oss-120b', mistral: 'Mistral', openrouter: 'OpenRouter', anthropic: 'Anthropic Claude'};
@@ -337,7 +337,6 @@ const MoneyAI = (function(){
     if(a.apple) out.push(['apple', 'Apple Intelligence (on the Mac)']);
     if(cloud.length >= 2) out.push(['council', 'Thinking — two cloud models write it, an editor merges them']);
     if(a.chatgpt && a.pcc) out.push(['deep', 'Deep think — more research; ChatGPT and Private Cloud merged']);
-    if(local.some(n=>/^qwen3:8b|^qwen3\.5:(4b|9b)/.test(n))) out.push(['deep-local', 'Deep on the Mac (private, slow)']);
     cloud.forEach(c=>out.push(['cloud:' + c, (MAC_CLOUD[c] || c) + ' (your key, on the Mac)']));
     local.forEach(n=>out.push(['local:' + n, n + ' (on the Mac, private)']));
     if(!d.apple && !cloud.length && !local.length) out.push(['chatgpt', 'ChatGPT (through Siri)']);
@@ -349,7 +348,7 @@ const MoneyAI = (function(){
     const m = String(model || 'auto');
     if(m === 'auto') return {};
     if(m === 'deep') return {deep: true};
-    if(m === 'deep-local') return {deep: true, deepLocal: true};
+    if(m === 'deep-local') return {deep: true};                // Deep on the Mac was removed: a saved choice of it is the normal deep mode
     if(/^cloud:/.test(m)) return {provider: m.slice(6)};
     if(/^local:/.test(m)) return {model: m.slice(6)};
     return {provider: m};                                                 // chatgpt · pcc · apple · council
