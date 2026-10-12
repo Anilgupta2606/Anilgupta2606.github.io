@@ -237,8 +237,8 @@ function bindPrivate(){
 /* ---- Your AI on the Mac (~/AI's helper): ChatGPT through it, free and without daily limits, as ATS uses it.
    Found by itself on the Mac; a phone (or the Mac with the helper off) goes straight to the next AI. Per device. */
 const MAC = {up: null, models: null};
-const MAC_MODELS = [['auto', 'Auto — ChatGPT when the Mac has it, else the Mac picks'], ['chatgpt', 'ChatGPT (through Siri)'],
-  ['pcc', 'Apple Private Cloud'], ['apple', 'Apple Intelligence on the Mac'], ['council', 'Best answer — several models, merged']];
+// every text model your own AI has (from the Mac's own list; no picture or video models): MoneyAI.macModels
+const macModelList = () => MoneyAI.macModels ? MoneyAI.macModels(MAC.models) : [['auto', 'Auto'], ['chatgpt', 'ChatGPT (through Siri)']];
 async function macCheck(force){
   MAC.up = await MoneyAI.macUp(MoneyAI.MAC_URL, force);
   if(MAC.up && !MAC.models){ try{ MAC.models = await (await MoneyAI.macFetch('/models')).json(); }catch(e){} }
@@ -250,10 +250,10 @@ function macRow(s){
   const viaTs = MoneyAI.macBase() !== MoneyAI.MAC_URL;
   const st = !on ? ['off', ''] : MAC.up === null ? ['checking…', ''] : MAC.up ? [viaTs ? 'ready · Tailscale' : 'ready', 'ready'] : ['not here', ''];
   return `<div class="prov mac">
-    <div class="pname"><b>Your AI on this Mac</b><small>Your own AI (~/AI) — ChatGPT through it, free, no daily limits; used first, as in ATS · no key</small></div>
+    <div class="pname"><b>Your own AI (on your Mac)</b><small>~/AI — ChatGPT, Private Cloud, Thinking, Deep, your cloud keys and the models on the Mac, in every app; free, no daily limits; used first, as in ATS · no key</small></div>
     <span class="st ${st[1]}">${st[0]}</span>
-    <div class="keyin"><select data-macmodel aria-label="Which model your Mac's AI uses"${on ? '' : ' disabled'}>${MAC_MODELS.filter(([v])=>v === 'auto' || v === 'council' || v === pinned || !MAC.models || apple[v])
-      .map(([v, t])=>`<option value="${v}"${v === pinned ? ' selected' : ''}>${esc(t)}</option>`).join('')}</select></div>
+    <div class="keyin"><select data-macmodel aria-label="Which model your own AI uses"${on ? '' : ' disabled'}>${(()=>{ const L = macModelList(); if(!L.some(([v])=>v === pinned)) L.push([pinned, pinned + ' (not on the Mac now)']); return L; })()
+      .map(([v, t])=>`<option value="${esc(v)}"${v === pinned ? ' selected' : ''}>${esc(t)}</option>`).join('')}</select></div>
     <div class="tools">${on ? `<button class="btn" data-test="mac"${MAC.up ? '' : ' disabled'}>Test</button><button class="btn" id="mac-off">Turn off</button>` : `<button class="btn primary" id="mac-on">Turn on</button>`}</div>
     <div class="res">${res ? (res.busy ? '<span class="spin"></span> Asking your Mac…' : res.ok ? `Works · ${esc(res.model)} answered in ${(res.ms / 1000).toFixed(1)} s` : `<span class="bad">${esc(res.error || 'No answer')}</span>`)
       : !on ? 'Off: your apps use the AIs below.'
@@ -287,7 +287,7 @@ function bindMac(){
   };
   const tout = $('mac-ts-out'); if(tout) tout.onclick = ()=>{ MoneyAI.setMacRemote(null); MAC.up = null; MAC.models = null; render(); macCheck(true); toast('Signed out of your Mac on this device.'); };
   const sel = document.querySelector('[data-macmodel]');
-  if(sel) sel.onchange = ()=>{ MoneyAI.setModel('mac', sel.value); changed(); delete results.mac; render(); toast(sel.value === 'auto' ? 'Auto: ChatGPT when the Mac has it.' : (MAC_MODELS.find(x=>x[0] === sel.value) || [])[1] + ' goes first.'); };
+  if(sel) sel.onchange = ()=>{ MoneyAI.setModel('mac', sel.value); changed(); delete results.mac; render(); toast(sel.value === 'auto' ? 'Auto: the right model for each question.' : (macModelList().find(x=>x[0] === sel.value) || [, sel.value])[1] + ' — every app uses it now.'); };
 }
 
 /* What the site's own Brain has learned from you (/ai/brain.js): see it, keep it, switch it off or forget it. */
@@ -374,7 +374,7 @@ function aiCard(){
     const res = results[p.id], pinned = (hub.model || {})[p.id] || 'auto', list = models[p.id];
     const now = status.find(x=>x.id === p.id && x.model);
     return `<div class="prov">
-      <div class="pname"><b>${esc(p.name)}</b><small>${k ? esc(FROM[s.from[p.id]] || '') : `<a href="${p.signupUrl}" target="_blank" rel="noopener">get a free key</a>`}${p.id === 'ollama' ? ' · this computer only' : ''}</small></div>
+      <div class="pname"><b>${esc(p.name)}</b><small>${k ? esc(FROM[s.from[p.id]] || '') : `<a href="${p.signupUrl}" target="_blank" rel="noopener">get a free key</a>`}</small></div>
       <span class="st ${st[1]}" title="${r ? esc(r.why) : ''}">${st[0]}</span>
       <div class="keyin"><input type="password" data-key="${p.id}" autocomplete="off" spellcheck="false" placeholder="${esc(k ? (p.keyless ? k : '•••••• ' + k.slice(-4)) : p.placeholder)}" aria-label="${esc(p.name)} key"></div>
       <div class="tools"><button class="btn" data-test="${p.id}" ${k ? '' : 'disabled'}>Test</button><label class="check" title="Use this service"><input type="checkbox" data-on="${p.id}" ${on ? 'checked' : ''}></label></div>
