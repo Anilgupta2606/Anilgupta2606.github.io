@@ -1406,6 +1406,9 @@ const COMMANDS = [
   {c: '/deep', a: 'a hard question', d: 'Deep mode: deeper research, then ChatGPT and Apple Private Cloud each write it and ChatGPT merges them'},
   {c: '/chats', a: '', d: 'Your past chats — open one to carry on (also /resume)'},
   {c: '/new', a: '', d: 'Start a new chat (the last one stays in Chats)'},
+  {c: '/model', a: '', d: 'Choose the model that answers (the ✦ menu)'},
+  {c: '/project', a: '', d: 'Choose the coding project (SoGPT 1.1 works on it)'},
+  {c: '/usage', a: '', d: 'Usage and health: models, who asked, what needs a look'},
   {c: '/help', a: '', d: 'Show all commands'},
 ];
 let slashSel = 0;
@@ -1446,6 +1449,8 @@ async function runCommand(line){
   else if(c === '/chats' || c === '/resume') openChats(true);
   else if(c === '/schedule') openTasks(true);
   else if(c === '/data-usage' || c === '/usage') openUsage(true);
+  else if(c === '/model') $('#stModel').click();
+  else if(c === '/project' || c === '/projects') $('#openProjects').click();
   else if(c === '/deep'){ const qq = String(arg || '').replace(/^local\b\s*/i, ''); if(qq) ask(qq, {deep: true}); else toast('Write the question after /deep'); }
   else if(c === '/video' || c === '/gif'){ if(arg) ask((c === '/gif' ? 'Make a GIF of ' : 'Make a video of ') + arg); else toast('Describe it after ' + c); }
   else if(c === '/compare'){ const best = /^best\b/i.test(arg || ''), d0 = String(arg || '').replace(/^best\b\s*/i, ''); if(d0) ask('Generate an image of ' + d0, {imageModel: best ? 'compare-best' : 'compare'}); else toast('Describe the picture after /compare'); }
