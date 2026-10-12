@@ -30,16 +30,18 @@ const MoneyAI = (function(){
   }
 
   const PROVIDERS = [
-    // your own AI on the Mac (~/AI, `ai serve`): ChatGPT through it answers in seconds, free and without daily limits,
-    // as it does for ATS. Tried first wherever the Mac's helper answers; skipped quietly everywhere else (a phone).
-    {id:'mac', name:'Your AI on this Mac (ChatGPT)', signupUrl:'https://anilgupta2606.github.io/ai/chat/', placeholder:'http://127.0.0.1:8899', models:['chatgpt', 'auto'], keyless:true},
+    // YOUR OWN AI on the Mac (~/AI, `ai serve`): every text model it has — ChatGPT and Apple Private Cloud through Siri,
+    // Apple Intelligence, Thinking, Deep, your cloud keys and the models on the Mac — free and without daily limits, as
+    // for ATS. Tried first wherever the Mac's helper answers (on a phone through Tailscale); skipped quietly elsewhere.
+    // Words only: an app's request never becomes a picture or a video.
+    {id:'mac', name:'Your own AI (on your Mac)', signupUrl:'https://anilgupta2606.github.io/ai/chat/', placeholder:'http://127.0.0.1:8899', models:['auto', 'chatgpt'], keyless:true},
     {id:'gemini', name:'Google Gemini', signupUrl:'https://aistudio.google.com/apikey', placeholder:'AIza…', models:['gemini-flash-latest','gemini-flash-lite-latest'], vision:true, search:true},
     {id:'groq', name:'Groq', signupUrl:'https://console.groq.com/keys', placeholder:'gsk_…', models:['openai/gpt-oss-120b','llama-3.3-70b-versatile','openai/gpt-oss-20b']},
     {id:'cerebras', name:'Cerebras', signupUrl:'https://cloud.cerebras.ai', placeholder:'csk-…', models:['gpt-oss-120b','llama-3.3-70b','llama3.1-8b']},
     {id:'mistral', name:'Mistral', signupUrl:'https://console.mistral.ai/api-keys', placeholder:'key', models:['mistral-small-latest','mistral-medium-latest']},
     {id:'openrouter', name:'OpenRouter', signupUrl:'https://openrouter.ai/keys', placeholder:'sk-or-…', models:['openrouter/free','meta-llama/llama-3.3-70b-instruct:free']},
     {id:'webllm', name:'Private AI (in this browser)', signupUrl:'https://webllm.mlc.ai', placeholder:'', models:['Qwen3-4B-q4f16_1-MLC'], keyless:true, device:true},
-    {id:'ollama', name:'Local (Ollama)', signupUrl:'https://ollama.com', placeholder:'http://localhost:11434', models:['gemma3:4b'], keyless:true},
+    // Local (Ollama) is gone from here: the models on the Mac are reached through Your own AI (local:…), one way for every app
     {id:'anthropic', name:'Anthropic Claude (paid)', signupUrl:'https://console.anthropic.com/settings/keys', placeholder:'sk-ant-…', models:['claude-haiku-4-5-20251001'], vision:true},
   ];
   const OPENAI_BASE = {groq:'https://api.groq.com/openai/v1', cerebras:'https://api.cerebras.ai/v1', mistral:'https://api.mistral.ai/v1', openrouter:'https://openrouter.ai/api/v1'};
@@ -316,11 +318,41 @@ const MoneyAI = (function(){
       const local = await ping(base || MAC_URL, 1500);
       if(local && local.ok){ up = true; at = base || MAC_URL; }
       else { const r = macRemote(); if(r.url && r.token){ const d = await ping(r.url, 4000, {'x-cyg-token': r.token}); if(d && d.ok && d.signedIn !== false){ up = true; at = r.url; } else if(d && d.signedIn === false) lsSet(MAC_REMOTE, Object.assign({}, r, {token: '', expired: true})); } }
-      lsSet(MAC_KEY, {up, at: Date.now(), base: at || undefined, tailscale: tailscale || was.tailscale}); if(up !== was.up || at !== (was.base || '')) changed();
+      lsSet(MAC_KEY, {up, at: Date.now(), base: at || undefined, tailscale: tailscale || was.tailscale, info: was.info}); if(up !== was.up || at !== (was.base || '')) changed();
       return up;
     })();
     macCheck = {at: Date.now(), p};
     return p;
+  }
+  /* THE MODELS OF YOUR OWN AI, as one list for Setup and every app: from what the Mac's helper says it has (/models).
+       auto · chatgpt · pcc · apple (through Siri / on the Mac) · council (Thinking) · deep · deep-local
+       cloud:<service> (a key on the Mac) · local:<model> (a model on the Mac)      -> [[id, label]]
+     Picture and video models are not in it: an app asks your AI for words. */
+  const MAC_CLOUD = {gemini: 'Google Gemini', groq: 'Groq — gpt-oss-120b', cerebras: 'Cerebras — gpt-oss-120b', mistral: 'Mistral', openrouter: 'OpenRouter', anthropic: 'Anthropic Claude'};
+  function macModels(info){
+    const d = info || {}, a = d.apple || {}, cloud = d.cloud || [], local = (d.local || []).map(m=>m.name || m).filter(n=>n && !/embed|guard|vision|llava/i.test(n));
+    const out = [['auto', 'Auto — the right model for each question (ChatGPT when the Mac has it)']];
+    if(a.chatgpt) out.push(['chatgpt', 'ChatGPT (through Siri)']);
+    if(a.pcc) out.push(['pcc', 'Apple Private Cloud']);
+    if(a.apple) out.push(['apple', 'Apple Intelligence (on the Mac)']);
+    if(cloud.length >= 2) out.push(['council', 'Thinking — two cloud models write it, an editor merges them']);
+    if(a.chatgpt && a.pcc) out.push(['deep', 'Deep think — more research; ChatGPT and Private Cloud merged']);
+    if(local.some(n=>/^qwen3:8b|^qwen3\.5:(4b|9b)/.test(n))) out.push(['deep-local', 'Deep on the Mac (private, slow)']);
+    cloud.forEach(c=>out.push(['cloud:' + c, (MAC_CLOUD[c] || c) + ' (your key, on the Mac)']));
+    local.forEach(n=>out.push(['local:' + n, n + ' (on the Mac, private)']));
+    if(!d.apple && !cloud.length && !local.length) out.push(['chatgpt', 'ChatGPT (through Siri)']);
+    return out;
+  }
+  const macModelLabel = id => (macModels(lsGet(MAC_KEY, {}).info).find(x=>x[0] === id) || [id, id])[1];
+  // the request fields for a model of the list above
+  function macRequest(model){
+    const m = String(model || 'auto');
+    if(m === 'auto') return {};
+    if(m === 'deep') return {deep: true};
+    if(m === 'deep-local') return {deep: true, deepLocal: true};
+    if(/^cloud:/.test(m)) return {provider: m.slice(6)};
+    if(/^local:/.test(m)) return {model: m.slice(6)};
+    return {provider: m};                                                 // chatgpt · pcc · apple · council
   }
   async function callMac(base, model, system, turns, opts, signal){
     const app = (typeof document !== 'undefined' && document.title) || 'Money Home';
@@ -329,9 +361,8 @@ const MoneyAI = (function(){
     const file = system + (before ? '\n\nThe conversation so far:\n\n' + before : '') + '\n\nThe request:\n\n' + last.content;
     const q = 'Answer the request in the attached file "' + app + ' request.txt", following its instructions exactly'
       + (opts.schema ? ' - reply with the JSON it asks for, and nothing else.' : '.');
-    const body = {question: q, history: [], attachments: [{name: app + ' request.txt', text: file.slice(0, 290000)}],
-      disabled: ['connectors', 'apps'], fresh: true};     // the request carries its own data; never its "same question" answer
-    if(model && model !== 'auto') body.provider = model;                 // ChatGPT; else its own Auto
+    const body = Object.assign({question: q, history: [], attachments: [{name: app + ' request.txt', text: file.slice(0, 290000)}],
+      disabled: ['connectors', 'apps'], fresh: true, noMedia: true}, macRequest(model));     // its own data; never its "same question" answer; words only
     const ctl = new AbortController(), timer = setTimeout(()=>ctl.abort(), 180000), stop = ()=>ctl.abort();
     if(signal) signal.addEventListener('abort', stop);
     try{
@@ -464,7 +495,7 @@ const MoneyAI = (function(){
   }
   async function listModels(id, key){
     if(id === 'webllm') return [key];              // the one you chose in Setup
-    if(id === 'mac'){ const d = await (await fetch(key.replace(/\/+$/, '') + '/models')).json(); return (d.apple || {}).chatgpt ? ['chatgpt', 'auto'] : ['auto']; }
+    if(id === 'mac'){ const d = await (await macFetch('/models')).json(); lsSet(MAC_KEY, Object.assign({}, lsGet(MAC_KEY, {}), {info: {apple: d.apple, cloud: d.cloud, local: (d.local || []).map(m=>({name: m.name}))}})); return macModels(d).map(x=>x[0]); }
     let res;
     if(id === 'gemini') res = await fetch('https://generativelanguage.googleapis.com/v1beta/models?pageSize=200&key=' + encodeURIComponent(key));
     else if(id === 'anthropic') res = await fetch('https://api.anthropic.com/v1/models', {headers:{'x-api-key':key, 'anthropic-version':'2023-06-01', 'anthropic-dangerous-direct-browser-access':'true'}});
@@ -535,7 +566,9 @@ const MoneyAI = (function(){
       const key = s.keys[id];
       const pinned = s.model[id] && s.model[id] !== 'auto' ? [s.model[id]] : [];
       const last = id === 'ollama' || id === 'mac' ? null : (working[id] || {})[tier];     // on this computer: always the light model first, not the one that last answered
-      const models = Array.from(new Set(pinned.concat(last ? [last] : [], await bestModels(id, key, tier), PROVIDERS.find(p=>p.id === id).models)))
+      // your own AI: the model you chose, then its Auto (which itself falls back across the Mac's models) — not five tries
+      // (nothing chosen: ChatGPT first when the Mac has it — fast and good for an app's request — then its Auto)
+      const models = id === 'mac' ? Array.from(new Set(pinned.concat(pinned.length || ((lsGet(MAC_KEY, {}).info || {}).apple || {chatgpt: true}).chatgpt === false ? [] : ['chatgpt'], ['auto']))) : Array.from(new Set(pinned.concat(last ? [last] : [], await bestModels(id, key, tier), PROVIDERS.find(p=>p.id === id).models)))
         .filter(m=>pinned.indexOf(m) >= 0 || !isBad(id, m)).slice(0, 5);
       const free = models.filter(m=>!resting(id + '|' + m));
       if(models.length && !free.length){ restAll(id, models); skipped.push(pname + ' is at its free limit'); tell(pname + ' is at its free limit — skipping'); continue; }
@@ -636,7 +669,7 @@ const MoneyAI = (function(){
   }
   const setModel = (id, m) => { const h = aiLocal(); h.model = Object.assign({}, h.model, {[id]: m}); saveAiLocal(h); };
 
-  return {MAC_URL, macUp, macFetch, macRemote, setMacRemote, macSignIn, macBase, PRIVATE_MODELS, trialPrivate, removePrivate, privateCached, PROVIDERS, loadAi, aiSettings, aiLocal, saveAiLocal, adoptAppKeys, aiStatus, rankModels, shareableAi, takeSyncedAi,
+  return {macModels, macModelLabel, macRequest, MAC_URL, macUp, macFetch, macRemote, setMacRemote, macSignIn, macBase, PRIVATE_MODELS, trialPrivate, removePrivate, privateCached, PROVIDERS, loadAi, aiSettings, aiLocal, saveAiLocal, adoptAppKeys, aiStatus, rankModels, shareableAi, takeSyncedAi,
           aiAvailable, aiNames, canSee, canSearch, resting, wake, backAt, chat, generate, json, test, setModel, listModels};
 })();
 

@@ -85,7 +85,9 @@ body{padding-left:var(--sb)}
 .clearall{display:block; margin:16px 8px 6px; font-size:12.5px; color:var(--mut)} .clearall.danger{color:var(--err); font-weight:600}
 .chat.hit{align-items:flex-start} .chat.hit .ct{white-space:normal} .chat.hit b{display:block; font-weight:600; font-size:13px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap} .chat.hit small{display:block; font-size:12px; color:var(--mut); line-height:1.35; max-height:2.7em; overflow:hidden}
 .chat .del{border:0; background:none; color:var(--mut); cursor:pointer; font-size:15px; width:24px; height:24px; border-radius:7px; visibility:hidden; flex:none}
-.chat:hover .del,.chat.cur .del{visibility:visible} .chat .del:hover{color:var(--check); background:var(--check-bg)}
+.chat .cpin{border:0; background:none; cursor:pointer; font-size:12px; width:22px; height:24px; border-radius:7px; visibility:hidden; flex:none; opacity:.55} .chat .cpin.on{visibility:visible; opacity:1}
+@media (hover:none){ .chat .cpin{visibility:visible} }
+.chat:hover .cpin,.chat.cur .cpin{visibility:visible} .chat:hover .del,.chat.cur .del{visibility:visible} .chat .del:hover{color:var(--check); background:var(--check-bg)}
 .sbnav{display:flex; flex-direction:column; gap:2px; border-top:1px solid var(--line); padding-top:8px}
 .navbtn{display:flex; align-items:center; gap:10px; border:0; background:none; color:var(--ink2); padding:8px 10px; border-radius:10px; font-size:14px; font-weight:500; cursor:pointer; text-align:left}
 .navbtn:hover{background:var(--page); color:var(--ink)} .navbtn i{font-style:normal; width:20px; text-align:center}
@@ -777,8 +779,10 @@ function finish(el, q, out, steps, traces, pending){
   const model = out.model || (/no AI/.test(out.by || '') ? 'Worked out exactly (no AI)' : '');
   const badge = out.verify ? trustBadge(out.verify) : out.trust && !out.saved && pending ? `<span class="conf pending" title="A second model is checking each claim against the sources">Checking claims…</span>` : '';
   el.querySelector('.slot').innerHTML = `<div class="a"><div class="badges">${model ? `<span class="model" title="The AI model that wrote this answer">✦ ${esc(model)}</span>` : ''}${badge}</div>${render(out)}
-    <div class="foot"><span class="by">${esc(out.by || '')}</span>${out.saved ? '<button class="ghost fresh" type="button">Ask fresh</button>' : ''}<button class="ghost cp" type="button" title="Copy the answer">Copy</button><button class="ghost rt" type="button" title="Ask again from scratch">Retry</button><button class="ghost up" type="button" title="Good answer — keep it">👍</button><button class="ghost down" type="button" title="Wrong — tell it what is right">👎</button></div></div>`;
+    <div class="foot"><span class="by">${esc(out.by || '')}</span>${out.saved ? '<button class="ghost fresh" type="button">Ask fresh</button>' : ''}<button class="ghost cp" type="button" title="Copy the answer">Copy</button><button class="ghost rt" type="button" title="Ask again from scratch">Retry</button><button class="ghost up" type="button" title="Good answer — keep it">👍</button><button class="ghost down" type="button" title="Wrong — tell it what is right">👎</button>${mode === 'mac' && out.text ? '<button class="ghost pin" type="button" title="Pin as important — every chat can use it (What it learned → Pinned)">📌</button>' : ''}</div></div>`;
   el.querySelector('.foot .down').onclick = () => teachBox(el, q);
+  const pinB = el.querySelector('.foot .pin');
+  if(pinB) pinB.onclick = async () => { const r = await post('/memory', {pin: {text: String(out.text || '').slice(0, 4000), q, chatId: sessionId, chatTitle: chatName || q}}).catch(()=>null); if(r && r.pin){ pinB.textContent = '📌 Pinned'; pinB.disabled = true; toast('Pinned — any chat can use it now'); } else toast('Could not pin it'); };
   el.querySelector('.foot .cp').onclick = e => { const b = e.currentTarget; (navigator.clipboard ? navigator.clipboard.writeText(out.text || '') : Promise.reject()).then(()=>{ b.textContent = 'Copied'; setTimeout(()=>{ b.textContent = 'Copy'; }, 1500); }).catch(()=>toast('Select the text to copy it')); };
   el.querySelector('.foot .rt').onclick = () => ask(q, {fresh: true});
   if(out.kind === 'clarify'){ const a = el.querySelector('.a'); a.classList.add('ask'); a.querySelector('.foot').insertAdjacentHTML('beforebegin', '<p class="asknote">Tap an answer, or type your own below.</p>'); }
@@ -920,7 +924,7 @@ async function ask(q, opt){
       out.secs = Math.round((Date.now() - t0) / 1000);
       done(out);
     } else {
-      const r = await fetch(HELPER + '/ask', {method: 'POST', headers: {'content-type': 'application/json'}, signal: request.controller.signal, body: JSON.stringify({question: q, deep: !!opt.deep || pick.kind === 'deep' || pick.kind === 'deeplocal', deepLocal: !!opt.deepLocal || pick.kind === 'deeplocal', research: !!opt.research, imageModel: opt.imageModel || store.get('ai.imageModel', 'auto'), videoModel: store.get('ai.videoModel', 'auto') !== 'auto' ? store.get('ai.videoModel') : undefined, model: pick.kind === 'local' ? pick.model : undefined, provider: opt.provider || (pick.kind === 'cloud' ? pick.provider : pick.kind === 'council' ? 'council' : undefined), history: turns, cloud: cloudKeys(), fresh: !!opt.fresh, attachments: files.map(f=>f.image ? {name: f.name, image: f.image} : f), goal: requestGoal, disabled, project: store.get('ai.project', '') || null, forceVideo: !!opt.forceVideo, lastKind: (requestHistory.length && requestHistory[requestHistory.length - 1].answer.kind) || ''})});
+      const r = await fetch(HELPER + '/ask', {method: 'POST', headers: {'content-type': 'application/json'}, signal: request.controller.signal, body: JSON.stringify({question: q, deep: !!opt.deep || pick.kind === 'deep' || pick.kind === 'deeplocal', deepLocal: !!opt.deepLocal || pick.kind === 'deeplocal', research: !!opt.research, imageModel: opt.imageModel || store.get('ai.imageModel', 'auto'), videoModel: store.get('ai.videoModel', 'auto') !== 'auto' ? store.get('ai.videoModel') : undefined, model: pick.kind === 'local' ? pick.model : undefined, provider: opt.provider || (pick.kind === 'cloud' ? pick.provider : pick.kind === 'council' ? 'council' : undefined), history: turns, cloud: cloudKeys(), fresh: !!opt.fresh, attachments: files.map(f=>f.image ? {name: f.name, image: f.image} : f), goal: requestGoal, session: requestSessionId, disabled, project: store.get('ai.project', '') || null, forceVideo: !!opt.forceVideo, lastKind: (requestHistory.length && requestHistory[requestHistory.length - 1].answer.kind) || ''})});
       if(!r.ok) throw new Error((await r.json().catch(()=>({}))).error || 'It answered ' + r.status);
       const reader = r.body.getReader(), dec = new TextDecoder();
       let buf = '', out = null;
@@ -966,7 +970,9 @@ async function loadLearned(){
   if(!d){ $('#learned').innerHTML = '<p class="err">Could not load.</p>'; return; }
   const cases = d.cases || [];
   const lc = $('#learnedCount'); lc.hidden = !cases.length; lc.textContent = cases.length;
+  let pinned = []; if(mode === 'mac'){ try{ pinned = (await fetch(HELPER + '/memory').then(r=>r.json())).pins || []; }catch(e){} }
   $('#learned').innerHTML =
+    `<h3><i style="background:var(--calc)"></i>📌 Pinned (every chat can use these)</h3>` + (pinned.length ? `<ul style="list-style:none;padding:0">${pinned.map(p=>`<li class="lesson you">${p.kind === 'chat' ? '💬 The whole chat “' + esc(p.chatTitle || 'untitled') + '”' : esc((p.q ? p.q + ' — ' : '') + p.text.slice(0, 240)) + (p.text.length > 240 ? '…' : '')}<div class="foot"><span>${p.kind === 'chat' ? 'Pinned chat' : esc(p.chatTitle ? 'From “' + p.chatTitle.slice(0, 60) + '”' : 'A note')} · ${esc(String(p.at).slice(0, 10))}</span><button class="ghost" type="button" data-unpin="${esc(p.id)}">Unpin</button></div></li>`).join('')}</ul>` : '<p class="sub">Nothing pinned yet — 📌 under an answer keeps it for every chat (in the terminal: /pin).</p>') +
     `<h3><i style="background:var(--read)"></i>Lessons from particular questions</h3>` + (cases.length ? `<ul>${cases.map(c=>`<li class="lesson${c.taught ? ' you' : ''}">${esc(c.lesson)}<div class="foot"><span>${c.taught ? 'You taught this' : 'Caught by its own check'}${c.n > 1 ? ' · ' + c.n + ' times' : ''}</span><button class="ghost" data-id="${esc(c.id)}" type="button">Forget</button></div></li>`).join('')}</ul>` : '<p class="sub">None yet. When its check catches a mistake, or you teach it, the lesson shows here.</p>') +
     `<h3><i style="background:var(--think)"></i>About you (/remember)</h3>` + ((d.profile || []).length ? `<ul style="list-style:none;padding:0">${d.profile.map(p=>`<li class="lesson you">${esc(p.text)}<div class="foot"><span>Given to every answer</span><button class="ghost" data-id="${esc(p.id)}" type="button">Forget</button></div></li>`).join('')}</ul>` : '<p class="sub">Nothing yet. Type <code>/remember I live in Pune</code>.</p>') +
     `<h3><i style="background:var(--calc)"></i>Answers you kept (👍)</h3>` + ((d.saved || []).length ? `<ul style="list-style:none;padding:0">${d.saved.map(c=>`<li class="lesson">${esc(c.question)}<div class="foot"><span>Given back when asked again</span><button class="ghost" data-id="${esc(c.id)}" type="button">Forget</button></div></li>`).join('')}</ul>` : '<p class="sub">None yet. Press 👍 on an answer about something that does not change.</p>') +
@@ -975,6 +981,7 @@ async function loadLearned(){
     `<h3><i style="background:var(--search)"></i>Rules every answer is checked against</h3><ol>${Object.values(d.rules || {}).map(r=>`<li>${esc(r)}</li>`).join('')}</ol>` +
     `<h3><i style="background:var(--think)"></i>Your own rules</h3>` + ((d.yours || []).length ? `<ul>${d.yours.map(r=>`<li>${esc(r)}</li>`).join('')}</ul>` : '') + (d.rulesFile ? `<p class="sub">Add lines starting with “- ” to <code>${esc(d.rulesFile)}</code></p>` : '<p class="sub">Kept on your Mac (~/.money-ai/rules.md).</p>');
   $('#learned').querySelectorAll('[data-id]').forEach(b=>b.onclick = async () => { await api.forget(b.dataset.id); loadLearned(); });
+  $('#learned').querySelectorAll('[data-unpin]').forEach(b=>b.onclick = async () => { await post('/memory', {unpin: b.dataset.unpin}).catch(()=>null); loadLearned(); });
 }
 const pill = (id, text, cls) => { const p = $(id); p.hidden = false; p.className = 'pill ' + (cls || ''); p.innerHTML = (/model/.test(cls || '') ? '✦ ' : '<i></i>') + esc(text);
   $('#sbStatus').textContent = [$('#stWhere').textContent, $('#stModel').hidden ? '' : $('#stModel').textContent.replace('✦ ', '').replace(/\s*▾\s*$/, '')].filter(Boolean).join(' · '); };
@@ -1519,7 +1526,7 @@ function drawChats(){
   for(const c of list){
     const g = dayGroup(c.updated);
     if(g !== last){ html += `<h6>${g}</h6>`; last = g; }
-    html += `<div class="chat${c.id === sessionId ? ' cur' : ''}" data-id="${esc(c.id)}" title="${esc(c.title || '')}${c.source === 'terminal' ? ' (from the terminal)' : ''}"><span class="ct">${esc(c.title || 'Untitled')}</span>${c.source === 'terminal' ? '<span class="csrc" title="From the terminal">⌘</span>' : c.source === 'task' ? '<span class="csrc" title="A scheduled task">⏰</span>' : ''}<button class="del" type="button" aria-label="Delete this chat" data-del="${esc(c.id)}">×</button></div>`;
+    html += `<div class="chat${c.id === sessionId ? ' cur' : ''}" data-id="${esc(c.id)}" title="${esc(c.title || '')}${c.source === 'terminal' ? ' (from the terminal)' : ''}"><span class="ct">${esc(c.title || 'Untitled')}</span>${c.source === 'terminal' ? '<span class="csrc" title="From the terminal">⌘</span>' : c.source === 'task' ? '<span class="csrc" title="A scheduled task">⏰</span>' : ''}<button class="cpin${pinnedChatIds.has(c.id) ? ' on' : ''}" type="button" aria-label="Pin this chat as important" title="${pinnedChatIds.has(c.id) ? 'Pinned — every chat can use it (click to unpin)' : 'Pin this whole chat as important — every chat can use it'}" data-cpin="${esc(c.id)}">📌</button><button class="del" type="button" aria-label="Delete this chat" data-del="${esc(c.id)}">×</button></div>`;
   }
   box.innerHTML = html + (f ? '' : `<button class="link clearall" id="clearAll" type="button">Delete all chats</button>`);
   const ca = box.querySelector('#clearAll');
@@ -1530,20 +1537,23 @@ function drawChats(){
     if(mode === 'mac'){ try{ await post('/session', {all: true, delete: true}); }catch(e){} }
     store.set('ai.sessions', {}); history = []; store.set('moneyai.history', []); newChat(true); await loadChats(); toast('All chats deleted');
   };
-  box.querySelectorAll('.chat').forEach(el=>el.onclick = e => { if(e.target.closest('.del')) return; openChat(el.dataset.id); });
+  box.querySelectorAll('.chat').forEach(el=>el.onclick = e => { if(e.target.closest('.del') || e.target.closest('.cpin')) return; openChat(el.dataset.id); });
+  box.querySelectorAll('[data-cpin]').forEach(b=>b.onclick = async e => { e.stopPropagation(); const c = chatCache.find(x=>x.id === b.dataset.cpin) || {}; const r = await post('/memory', {pinChat: {chatId: b.dataset.cpin, title: c.title || ''}}).catch(()=>null); if(!r) return toast('Could not pin it'); if(r.pin) pinnedChatIds.add(b.dataset.cpin); else pinnedChatIds.delete(b.dataset.cpin); toast(r.pin ? 'Chat pinned — every chat can use it' : 'Chat unpinned'); drawChats(); });
   box.querySelectorAll('[data-del]').forEach(b=>b.onclick = async e => {
     e.stopPropagation();
     const id = b.dataset.del;
     deletedSessions.add(id);
     const req = activeRequests.get(id);
     if(req){ try{ req.controller.abort(); }catch(_){} activeRequests.delete(id); }
-    if(mode === 'mac'){ try{ await post('/session', {id, delete: true}); }catch(e){} }
+    if(mode === 'mac'){ try{ const r = await post('/session', {id, delete: true}); const m = r && r.removed; if(m){ const extra = [m.cached && m.cached + ' kept answer' + (m.cached === 1 ? '' : 's'), m.good && m.good + ' 👍 answer' + (m.good === 1 ? '' : 's'), m.learned && m.learned + ' lesson' + (m.learned === 1 ? '' : 's'), m.pins && m.pins + ' pin' + (m.pins === 1 ? '' : 's'), m.typed && 'its terminal history'].filter(Boolean); toast('Chat deleted everywhere' + (extra.length ? ' — with ' + extra.join(', ') : '')); } }catch(e){} }
     const all = localChats(); delete all[id]; store.set('ai.sessions', all);
     if(id === sessionId){ history = []; store.set('moneyai.history', []); newChat(true); }
     await loadChats();
   });
 }
-async function loadChats(){ chatCache = await listChats(); drawChats(); }
+// chats pinned as important (kept on the Mac: the terminal's /pin chat shows here too)
+let pinnedChatIds = new Set();
+async function loadChats(){ chatCache = await listChats(); if(mode === 'mac'){ try{ pinnedChatIds = new Set(((await fetch(HELPER + '/memory').then(r=>r.json())).pins || []).filter(p=>p.kind === 'chat').map(p=>p.chatId)); }catch(e){} } drawChats(); }
 // searching: titles at once, then inside every question and answer (on the Mac, the terminal's chats too)
 let searchT = null;
 async function searchChats(){
@@ -1629,18 +1639,20 @@ async function loadProjects(){
   let list = [], active = ''; try{ const j = await fetch(HELPER + '/projects').then(r=>r.json()); list = j.list || []; active = j.selected || ''; }catch(e){ active = store.get('ai.project', ''); }
   store.set('ai.project', active); showProject(list.find(p=>p.id === active));
   box.innerHTML = (list.length ? `<label class="trow2"><input type="radio" name="project" data-use="" ${active ? '' : 'checked'}><span class="tt"><b>No project</b><small>Questions are answered as usual</small></span></label>` + list.map(p=>`<label class="trow2"><input type="radio" name="project" data-use="${esc(p.id)}" ${p.id === active ? 'checked' : ''}><span class="tt"><b>${esc(p.name)}</b><small>${esc(p.path)}${p.test ? ' · test: ' + esc(p.test) : ' · no test command detected'}</small></span><button class="ghost" type="button" data-project-del="${esc(p.id)}">Remove</button></label>`).join('') : '<p class="sub">No project selected. Upload a ZIP or import an existing folder.</p>') +
-    `<h3>Upload a project</h3><p class="sub">ZIP files are extracted on this Mac. The AI then reads the extracted project through its project tools — the ZIP itself is not sent blindly to the model.</p><input id="projectZip" type="file" accept=".zip,application/zip" hidden><button class="btn" type="button" id="uploadProject">Upload ZIP</button><span id="projectUploadStatus" class="sub" style="margin-left:8px"></span><h3>Import an existing project</h3><button class="btn" type="button" id="findProjects">Find local projects</button><div id="projectImports"></div><h3>Add manually</h3><form class="cform" id="projectForm"><input id="projectName" placeholder="Name, e.g. My website" maxlength="60" required><input id="projectPath" placeholder="Local folder, e.g. /Users/anilgupta/AI" required><input id="projectTest" placeholder="Test command, e.g. npm test" maxlength="300"><button class="btn">Add project</button></form>`;
+    `<h3>Start a new project</h3><p class="sub">An empty folder in ~/Developer for a new app — then ask for it: “create a todo app in node with tests”.</p><form class="cform" id="newProjectForm"><input id="newProjectName" placeholder="Name, e.g. todo-app" maxlength="60" required><button class="btn">Create</button></form><h3>Upload a project</h3><p class="sub">ZIP files are extracted on this Mac. The AI then reads the extracted project through its project tools — the ZIP itself is not sent blindly to the model.</p><input id="projectZip" type="file" accept=".zip,application/zip" hidden><button class="btn" type="button" id="uploadProject">Upload ZIP</button><span id="projectUploadStatus" class="sub" style="margin-left:8px"></span><h3>Import an existing project</h3><button class="btn" type="button" id="findProjects">Find local projects</button><div id="projectImports"></div><h3>Add manually</h3><form class="cform" id="projectForm"><input id="projectName" placeholder="Name, e.g. My website" maxlength="60" required><input id="projectPath" placeholder="Local folder, e.g. /Users/anilgupta/AI" required><input id="projectTest" placeholder="Test command, e.g. npm test" maxlength="300"><button class="btn">Add project</button></form>`;
   box.querySelectorAll('[data-use]').forEach(i=>i.onchange = async () => { await post('/projects', {select: i.dataset.use || null}).catch(()=>null); store.set('ai.project', i.dataset.use); showProject(list.find(p=>p.id === i.dataset.use)); toast(i.dataset.use ? 'Project selected — the terminal uses it too' : 'No project selected'); });
   box.querySelectorAll('[data-project-del]').forEach(b=>b.onclick = async () => { await post('/projects', {id: b.dataset.projectDel, delete: true}); if(store.get('ai.project', '') === b.dataset.projectDel){ store.set('ai.project', ''); showProject(null); } loadProjects(); });
+  $('#newProjectForm').onsubmit = async e => { e.preventDefault(); const r = await post('/projects', {create: $('#newProjectName').value}).catch(()=>null); if(r && r.project){ store.set('ai.project', r.project.id); toast('New project ' + r.project.name + ' — selected; now ask for the app'); loadProjects(); } else toast((r && r.error) || 'Could not create it'); };
   $('#uploadProject').onclick = () => $('#projectZip').click();
   $('#projectZip').onchange = async () => {
     const f = $('#projectZip').files && $('#projectZip').files[0]; if(!f) return;
     const status = $('#projectUploadStatus'); status.textContent = 'Uploading and extracting…';
     try{
-      const r = await fetch(HELPER + '/projects/upload', {method:'POST', headers:{'content-type':'application/zip','x-project-name': encodeURIComponent(f.name)}, body:f});
+      if(f.size > 90 * 1024 * 1024) throw new Error('The ZIP is ' + Math.round(f.size / 1048576) + ' MB — at most 90 MB (leave out node_modules, build folders and videos)');
+      const r = await fetch(HELPER + '/projects/upload?name=' + encodeURIComponent(f.name), {method:'POST', headers:{'content-type':'application/zip'}, body:f});
       const j = await r.json(); if(!r.ok || !j.project) throw new Error(j.error || 'Upload failed');
       store.set('ai.project', j.project.id); status.textContent = 'Uploaded and selected'; toast('Project uploaded, extracted, and selected'); loadProjects();
-    }catch(e){ status.textContent = 'Upload failed'; toast(String(e.message || e)); }
+    }catch(e){ status.textContent = 'Upload failed'; toast(/failed to fetch|load failed|network/i.test(String(e.message)) ? 'Upload failed: the Mac\'s helper could not be reached — is it running? (and the ZIP at most 90 MB)' : String(e.message || e)); }
     $('#projectZip').value = '';
   };
   $('#findProjects').onclick = async () => {
