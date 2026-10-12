@@ -621,16 +621,17 @@ const keepText = (t, n) => { t = String(t || ''); const s = (/Saved on this Mac:
 const conversationTurns = saved => {
   const all = (saved || []).slice(-60), recent = 3, older = Math.max(0, all.length - recent);
   const oldPair = older ? Math.max(180, Math.min(900, Math.floor(9000 / older))) : 0;
-  const compact = (text, limit) => {
-    const raw = String(text || '').replace(/\s+/g, ' ').trim(), saved = (/Saved on this Mac: `[^`]+`/.exec(raw) || [''])[0];
+  // older turns: squeezed onto one line; the latest ones keep their line breaks (code in them stays readable)
+  const compact = (text, limit, lines) => {
+    const raw = (lines ? String(text || '').replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n') : String(text || '').replace(/\s+/g, ' ')).trim(), saved = (/Saved on this Mac: `[^`]+`/.exec(raw) || [''])[0];
     let s = raw.slice(0, limit).trim();
     if(saved && !s.includes(saved)) s = s.slice(0, Math.max(0, limit - saved.length - 2)).trim() + '\n' + saved;
     return s.length > limit && !saved ? s.slice(0, Math.max(0, limit - 1)) + '…' : s;
   };
   return all.flatMap((turn, i) => {
     const detailed = i >= older, pair = detailed ? 2400 : oldPair;
-    const question = compact(turn.q, detailed ? 1000 : Math.max(70, Math.floor(pair * .45)));
-    const answer = compact((turn.answer || {}).text, detailed ? 1400 : Math.max(100, pair - question.length));
+    const question = compact(turn.q, detailed ? 1000 : Math.max(70, Math.floor(pair * .45)), detailed);
+    const answer = compact((turn.answer || {}).text, detailed ? 1400 : Math.max(100, pair - question.length), detailed);
     return [{role: 'user', content: question}, {role: 'assistant', content: answer}];
   });
 };
@@ -846,6 +847,10 @@ async function ask(q, opt){
   request.q = q; request.files = files;
   attachments = []; showFiles();
   activeRequests.set(requestSessionId, request); syncRequestUI(); $('#q').value = ''; grow();
+  // Persist a lightweight shell immediately so the chat appears in History before the answer is ready.
+  if(mode === 'mac' && !deletedSessions.has(requestSessionId)){
+    post('/session', {id: requestSessionId, q, goal: requestGoal, chatName: requestChatName, pending: true}).then(()=>loadChats()).catch(()=>{});
+  }
   const el = turnEl(q, files), box = el.querySelector('.steps'), live = el.querySelector('.live'), steps = [], traces = [];
   const addTrace = t => { traces.push(t); const open = Array.from(live.querySelectorAll('details')).map(d=>d.open); live.innerHTML = timeline(traces, true); live.querySelectorAll('details').forEach((d, i)=>{ if(open[i]) d.open = true; }); };
   el.scrollIntoView({behavior: 'smooth', block: 'start'});
@@ -859,6 +864,7 @@ async function ask(q, opt){
   const turns = conversationTurns(requestHistory);
   let doneShown = false;
   const done = out => {
+    if(deletedSessions.has(requestSessionId)) return;
     lastAnswer = out;
     if(steps[0] && steps[0].t === 'Starting') steps.shift();
     finish(el, q, out, steps, traces, true);
@@ -872,7 +878,7 @@ async function ask(q, opt){
       history = requestHistory; store.set('moneyai.history', history); setTitle();
       // A chat can have been opened again while its request was running. Its old
       // placeholder is then detached, so paint the saved reply into that chat only.
-      if(!el.isConnected) drawHistory();
+      if(!el.isConnected) drawHistory(true);   // true: this request is done — do not draw it again as still running
     }
     saveChat({id: requestSessionId, history: requestHistory, goal: requestGoal, chatName: requestChatName}).then(loadChats);
   };
@@ -914,7 +920,7 @@ async function ask(q, opt){
       out.secs = Math.round((Date.now() - t0) / 1000);
       done(out);
     } else {
-      const r = await fetch(HELPER + '/ask', {method: 'POST', headers: {'content-type': 'application/json'}, signal: request.controller.signal, body: JSON.stringify({question: q, deep: !!opt.deep, deepLocal: !!opt.deepLocal, research: !!opt.research, imageModel: opt.imageModel || store.get('ai.imageModel', 'auto'), videoModel: store.get('ai.videoModel', 'auto') !== 'auto' ? store.get('ai.videoModel') : undefined, model: pick.kind === 'local' ? pick.model : undefined, provider: opt.provider || (pick.kind === 'cloud' ? pick.provider : pick.kind === 'council' ? 'council' : undefined), history: turns, cloud: cloudKeys(), fresh: !!opt.fresh, attachments: files.map(f=>f.image ? {name: f.name, image: f.image} : f), goal: requestGoal, disabled, project: store.get('ai.project', ''), lastKind: (requestHistory.length && requestHistory[requestHistory.length - 1].answer.kind) || ''})});
+      const r = await fetch(HELPER + '/ask', {method: 'POST', headers: {'content-type': 'application/json'}, signal: request.controller.signal, body: JSON.stringify({question: q, deep: !!opt.deep, deepLocal: !!opt.deepLocal, research: !!opt.research, imageModel: opt.imageModel || store.get('ai.imageModel', 'auto'), videoModel: store.get('ai.videoModel', 'auto') !== 'auto' ? store.get('ai.videoModel') : undefined, model: pick.kind === 'local' ? pick.model : undefined, provider: opt.provider || (pick.kind === 'cloud' ? pick.provider : pick.kind === 'council' ? 'council' : undefined), history: turns, cloud: cloudKeys(), fresh: !!opt.fresh, attachments: files.map(f=>f.image ? {name: f.name, image: f.image} : f), goal: requestGoal, disabled, project: store.get('ai.project', ''), forceVideo: !!opt.forceVideo, lastKind: (requestHistory.length && requestHistory[requestHistory.length - 1].answer.kind) || ''})});
       if(!r.ok) throw new Error((await r.json().catch(()=>({}))).error || 'It answered ' + r.status);
       const reader = r.body.getReader(), dec = new TextDecoder();
       let buf = '', out = null;
@@ -1155,8 +1161,8 @@ async function savePictureForEdit(button){
     if(!r.ok || x.error) throw new Error(x.error || (isCurrent ? 'Could not clear the saved picture.' : 'Could not save the picture for editing.'));
     savedEditFile = isCurrent ? '' : String(x.file || file);
     document.querySelectorAll('[data-save-edit]').forEach(b=>{ const on = !!savedEditFile && b.dataset.saveEdit === savedEditFile; b.classList.toggle('on', on); b.textContent = on ? 'Saved for edit' : 'Save for edit'; });
-    showToast(isCurrent ? 'Saved-for-edit picture cleared.' : 'Picture saved for edit — it will be used for the next image edit, even in another chat.');
-  }catch(e){ showToast(String(e.message || e), true); }
+    toast(isCurrent ? 'Saved-for-edit picture cleared.' : 'Picture saved for edit — it will be used for the next image edit, even in another chat.');
+  }catch(e){ toast(String(e.message || e)); }
   finally{ button.disabled = false; }
 }
 document.addEventListener('click', e=>{ const b = e.target.closest && e.target.closest('[data-save-edit]'); if(b){ e.preventDefault(); savePictureForEdit(b); return; } });
@@ -1178,7 +1184,7 @@ const send = v => {
   if(/^\/\w/.test(v.trim())) return runCommand(v);
   if(!v.trim()) return;
   if(toolMode === 'image') return ask(/^\s*(draw|paint|sketch|generate|create|make)\b/i.test(v) ? v : 'Generate an image of ' + v);
-  if(toolMode === 'video') return ask(/\b(video|gif|animat)/i.test(v) ? v : 'Make a video of ' + v);
+  if(toolMode === 'video') return ask(/\b(video|gif|animat)/i.test(v) ? v : 'Make a video of ' + v, {forceVideo: true});
   if(toolMode === 'deep') return ask(v, {deep: true});
   if(toolMode === 'research') return ask(v, {research: true});
   if(toolMode === 'council') return ask(v, {provider: 'council'});
@@ -1290,6 +1296,7 @@ let ctl = null;
 // One request may run in each chat. `busy` and `ctl` remain the controls for the
 // selected chat only, so the Stop button never affects work in another chat.
 const activeRequests = new Map();
+const deletedSessions = new Set();
 const SEND = $('#ask').innerHTML, STOP = '<svg width="14" height="14" viewBox="0 0 24 24"><rect x="5" y="5" width="14" height="14" rx="2" fill="currentColor"/></svg>';
 function sendState(on){ const b = $('#ask'); b.classList.toggle('stop', on); b.innerHTML = on ? STOP : SEND; b.setAttribute('aria-label', on ? 'Stop' : 'Ask'); b.title = on ? 'Stop' : ''; }
 function syncRequestUI(){
@@ -1454,6 +1461,8 @@ const localChats = () => store.get('ai.sessions', {});
 let chatOpenSeq = 0; // Ignore a slower earlier click after the user selected another chat.
 async function saveChat(state){
   state = state || {};
+  const blockedId = state.id || sessionId;
+  if(deletedSessions.has(blockedId)) return;
   const savedHistory = state.history || history, savedId = state.id || sessionId;
   const savedName = state.chatName == null ? chatName : state.chatName;
   const savedGoal = state.goal == null ? goal : state.goal;
@@ -1477,17 +1486,20 @@ async function openChat(id){
   if(openSeq !== chatOpenSeq) return;
   if(!x) return toast('That chat could not be opened');
   sessionId = x.id; store.set('ai.session', sessionId); chatName = x.title || ''; store.set('ai.chatName', chatName);
-  history = (x.turns || []).filter(t=>t && t.answer); store.set('moneyai.history', history);
+  history = (x.turns || []).filter(t=>t && t.answer && !t.answer.pending); store.set('moneyai.history', history);
   goal = x.goal || ''; store.set('ai.goal', goal); showGoal();
-  drawHistory(); syncRequestUI();
+  drawHistory();
+  // a question still being answered (in another tab, or before a reload): shown for 10 minutes, not forever when it failed
+  if(x.pending && x.pending.q && !activeRequests.has(x.id) && Date.now() - Date.parse(x.pending.at || 0) < 600000) turnEl(x.pending.q);
+  syncRequestUI();
   openChats(false); setTitle(); drawChats();
   const last = $('#turns').lastElementChild; if(last) last.scrollIntoView({block: 'start'});
 }
-function drawHistory(){
+function drawHistory(finished){
   $('#turns').innerHTML = ''; $('#hello').hidden = history.length > 0;
   history.forEach(h=>{ const el = turnEl(h.q); finish(el, h.q, h.answer, h.steps || [], h.traces || []); });
   // Keep the in-progress question visible if the user returns to its chat.
-  const request = activeRequests.get(sessionId);
+  const request = !finished && activeRequests.get(sessionId);
   if(request) turnEl(request.q, request.files);
 }
 const ago = iso => { const m = Math.round((Date.now() - new Date(iso)) / 60000); return m < 1 ? 'just now' : m < 60 ? m + ' min ago' : m < 1440 ? Math.round(m / 60) + ' h ago' : Math.round(m / 1440) + ' d ago'; };
@@ -1510,16 +1522,22 @@ function drawChats(){
   const ca = box.querySelector('#clearAll');
   if(ca) ca.onclick = async () => {
     if(!ca.dataset.sure){ ca.dataset.sure = '1'; ca.textContent = 'Click again to delete all ' + chatCache.length + ' chats — this cannot be undone'; ca.classList.add('danger'); setTimeout(()=>{ if(ca.isConnected){ delete ca.dataset.sure; ca.textContent = 'Delete all chats'; ca.classList.remove('danger'); } }, 5000); return; }
+    for(const [id, req] of activeRequests){ deletedSessions.add(id); try{ req.controller.abort(); }catch(_){} }
+    activeRequests.clear();
     if(mode === 'mac'){ try{ await post('/session', {all: true, delete: true}); }catch(e){} }
-    store.set('ai.sessions', {}); newChat(true); await loadChats(); toast('All chats deleted');
+    store.set('ai.sessions', {}); history = []; store.set('moneyai.history', []); newChat(true); await loadChats(); toast('All chats deleted');
   };
   box.querySelectorAll('.chat').forEach(el=>el.onclick = e => { if(e.target.closest('.del')) return; openChat(el.dataset.id); });
-  box.querySelectorAll('[data-del]').forEach(b=>b.onclick = async () => {
+  box.querySelectorAll('[data-del]').forEach(b=>b.onclick = async e => {
+    e.stopPropagation();
     const id = b.dataset.del;
+    deletedSessions.add(id);
+    const req = activeRequests.get(id);
+    if(req){ try{ req.controller.abort(); }catch(_){} activeRequests.delete(id); }
     if(mode === 'mac'){ try{ await post('/session', {id, delete: true}); }catch(e){} }
     const all = localChats(); delete all[id]; store.set('ai.sessions', all);
-    if(id === sessionId) newChat(true);
-    loadChats();
+    if(id === sessionId){ history = []; store.set('moneyai.history', []); newChat(true); }
+    await loadChats();
   });
 }
 async function loadChats(){ chatCache = await listChats(); drawChats(); }
@@ -1604,10 +1622,21 @@ async function loadProjects(){
   if(mode !== 'mac'){ box.innerHTML = '<p class="sub">Coding projects run on your Mac. Open this page through your Mac or Tailscale.</p>'; return; }
   let list = []; try{ list = (await fetch(HELPER + '/projects').then(r=>r.json())).list || []; }catch(e){}
   const active = store.get('ai.project', '');
-  box.innerHTML = (list.length ? list.map(p=>`<label class="trow2"><input type="radio" name="project" data-use="${esc(p.id)}" ${p.id === active ? 'checked' : ''}><span class="tt"><b>${esc(p.name)}</b><small>${esc(p.path)} · test: ${esc(p.test)}</small></span><button class="ghost" type="button" data-project-del="${esc(p.id)}">Remove</button></label>`).join('') : '<p class="sub">No project selected. Import or add one below.</p>') +
-    `<h3>Import an existing project</h3><button class="btn" type="button" id="findProjects">Find local projects</button><div id="projectImports"></div><h3>Add manually</h3><form class="cform" id="projectForm"><input id="projectName" placeholder="Name, e.g. My website" maxlength="60" required><input id="projectPath" placeholder="Local folder, e.g. /Users/anilgupta/AI" required><input id="projectTest" placeholder="Test command, e.g. npm test" maxlength="300" required><button class="btn">Add project</button></form>`;
+  box.innerHTML = (list.length ? list.map(p=>`<label class="trow2"><input type="radio" name="project" data-use="${esc(p.id)}" ${p.id === active ? 'checked' : ''}><span class="tt"><b>${esc(p.name)}</b><small>${esc(p.path)}${p.test ? ' · test: ' + esc(p.test) : ' · no test command detected'}</small></span><button class="ghost" type="button" data-project-del="${esc(p.id)}">Remove</button></label>`).join('') : '<p class="sub">No project selected. Upload a ZIP or import an existing folder.</p>') +
+    `<h3>Upload a project</h3><p class="sub">ZIP files are extracted on this Mac. The AI then reads the extracted project through its project tools — the ZIP itself is not sent blindly to the model.</p><input id="projectZip" type="file" accept=".zip,application/zip" hidden><button class="btn" type="button" id="uploadProject">Upload ZIP</button><span id="projectUploadStatus" class="sub" style="margin-left:8px"></span><h3>Import an existing project</h3><button class="btn" type="button" id="findProjects">Find local projects</button><div id="projectImports"></div><h3>Add manually</h3><form class="cform" id="projectForm"><input id="projectName" placeholder="Name, e.g. My website" maxlength="60" required><input id="projectPath" placeholder="Local folder, e.g. /Users/anilgupta/AI" required><input id="projectTest" placeholder="Test command, e.g. npm test" maxlength="300"><button class="btn">Add project</button></form>`;
   box.querySelectorAll('[data-use]').forEach(i=>i.onchange = () => { store.set('ai.project', i.dataset.use); toast('Coding project selected'); });
   box.querySelectorAll('[data-project-del]').forEach(b=>b.onclick = async () => { await post('/projects', {id: b.dataset.projectDel, delete: true}); if(store.get('ai.project', '') === b.dataset.projectDel) store.set('ai.project', ''); loadProjects(); });
+  $('#uploadProject').onclick = () => $('#projectZip').click();
+  $('#projectZip').onchange = async () => {
+    const f = $('#projectZip').files && $('#projectZip').files[0]; if(!f) return;
+    const status = $('#projectUploadStatus'); status.textContent = 'Uploading and extracting…';
+    try{
+      const r = await fetch(HELPER + '/projects/upload', {method:'POST', headers:{'content-type':'application/zip','x-project-name': encodeURIComponent(f.name)}, body:f});
+      const j = await r.json(); if(!r.ok || !j.project) throw new Error(j.error || 'Upload failed');
+      store.set('ai.project', j.project.id); status.textContent = 'Uploaded and selected'; toast('Project uploaded, extracted, and selected'); loadProjects();
+    }catch(e){ status.textContent = 'Upload failed'; toast(String(e.message || e)); }
+    $('#projectZip').value = '';
+  };
   $('#findProjects').onclick = async () => {
     const target = $('#projectImports'); target.innerHTML = '<p class="sub">Looking in common local development folders…</p>';
     let found = []; try{ found = (await fetch(HELPER + '/projects?discover=1').then(r=>r.json())).list || []; }catch(e){}
