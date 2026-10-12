@@ -461,9 +461,11 @@ Headlines about ${trip.city}:\n${list(data.city, 15)}
 Safety / geopolitics:\n${list(data.security, 15)}
 Flights / airports:\n${list(data.travel, 15)}`;
     // with the web search if an AI that can search is free; otherwise the next AI (Groq, …) writes it from the headlines
-    const r = await Cloud.chat(brief(!!opts.search), [{role: 'user', content: msg}], opts.search ? {search: true, searchOptional: true} : {});
+    // what your own AI looks up on the web when it does the searching (no Gemini key needed)
+    const webQuestion = `What is the latest news (last 7 days) affecting travellers to ${trip.city}${trip.country ? ', ' + trip.country : ''}: safety and security, regional tensions, flights and airports, strikes and protests, weather? Give dated facts with sources.`;
+    const r = await Cloud.chat(brief(!!opts.search), [{role: 'user', content: msg}], opts.search ? {search: true, searchOptional: true, webQuestion} : {});
     const j = Cloud.json(r.text);
-    return Object.assign({status: 'clear', headline: '', points: [], flights: '', advice: ''}, j, {by: r.provider + ' · ' + r.model + (opts.search && r.noSearch ? ' (without web search — the AI that searches is busy)' : ''), sources: r.sources || [], at: Date.now()});
+    return Object.assign({status: 'clear', headline: '', points: [], flights: '', advice: ''}, j, {by: r.provider + ' · ' + r.model + (opts.search && r.searchedBy ? ' (with a web search on ' + r.searchedBy + ')' : opts.search && r.noSearch ? ' (without web search — the AI that searches is busy)' : ''), sources: r.sources || [], at: Date.now()});
   }
   return {headlines, advisory, summarise, gdelt};
 })();
