@@ -920,7 +920,7 @@ async function ask(q, opt){
       out.secs = Math.round((Date.now() - t0) / 1000);
       done(out);
     } else {
-      const r = await fetch(HELPER + '/ask', {method: 'POST', headers: {'content-type': 'application/json'}, signal: request.controller.signal, body: JSON.stringify({question: q, deep: !!opt.deep, deepLocal: !!opt.deepLocal, research: !!opt.research, imageModel: opt.imageModel || store.get('ai.imageModel', 'auto'), videoModel: store.get('ai.videoModel', 'auto') !== 'auto' ? store.get('ai.videoModel') : undefined, model: pick.kind === 'local' ? pick.model : undefined, provider: opt.provider || (pick.kind === 'cloud' ? pick.provider : pick.kind === 'council' ? 'council' : undefined), history: turns, cloud: cloudKeys(), fresh: !!opt.fresh, attachments: files.map(f=>f.image ? {name: f.name, image: f.image} : f), goal: requestGoal, disabled, project: store.get('ai.project', ''), forceVideo: !!opt.forceVideo, lastKind: (requestHistory.length && requestHistory[requestHistory.length - 1].answer.kind) || ''})});
+      const r = await fetch(HELPER + '/ask', {method: 'POST', headers: {'content-type': 'application/json'}, signal: request.controller.signal, body: JSON.stringify({question: q, deep: !!opt.deep || pick.kind === 'deep' || pick.kind === 'deeplocal', deepLocal: !!opt.deepLocal || pick.kind === 'deeplocal', research: !!opt.research, imageModel: opt.imageModel || store.get('ai.imageModel', 'auto'), videoModel: store.get('ai.videoModel', 'auto') !== 'auto' ? store.get('ai.videoModel') : undefined, model: pick.kind === 'local' ? pick.model : undefined, provider: opt.provider || (pick.kind === 'cloud' ? pick.provider : pick.kind === 'council' ? 'council' : undefined), history: turns, cloud: cloudKeys(), fresh: !!opt.fresh, attachments: files.map(f=>f.image ? {name: f.name, image: f.image} : f), goal: requestGoal, disabled, project: store.get('ai.project', '') || null, forceVideo: !!opt.forceVideo, lastKind: (requestHistory.length && requestHistory[requestHistory.length - 1].answer.kind) || ''})});
       if(!r.ok) throw new Error((await r.json().catch(()=>({}))).error || 'It answered ' + r.status);
       const reader = r.body.getReader(), dec = new TextDecoder();
       let buf = '', out = null;
@@ -989,7 +989,7 @@ const IMG_PICK = [['auto', 'Auto pictures', 'FLUX.1 schnell; styles by Image Pla
   ['flux-2-klein-4b', 'FLUX.2 klein 4B', 'cheap; can be slow'], ['sdxl-lightning', 'SDXL Lightning', 'fast; loose'], ['dreamshaper', 'DreamShaper 8', 'fast, painterly; loose'], ['gemini', 'Gemini 3.1 Flash Image', 'Google; needs billing on your key'], ['pollinations', 'Pollinations', 'free, no key; a small mark'], ['playground', 'Apple Image Playground', 'illustration styles (its Shortcut needed)'], ['drawthings', 'Draw Things', 'on this Mac, its chosen model (API Server on)'], ['diffusionbee', 'DiffusionBee', 'on this Mac: private, offline; slower (~40 s)']];
 // the video models (cli/animatediff.mjs): AnimateDiff for real motion, the zoom or pan as the fallback
 const VID_PICK = [['auto', 'Auto videos', 'Wan 2.2 or LTX-Video online (5–8 s), then AnimateDiff (2 s), then a zoom or pan'], ['wan', 'Wan 2.2 online', 'the best looking; animates a picture — up to 5 s'], ['ltx', 'LTX-Video online', 'the longest — up to 8.5 s; quick'], ['animatediff', 'AnimateDiff', '2 s; online, then this Mac — never the zoom or pan'], ['animatediff-online', 'AnimateDiff online', 'ByteDance\'s free Hugging Face Space — seconds'], ['animatediff-mac', 'AnimateDiff on this Mac', 'private, offline — about 7 minutes on 8 GB (ai animatediff install)'], ['kenburns', 'Zoom or pan', 'the older way: a slow camera move across one picture, 6 s']];
-const pickLabel = () => pick.kind === 'auto' ? autoLabel : pick.kind === 'local' ? pick.model : pick.kind === 'private' ? 'Private AI (in this browser)' : pick.kind === 'council' ? 'Thinking' : (CLOUD_NAMES[pick.provider] || pick.provider);
+const pickLabel = () => pick.kind === 'deep' ? 'Deep think' : pick.kind === 'deeplocal' ? 'Deep on this Mac' : pick.kind === 'auto' ? autoLabel : pick.kind === 'local' ? pick.model : pick.kind === 'private' ? 'Private AI (in this browser)' : pick.kind === 'council' ? 'Thinking' : (CLOUD_NAMES[pick.provider] || pick.provider);
 async function openPicker(){
   const box = $('#picker');
   if(!box.hidden){ box.hidden = true; return; }
@@ -1001,6 +1001,8 @@ async function openPicker(){
   const item = (p, icon, title, sub) => `<button type="button" role="menuitem" data-p='${esc(JSON.stringify(p))}' class="${JSON.stringify(p) === JSON.stringify(pick) ? 'on' : ''}"><i>${icon}</i><span><b>${esc(title)}</b><small>${esc(sub)}</small></span></button>`;
   box.innerHTML = item({kind: 'auto'}, '✦', 'Auto (recommended)', info.apple && info.apple.chatgpt ? 'The right model for each question: ChatGPT (through Siri) for money, hard questions and code; Apple Private Cloud for web answers; this Mac for your files, chat and pictures' : 'The right model for each question: general, code, pictures, hard questions')
     + (cloud.length >= 2 ? item({kind: 'council'}, '💭', 'Thinking', 'Research here, then two top cloud models write it and an editor merges them — the most reliable') : '')
+    + (info.apple && (info.apple.chatgpt || info.apple.pcc) ? item({kind: 'deep'}, '🧠', 'Deep think', 'Deeper research here (more searches and pages), then ChatGPT and Apple Private Cloud each write it and ChatGPT merges them') : '')
+    + (info.local.some(m=>/^qwen3:8b|^qwen3\.5:(4b|9b)/.test(m.name)) ? item({kind: 'deeplocal'}, '🧠', 'Deep on this Mac (private)', 'Nothing leaves the Mac: ' + ((info.local.find(m=>/^qwen3:8b|^qwen3\.5:9b/.test(m.name)) || info.local.find(m=>/^qwen3\.5:4b/.test(m.name))).name) + ' thinks it through — slow on 8 GB (minutes per answer)') : '')
     + (info.local.length ? '<h6>On this Mac</h6>' + info.local.map(m=>item({kind: 'local', model: m.name}, '💻', m.name, (m.role ? m.role + ' · ' : '') + m.gb + ' GB')).join('') : '')
     + (info.apple && (info.apple.apple || info.apple.chatgpt || info.apple.pcc) ? '<h6>Apple Intelligence</h6>'
         + (info.apple.apple ? item({kind: 'cloud', provider: 'apple'}, '', 'Apple Intelligence (on this Mac)', 'Apple\'s on-device model — private and free; research is done here') : '')
@@ -1139,6 +1141,7 @@ async function detect(){
   }
   loadLearned();
   loadSavedEdit();
+  syncProject();
 }
 const grow = () => { const t = $('#q'); t.style.height = 'auto'; t.style.height = Math.min(180, t.scrollHeight) + 'px'; };
 const hour = new Date().getHours();
@@ -1617,15 +1620,18 @@ const openTasks = on => { $('#taskPanel').classList.toggle('open', on); $('#scri
 $('#openTasks').onclick = () => openTasks(true);
 $('#closeTasks').onclick = () => openTasks(false);
 
+// the selected project, named on the Projects button (it is kept on the Mac: the terminal and the phone share it)
+function showProject(p){ const b = $('#openProjects'); if(b) b.innerHTML = '<i>⌘</i>' + (p ? 'Project: ' + esc(p.name.length > 22 ? p.name.slice(0, 21) + '…' : p.name) : 'Projects'); }
+async function syncProject(){ if(mode !== 'mac') return; try{ const j = await fetch(HELPER + '/projects').then(r=>r.json()); store.set('ai.project', j.selected || ''); showProject((j.list || []).find(p=>p.id === j.selected)); }catch(e){} }
 async function loadProjects(){
   const box = $('#projects');
   if(mode !== 'mac'){ box.innerHTML = '<p class="sub">Coding projects run on your Mac. Open this page through your Mac or Tailscale.</p>'; return; }
-  let list = []; try{ list = (await fetch(HELPER + '/projects').then(r=>r.json())).list || []; }catch(e){}
-  const active = store.get('ai.project', '');
-  box.innerHTML = (list.length ? list.map(p=>`<label class="trow2"><input type="radio" name="project" data-use="${esc(p.id)}" ${p.id === active ? 'checked' : ''}><span class="tt"><b>${esc(p.name)}</b><small>${esc(p.path)}${p.test ? ' · test: ' + esc(p.test) : ' · no test command detected'}</small></span><button class="ghost" type="button" data-project-del="${esc(p.id)}">Remove</button></label>`).join('') : '<p class="sub">No project selected. Upload a ZIP or import an existing folder.</p>') +
+  let list = [], active = ''; try{ const j = await fetch(HELPER + '/projects').then(r=>r.json()); list = j.list || []; active = j.selected || ''; }catch(e){ active = store.get('ai.project', ''); }
+  store.set('ai.project', active); showProject(list.find(p=>p.id === active));
+  box.innerHTML = (list.length ? `<label class="trow2"><input type="radio" name="project" data-use="" ${active ? '' : 'checked'}><span class="tt"><b>No project</b><small>Questions are answered as usual</small></span></label>` + list.map(p=>`<label class="trow2"><input type="radio" name="project" data-use="${esc(p.id)}" ${p.id === active ? 'checked' : ''}><span class="tt"><b>${esc(p.name)}</b><small>${esc(p.path)}${p.test ? ' · test: ' + esc(p.test) : ' · no test command detected'}</small></span><button class="ghost" type="button" data-project-del="${esc(p.id)}">Remove</button></label>`).join('') : '<p class="sub">No project selected. Upload a ZIP or import an existing folder.</p>') +
     `<h3>Upload a project</h3><p class="sub">ZIP files are extracted on this Mac. The AI then reads the extracted project through its project tools — the ZIP itself is not sent blindly to the model.</p><input id="projectZip" type="file" accept=".zip,application/zip" hidden><button class="btn" type="button" id="uploadProject">Upload ZIP</button><span id="projectUploadStatus" class="sub" style="margin-left:8px"></span><h3>Import an existing project</h3><button class="btn" type="button" id="findProjects">Find local projects</button><div id="projectImports"></div><h3>Add manually</h3><form class="cform" id="projectForm"><input id="projectName" placeholder="Name, e.g. My website" maxlength="60" required><input id="projectPath" placeholder="Local folder, e.g. /Users/anilgupta/AI" required><input id="projectTest" placeholder="Test command, e.g. npm test" maxlength="300"><button class="btn">Add project</button></form>`;
-  box.querySelectorAll('[data-use]').forEach(i=>i.onchange = () => { store.set('ai.project', i.dataset.use); toast('Coding project selected'); });
-  box.querySelectorAll('[data-project-del]').forEach(b=>b.onclick = async () => { await post('/projects', {id: b.dataset.projectDel, delete: true}); if(store.get('ai.project', '') === b.dataset.projectDel) store.set('ai.project', ''); loadProjects(); });
+  box.querySelectorAll('[data-use]').forEach(i=>i.onchange = async () => { await post('/projects', {select: i.dataset.use || null}).catch(()=>null); store.set('ai.project', i.dataset.use); showProject(list.find(p=>p.id === i.dataset.use)); toast(i.dataset.use ? 'Project selected — the terminal uses it too' : 'No project selected'); });
+  box.querySelectorAll('[data-project-del]').forEach(b=>b.onclick = async () => { await post('/projects', {id: b.dataset.projectDel, delete: true}); if(store.get('ai.project', '') === b.dataset.projectDel){ store.set('ai.project', ''); showProject(null); } loadProjects(); });
   $('#uploadProject').onclick = () => $('#projectZip').click();
   $('#projectZip').onchange = async () => {
     const f = $('#projectZip').files && $('#projectZip').files[0]; if(!f) return;
