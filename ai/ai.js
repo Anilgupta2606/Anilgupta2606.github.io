@@ -361,7 +361,12 @@ const MoneyAI = (function(){
     const file = system + (before ? '\n\nThe conversation so far:\n\n' + before : '') + '\n\nThe request:\n\n' + last.content;
     const q = 'Answer the request in the attached file "' + app + ' request.txt", following its instructions exactly'
       + (opts.schema ? ' - reply with the JSON it asks for, and nothing else.' : '.');
-    const body = Object.assign({question: q, history: [], attachments: [{name: app + ' request.txt', text: file.slice(0, 290000)}],
+    const body = opts.webQuestion
+      // a plain question for its web search (SearXNG and the pages it reads): no file, so it is free to look things up
+      // (ChatGPT writes it from what this Mac found when the Mac has it: seconds, not minutes on the small model here)
+      ? Object.assign({question: String(opts.webQuestion).slice(0, 2000), history: [], disabled: ['connectors', 'apps'], fresh: true, noMedia: true},
+          ((lsGet(MAC_KEY, {}).info || {}).apple || {chatgpt: true}).chatgpt === false ? {} : {provider: 'chatgpt'})
+      : Object.assign({question: q, history: [], attachments: [{name: app + ' request.txt', text: file.slice(0, 290000)}],
       disabled: ['connectors', 'apps'], fresh: true, noMedia: true}, macRequest(model));     // its own data; never its "same question" answer; words only
     const ctl = new AbortController(), timer = setTimeout(()=>ctl.abort(), 180000), stop = ()=>ctl.abort();
     if(signal) signal.addEventListener('abort', stop);
@@ -385,7 +390,8 @@ const MoneyAI = (function(){
             const text = String(j.answer.text || '').replace(/^\s*⚠.*$/gm, '').replace(/\s*\[\d+(?:,\s*\d+)*\]/g, '').replace(/[ \t]+([.,;:!?])/g, '$1').trim();
             if(!text) throw Unavailable('Your Mac\'s AI returned an empty answer.', 502);
             ctl.abort();                                                        // the extras after the answer are not needed
-            return {text, sources: [], by: String(j.answer.by || '').split(' · ')[0]};
+            const sources = [].concat(Array.isArray(j.answer.sources) ? j.answer.sources : [], Array.isArray(j.answer.read) ? j.answer.read : []).map(x=>({title: String(x.title || x.url || ''), url: String(x.url || x.link || '')})).filter(x=>/^https?:/.test(x.url)).slice(0, 12);
+            return {text, sources, by: String(j.answer.by || '').split(' · ')[0]};
           }
         }
         if(done) break;
@@ -546,6 +552,24 @@ const MoneyAI = (function(){
     const s = aiSettings();
     if(s.keys.mac && s.off.indexOf('mac') < 0) await macUp(s.keys.mac);     // is your Mac's AI there? (a phone: no; checked every 30 s)
     let order = usable(s);
+    // A WEB SEARCH BY YOUR OWN AI: an app that wants the latest (Trip Vault's news) says what to look up (opts.webQuestion);
+    // your Mac searches the web and reads the pages, then the app's request is answered with what it found. Only
+    // Gemini could search before, so with no Gemini key the news was written from the app's headlines alone.
+    if(opts.search && opts.webQuestion && order.indexOf('mac') >= 0 && !resting('mac') && !(opts.only && opts.only.indexOf('mac') < 0)){
+      try{
+        tell('Your Mac\'s AI is searching the web…', 'mac');
+        const found = await callMac(s.keys.mac, 'auto', '', [], opts, signal);
+        const last = turns[turns.length - 1] || {role: 'user', content: ''};
+        const withFound = turns.slice(0, -1).concat([{role: 'user', content: last.content + '\n\nWhat a web search found just now (' + new Date().toISOString().slice(0, 10) + '), with its sources:\n' + found.text
+          + (found.sources.length ? '\nSources:\n' + found.sources.map(x=>'- ' + x.title + ' ' + x.url).join('\n') : '')}]);
+        const out = await chat(system, withFound, Object.assign({}, opts, {search: false, searchOptional: false, webQuestion: null}), signal);
+        return Object.assign(out, {sources: found.sources, searchedBy: 'your Mac', noSearch: false});
+      }catch(e){
+        if(e.code === 'cancelled') throw e;
+        tell('Your Mac\'s web search did not answer (' + e.message + ') — trying the next', 'mac');
+      }
+    }
+    if(opts.webQuestion) opts = Object.assign({}, opts, {webQuestion: null});        // from here on: the app's own request
     if(opts.images && opts.images.length) order = order.filter(id=>PROVIDERS.find(p=>p.id === id).vision);
     if(opts.search) order = order.filter(id=>PROVIDERS.find(p=>p.id === id).search);
     if(opts.only) order = order.filter(id=>opts.only.indexOf(id) >= 0);              // e.g. only the AI on this device
