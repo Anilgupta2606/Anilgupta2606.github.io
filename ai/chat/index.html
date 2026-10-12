@@ -1005,7 +1005,7 @@ async function openPicker(){
   if(mode === 'mac'){ try{ info = await fetch(HELPER + '/models').then(r=>r.json()); }catch(e){} }
   info.local = info.local || [];
   const cloud = info.cloud && info.cloud.length ? info.cloud : (typeof MoneyAI !== 'undefined' ? Object.keys(browserKeys()) : []);
-  const privateOk = typeof MoneyAI !== 'undefined' && !LOCAL_PAGE;
+  const privateOk = false;                                         // Private AI (in this browser) was removed from Setup
   const item = (p, icon, title, sub) => `<button type="button" role="menuitem" data-p='${esc(JSON.stringify(p))}' class="${JSON.stringify(p) === JSON.stringify(pick) ? 'on' : ''}"><i>${icon}</i><span><b>${esc(title)}</b><small>${esc(sub)}</small></span></button>`;
   box.innerHTML = item({kind: 'auto'}, '✦', 'Auto (recommended)', info.apple && info.apple.chatgpt ? 'The right model for each question: ChatGPT (through Siri) for money, hard questions and code; Apple Private Cloud for web answers; this Mac for your files, chat and pictures' : 'The right model for each question: general, code, pictures, hard questions')
     + (cloud.length >= 2 ? item({kind: 'council'}, '💭', 'Thinking', 'Research here, then two top cloud models write it and an editor merges them — the most reliable') : '')

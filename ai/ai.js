@@ -40,7 +40,7 @@ const MoneyAI = (function(){
     {id:'cerebras', name:'Cerebras', signupUrl:'https://cloud.cerebras.ai', placeholder:'csk-…', models:['gpt-oss-120b','llama-3.3-70b','llama3.1-8b']},
     {id:'mistral', name:'Mistral', signupUrl:'https://console.mistral.ai/api-keys', placeholder:'key', models:['mistral-small-latest','mistral-medium-latest']},
     {id:'openrouter', name:'OpenRouter', signupUrl:'https://openrouter.ai/keys', placeholder:'sk-or-…', models:['openrouter/free','meta-llama/llama-3.3-70b-instruct:free']},
-    {id:'webllm', name:'Private AI (in this browser)', signupUrl:'https://webllm.mlc.ai', placeholder:'', models:['Qwen3-4B-q4f16_1-MLC'], keyless:true, device:true},
+    // Private AI (in this browser) is gone: Your own AI (on your Mac) is the private one — a key saved for it is not used
     // Local (Ollama) is gone from here: the models on the Mac are reached through Your own AI (local:…), one way for every app
     {id:'anthropic', name:'Anthropic Claude (paid)', signupUrl:'https://console.anthropic.com/settings/keys', placeholder:'sk-ant-…', models:['claude-haiku-4-5-20251001'], vision:true},
   ];
