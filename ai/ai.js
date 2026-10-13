@@ -468,7 +468,7 @@ const MoneyAI = (function(){
     return {text: text.replace(/<think>[\s\S]*?<\/think>/g, ''), sources: []};     // reasoning models think out loud first
   }
 
-  const NOT_CHAT = /embed|tts|whisper|audio|speech|transcribe|image-gen|imagen|veo|lyria|dall|guard|moderation|rerank|live|realtime|robotics|computer-use|omni|customtools|aqa|learnlm|compound|playai|safeguard|orpheus|voice|music|sound|vocal/i;      // orpheus: a text-to-speech model Groq lists — picked as a writer, every hand-off failed (400)
+  const NOT_CHAT = /embed|tts|whisper|audio|speech|transcribe|image-gen|imagen|veo|lyria|dall|guard|moderation|rerank|live|realtime|robotics|computer-use|omni|customtools|aqa|learnlm|compound|playai|safeguard|orpheus|voice|music|sound|vocal|allam/i;      // orpheus: a text-to-speech model Groq lists — picked as a writer, every hand-off failed (400)
   const PREFER = ['gpt-oss-120b','kimi-k2','qwen3-235b','qwen-3-235b','llama-4-maverick','deepseek-v3','llama-3.3-70b','mistral-large','mistral-medium','qwen3-32b','qwen-3-32b','llama-4-scout','mistral-small','gpt-oss-20b','gemma-3-27b','ministral-8b','llama-3.1-8b','llama3.1-8b'];
   const sizeB = m => Number((m.match(/(\d+(?:\.\d+)?)b\b/i) || [])[1] || 0);
   // a giant free model (400B+, or an "ultra" reasoning one) is queued and thinks for minutes: after the mid-size ones
