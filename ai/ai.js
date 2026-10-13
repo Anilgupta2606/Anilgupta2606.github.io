@@ -164,7 +164,9 @@ const MoneyAI = (function(){
     if(res.status === 404) throw Unavailable(name + ': model not available to this key.', 404);
     if(res.status === 400 && /image|vision|multimodal|content type/i.test(body)) throw Unavailable(name + ' cannot read images with this model.', 400);
     if(res.status >= 500) throw Unavailable(name + ' is busy right now.', res.status);
-    throw Unavailable(name + ' returned an error (' + res.status + ').', res.status);
+    // what the service said, short (a bare "error (400)" hid why every hand-off to Groq failed)
+    let said = ''; try{ const j = JSON.parse(body); said = String((j.error && (j.error.message || j.error)) || j.message || '').slice(0, 160); }catch(e){ said = String(body).replace(/\s+/g, ' ').slice(0, 160); }
+    throw Unavailable(name + ' returned an error (' + res.status + ')' + (said ? ': ' + said : '') + '.', res.status);
   }
   /* opts.images: [{mime, b64}] (only services that can see get them); opts.search: Gemini looks on the web.
      -> {text, sources:[{title, url}]} */
@@ -449,8 +451,14 @@ const MoneyAI = (function(){
     const base = OPENAI_BASE[id];
     const headers = {Authorization:'Bearer ' + key};
     if(id === 'openrouter'){ headers['HTTP-Referer'] = location.origin; headers['X-Title'] = 'Money Home'; }
-    const body = json => Object.assign({model, temperature: temp(opts), max_tokens:8192, messages:[{role:'system', content:system}].concat(turns)}, json ? {response_format: {type: 'json_object'}} : {});
+    let maxTok = 8192;
+    const body = json => Object.assign({model, temperature: temp(opts), max_tokens: maxTok, messages:[{role:'system', content:system}].concat(turns)}, json ? {response_format: {type: 'json_object'}} : {});
     let res = await post(base + '/chat/completions', headers, body(!!opts.schema), signal, 90000);
+    // a model that takes fewer output tokens ("`max_tokens` must be less than or equal to `4096`"): asked again within it
+    if(res.status === 400){ const said = await res.clone().text().catch(()=>''), m = /max_tokens[^0-9]{0,80}?(\d{3,6})/i.exec(said);
+      if(m && +m[1] < maxTok){ maxTok = +m[1]; res = await post(base + '/chat/completions', headers, body(!!opts.schema), signal, 90000); }
+      // a small context ("Please reduce the length of the messages or completion"): the room kept for the answer is made smaller
+      else if(/reduce the length|context length|maximum context|context window/i.test(said) && maxTok > 2500){ maxTok = 2500; res = await post(base + '/chat/completions', headers, body(!!opts.schema), signal, 90000); } }
     // some models refuse the JSON switch: ask again without it (the instructions still ask for JSON)
     if(opts.schema && res.status === 400 && /response_format|json/i.test(await res.clone().text().catch(()=>''))) res = await post(base + '/chat/completions', headers, body(false), signal, 90000);
     if(!res.ok) await failure(name, res, id);
@@ -460,7 +468,7 @@ const MoneyAI = (function(){
     return {text: text.replace(/<think>[\s\S]*?<\/think>/g, ''), sources: []};     // reasoning models think out loud first
   }
 
-  const NOT_CHAT = /embed|tts|whisper|audio|speech|transcribe|image-gen|imagen|veo|lyria|dall|guard|moderation|rerank|live|realtime|robotics|computer-use|omni|customtools|aqa|learnlm|compound|playai|safeguard/i;
+  const NOT_CHAT = /embed|tts|whisper|audio|speech|transcribe|image-gen|imagen|veo|lyria|dall|guard|moderation|rerank|live|realtime|robotics|computer-use|omni|customtools|aqa|learnlm|compound|playai|safeguard|orpheus|voice|music|sound|vocal/i;      // orpheus: a text-to-speech model Groq lists — picked as a writer, every hand-off failed (400)
   const PREFER = ['gpt-oss-120b','kimi-k2','qwen3-235b','qwen-3-235b','llama-4-maverick','deepseek-v3','llama-3.3-70b','mistral-large','mistral-medium','qwen3-32b','qwen-3-32b','llama-4-scout','mistral-small','gpt-oss-20b','gemma-3-27b','ministral-8b','llama-3.1-8b','llama3.1-8b'];
   const sizeB = m => Number((m.match(/(\d+(?:\.\d+)?)b\b/i) || [])[1] || 0);
   // a giant free model (400B+, or an "ultra" reasoning one) is queued and thinks for minutes: after the mid-size ones
