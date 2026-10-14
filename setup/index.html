@@ -228,7 +228,12 @@ function macRemoteHtml(){
     <div class="row end"><button class="btn primary" id="mac-ts-in">Sign in to your Mac</button><span class="note" id="mac-ts-res"></span></div>
   </details>`;
 }
+function bindKeys(){
+  const mv = $('keys-move'); if(mv) mv.onclick = async ()=>{ mv.disabled = true; mv.textContent = 'Moving…'; const ok = await MoneyAI.keysToMac(true); if(ok) await MoneyAI.macLights(); render(); toast(ok ? 'Your keys are in your own AI now — manage them there.' : 'Your Mac could not be reached — nothing was moved.'); };
+  const rf = $('keys-refresh'); if(rf) rf.onclick = async ()=>{ rf.disabled = true; await MoneyAI.keysToMac(true); await MoneyAI.macLights(); render(); };
+}
 function bindMac(){
+  bindKeys();
   const set = v => { const h = MoneyAI.aiLocal(); h.mac = v; if(!v && h.first === 'mac') h.first = 'auto'; MoneyAI.saveAiLocal(h); changed(); delete results.mac; };
   const off = $('mac-off'); if(off) off.onclick = ()=>{ set(false); render(); toast('Your Mac’s AI is off.'); };
   const on = $('mac-on'); if(on) on.onclick = ()=>{ set(true); macCheck(true); toast('Your Mac’s AI is on — every app asks it first.'); };
@@ -317,8 +322,25 @@ function bindWeb(){
   if(off) off.onclick = ()=>{ const h = MoneyAI.aiLocal(); delete h.relay; MoneyAI.saveAiLocal(h); WEBTEST = null; render(); };
 }
 
+/* keys live in your own AI (on the Mac): this card only shows its models, with their lights, and links to where the
+   keys are kept; nothing to type here */
+const LIGHT = {green: 'ready', yellow: 'rest', red: 'bad'};
+function managedCard(s){
+  const L = (()=>{ try{ return (JSON.parse(localStorage.getItem(MoneyAI.LIGHTS_KEY) || '{}').lights) || {}; }catch(e){ return {}; } })();
+  const list = MoneyAI.macModels(MAC.models || (()=>{ try{ return JSON.parse(localStorage.getItem('money-ai-mac') || '{}').info; }catch(e){ return null; } })());
+  const backup = s.backup ? MoneyAI.PROVIDERS.find(p=>p.id === s.backup) : null;
+  const rows = list.filter(([id])=>L[id]).map(([id, name])=>`<div class="prov"><div class="pname"><b>${esc(name.replace(/ — .*/, ''))}</b><small>${esc(L[id].why || '')}</small></div><span class="st ${LIGHT[L[id].light] || ''}">${L[id].light === 'green' ? 'ready' : L[id].light === 'yellow' ? 'resting' : 'needs a key'}</span></div>`).join('');
+  return `<section class="card" id="ai">
+    <h2><span class="n">3</span>AI — your own AI, in every app</h2>
+    <p class="cap">Your AI keys are kept in <b>one place: your own AI on your Mac</b>. Every app asks it, and you pick the model from the <b>AI</b> button in any app. To add, replace or remove a key: <a href="https://anilgupta2606.github.io/ai/chat/#keys" target="_blank" rel="noopener">open your AI → 🔑 Your AI keys</a>.</p>
+    ${macRow(s)}
+    ${rows || '<p class="note">Open this page while your Mac is reachable to see each model’s light.</p>'}
+    <p class="note">${backup ? `When your Mac cannot be reached, this device uses one backup key your AI gave it: <b>${esc(backup.name)}</b> (refreshed daily).` : 'No backup key on this device yet — it is fetched from your Mac the next time it is reachable.'} <button class="btn" id="keys-refresh">Refresh from my AI</button></p>
+  </section>`;
+}
 function aiCard(){
   const s = MoneyAI.aiSettings(), hub = MoneyAI.aiLocal(), status = MoneyAI.aiStatus();
+  if(s.managed) return managedCard(s);
   const rows = MoneyAI.PROVIDERS.map(p=>{
     if(p.id === 'mac') return macRow(s);
     const k = s.keys[p.id], r = MoneyAI.resting(p.id), on = s.off.indexOf(p.id) < 0;
@@ -346,6 +368,7 @@ function aiCard(){
       <label class="check"><input type="checkbox" id="fallback" ${s.fallback ? 'checked' : ''}> If it fails, try the others</label>
     </div>
     ${rows}
+    ${MAC.up ? `<p class="note"><b>Keep your keys in one place:</b> move them into your own AI on your Mac — then every app uses it, and no app keeps keys. <button class="btn primary" id="keys-move">Move my keys to my own AI</button></p>` : ''}
     <div class="row end"><button class="btn primary" id="save">Save keys</button><button class="btn" id="testall">Test all</button><button class="btn" id="adopt">Bring in keys from my apps</button></div>
     <p class="note">Keys stay in this browser and go only to the AI services, straight from here${MoneyShared.status().setup ? '; sync carries them to your other devices, encrypted' : ''}. Your Mac’s AI needs no key and stays on the Mac: on your phone the apps go straight to the next AI. ATS on your Mac keeps its own AI settings.</p>
   </section>`;
@@ -378,8 +401,8 @@ function bind(){
   on('reuse', ()=>run(async ()=>{ const c = MoneyShared.existing(); return setupText(await MoneyShared.setUp(c.token, c.pass)); }));
   on('syncnow', ()=>run(async ()=>{ const r = await MoneyShared.sync(); return 'Synced: ' + r.keys + ' AI key' + (r.keys === 1 ? '' : 's') + (r.signIn ? ' and the sign-in' : '') + '.'; }));
   on('forget', ()=>{ MoneyShared.forget(); message = {ok: true, text: 'Settings sync stopped on this device (each app’s own sync is unchanged).'}; render(); });
-  $('first').onchange = e=>{ const h = MoneyAI.aiLocal(); h.first = e.target.value; MoneyAI.saveAiLocal(h); changed(); render(); };
-  $('fallback').onchange = e=>{ const h = MoneyAI.aiLocal(); h.fallback = e.target.checked; MoneyAI.saveAiLocal(h); changed(); render(); };
+  if($('first')) $('first').onchange = e=>{ const h = MoneyAI.aiLocal(); h.first = e.target.value; MoneyAI.saveAiLocal(h); changed(); render(); };
+  if($('fallback')) $('fallback').onchange = e=>{ const h = MoneyAI.aiLocal(); h.fallback = e.target.checked; MoneyAI.saveAiLocal(h); changed(); render(); };
   on('save', async ()=>{
     const h = MoneyAI.aiLocal(); h.keys = h.keys || {};
     let n = 0;
@@ -411,10 +434,10 @@ function bind(){
     return;
   }
   await MoneyAI.loadAi();
-  if(MoneyAI.adoptAppKeys()) changed();        // first visit: the keys your apps already have
+  if(!MoneyAI.aiSettings().managed && MoneyAI.adoptAppKeys()) changed();        // first visit: the keys your apps already have
   source = await MoneyShared.loginSource();
   render();
-  macCheck();
+  macCheck().then(async ()=>{ if(MAC.up && MoneyAI.aiSettings().managed){ await MoneyAI.macLights(); render(); } });
   if(location.hash){ const t = document.querySelector(location.hash); if(t) t.scrollIntoView(); }
   const r = await MoneyShared.quiet();         // settings from your other device, if it changed them
   if(r){ source = await MoneyShared.loginSource(); render(); }
