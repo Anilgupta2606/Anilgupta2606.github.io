@@ -15,6 +15,26 @@ const MoneyAI = (function(){
   const lsSet = (k, v) => { try{ if(v === undefined) localStorage.removeItem(k); else localStorage.setItem(k, JSON.stringify(v)); }catch(e){} };
 
   /* The Expense Tracker's AI settings in this browser (read only; a missing database is never created). */
+  // the Expense Tracker's own copy of the keys, deleted once your own AI has them (only those; its other settings stay)
+  async function clearExpenseTracker(have){
+    try{
+      if(!window.indexedDB || !have || !have.length) return 0;
+      if(indexedDB.databases && !(await indexedDB.databases()).some(d=>d.name === 'expense-tracker')) return 0;
+      const db = await new Promise((res, rej)=>{ const r = indexedDB.open('expense-tracker'); r.onupgradeneeded = ()=>{ try{ r.transaction.abort(); }catch(e){} }; r.onsuccess = ()=>res(r.result); r.onerror = ()=>rej(r.error); });
+      try{
+        if(!db.objectStoreNames.contains('kv')) return 0;
+        const tx = db.transaction('kv', 'readwrite'), store = tx.objectStore('kv');
+        const s = await new Promise((res, rej)=>{ const r = store.get('state'); r.onsuccess = ()=>res(r.result); r.onerror = ()=>rej(r.error); });
+        const st = s && s.settings; if(!st) return 0;
+        let n = 0;
+        if(st.aiKeys) Object.keys(st.aiKeys).forEach(id=>{ if(have.indexOf(id) >= 0){ delete st.aiKeys[id]; n++; } });
+        if(st.geminiKey && have.indexOf('gemini') >= 0){ delete st.geminiKey; n++; }
+        if(n) await new Promise((res, rej)=>{ const r = store.put(s, 'state'); r.onsuccess = res; r.onerror = ()=>rej(r.error); });
+        if(n && etAi) Object.keys(etAi.keys || {}).forEach(id=>{ if(have.indexOf(id) >= 0) delete etAi.keys[id]; });
+        return n;
+      } finally { db.close(); }
+    }catch(e){ return 0; }
+  }
   async function expenseTracker(){
     try{
       if(!window.indexedDB) return null;
@@ -82,10 +102,11 @@ const MoneyAI = (function(){
   const BACKUP_KEY = 'money-ai-backup';
   function macManaged(){
     const own = aiLocal(); if(!own.keysOnMac || own.mac === false) return null;
-    const b = lsGet(BACKUP_KEY, null), keys = {mac: MAC_URL}, from = {mac: 'mac'}, order = ['mac'];
-    if(b && b.id && b.key && PROVIDERS.some(p=>p.id === b.id)){ keys[b.id] = b.key; from[b.id] = 'backup'; order.push(b.id); }
+    const b = lsGet(BACKUP_KEY, null) || {}, keys = {mac: MAC_URL}, from = {mac: 'mac'}, order = ['mac'];
+    const list = b.list || (b.id ? [{id: b.id, key: b.key}] : []);
+    list.forEach(x=>{ if(x && x.id && x.key && !keys[x.id] && PROVIDERS.some(p=>p.id === x.id)){ keys[x.id] = x.key; from[x.id] = 'backup'; order.push(x.id); } });
     PROVIDERS.forEach(p=>{ if(order.indexOf(p.id) < 0) order.push(p.id); });
-    return {keys, from, order, off: [], first: 'mac', fallback: true, model: Object.assign({}, own.model || {}), managed: true, backup: b && b.id || ''};
+    return {keys, from, order, off: [], first: 'mac', fallback: true, model: Object.assign({}, own.model || {}), managed: true, backup: list.map(x=>x.id).filter(id=>keys[id])};
   }
   function aiSettings(){
     const managed = macManaged(); if(managed) return managed;
@@ -338,7 +359,8 @@ const MoneyAI = (function(){
       // cleared here only once the Mac has them
       const clear = (k, o) => { if(!o || !o.keys) return; let n = 0; Object.keys(o.keys).forEach(id=>{ if(have.indexOf(id) >= 0){ delete o.keys[id]; n++; } }); if(n) lsSet(k, o); };
       const now = aiLocal(); clear(AI_KEY, now); clear('tripvault-ai', lsGet('tripvault-ai', null)); clear('ledger-ai', lsGet('ledger-ai', null)); clear(SYNCED_AI, lsGet(SYNCED_AI, null));
-      try{ const b = await (await macFetch('/keys/backup')).json(); lsSet(BACKUP_KEY, b && b.id && b.key ? {id: b.id, key: b.key, at: Date.now()} : {at: Date.now()}); }catch(e){}
+      await clearExpenseTracker(have);
+      try{ const b = await (await macFetch('/keys/backup')).json(); lsSet(BACKUP_KEY, {list: (b.keys || (b.id ? [b] : [])).filter(x=>x && x.id && x.key).map(x=>({id: x.id, key: x.key})), at: Date.now()}); }catch(e){}
       const after = aiLocal(); after.keysOnMac = true; after.first = 'mac'; saveAiLocal(after);
       if(typeof MoneyShared !== 'undefined') try{ MoneyShared.markChanged(); }catch(e){}
       changed(); return true;
@@ -986,8 +1008,9 @@ MoneyAI.widget = (function(){
       const L = (lsGet(MoneyAI.LIGHTS_KEY, {}) || {}).lights || {}, up = MoneyAI.macMaybe(), pick = s.model.mac || 'auto';
       const dot = id => { const l = L[id] || (/^cloud:|^local:/.test(id) ? null : L[(id === 'council' ? 'cloud:gemini' : id)]); return !l ? (id === 'auto' || id === 'council' || id === 'deep' ? 'good' : '') : l.light === 'green' ? 'good' : l.light === 'yellow' ? 'lim' : 'bad'; };
       const list = MoneyAI.macModels(lsGet('money-ai-mac', {}).info).map(([id, name])=>({id, name, dot: dot(id), why: (L[id] || {}).why || ''}));
-      const backup = s.backup ? MoneyAI.PROVIDERS.find(p=>p.id === s.backup) : null;
-      return {s, managed: true, up, pick, list, backup, inUse: up ? list.find(x=>x.id === pick) || list[0] : backup ? {id: backup.id, name: backup.name + ' (backup)'} : null};
+      const backups = (s.backup || []).map(id=>MoneyAI.PROVIDERS.find(p=>p.id === id)).filter(Boolean);
+      const backup = backups.find(p=>!MoneyAI.resting(p.id)) || backups[0] || null;
+      return {s, managed: true, up, pick, list, backup, backups, inUse: up ? list.find(x=>x.id === pick) || list[0] : backup ? {id: backup.id, name: backup.name + ' (backup)'} : null};
     }
     const answering = MoneyAI.aiStatus();                      // the ones that will be asked, in order
     const inUse = answering.find(x=>!x.resting) || null;       // who answers the next question
@@ -1016,7 +1039,7 @@ MoneyAI.widget = (function(){
     if(st.managed){
       const rows = st.list.map(x=>`<label class="mai-opt${st.pick === x.id ? ' on' : ''}" title="${esc(x.why)}"><input type="radio" name="mai-mac" data-mac="${esc(x.id)}" ${st.pick === x.id ? 'checked' : ''}>
         <span class="mai-dot ${x.dot}"></span><span class="t"><b>${esc(String(x.name).replace(/ — .*/, ''))}</b><small>${esc(x.why || String(x.name).replace(/^[^—]*— ?/, '') || '')}</small></span>${st.up && st.pick === x.id ? '<span class="mai-now">in use</span>' : ''}</label>`);
-      return `<h4>Your own AI</h4><p class="mai-sub">${st.up ? 'Every app asks it. Pick the model — the same in all your apps.' : 'Your Mac cannot be reached' + (st.backup ? ' — using the backup key: ' + esc(st.backup.name) + '.' : ' and there is no backup key.')}</p>
+      return `<h4>Your own AI</h4><p class="mai-sub">${st.up ? 'Every app asks it. Pick the model — the same in all your apps.' : 'Your Mac cannot be reached' + (st.backup ? ' — using the backup keys: ' + st.backups.map(p=>esc(short(p.name))).join(', then ') + '.' : ' and there is no backup key.')}</p>
         ${rows.join('')}
         <div class="mai-foot"><a href="${AI_PAGE}" target="_blank" rel="noopener">Keys — managed in your own AI</a></div>`;
     }
