@@ -965,6 +965,9 @@ MoneyAI.widget = (function(){
 .mai-dot.good{background:#1FB36B;box-shadow:0 0 0 3px rgb(31 179 107 / .2)}
 .mai-dot.lim{background:#F2A516;box-shadow:0 0 0 3px rgb(242 165 22 / .2)}
 .mai-dot.bad{background:#E5484D}
+.mai-more{margin-top:6px}.mai-more summary{cursor:pointer;padding:8px 6px;color:#1F6B72;font-weight:600;list-style-position:inside}
+:root[data-theme="dark"] .mai-more summary{color:#3CCFCF}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]) .mai-more summary{color:#3CCFCF} }
 .mai-pop{position:absolute;right:0;top:calc(100% + 8px);z-index:1000;width:320px;max-width:calc(100vw - 24px);background:#fff;color:#0B2545;border:1px solid #D5E0EB;border-radius:16px;box-shadow:0 18px 44px -12px rgb(11 37 69 / .35);max-height:min(70vh,560px);overflow:auto;overscroll-behavior:contain;padding:14px;font:14px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif;text-align:left}
 .mai-pop[hidden]{display:none}
 .mai-pop.mai-up{top:auto;bottom:calc(100% + 8px)}
@@ -1037,13 +1040,25 @@ MoneyAI.widget = (function(){
     return {dot, name, model, title};
   }
   const AI_PAGE = 'https://anilgupta2606.github.io/ai/chat/#keys';
+  let moreOpen = false;
   function popHTML(st){
     if(st.managed){
-      const rows = st.list.map(x=>`<label class="mai-opt${st.pick === x.id ? ' on' : ''}" title="${esc(x.why)}"><input type="radio" name="mai-mac" data-mac="${esc(x.id)}" ${st.pick === x.id ? 'checked' : ''}>
-        <span class="mai-dot ${x.dot}"></span><span class="t"><b>${esc(String(x.name).replace(/ — .*/, '').replace(/ \((your key, )?on the Mac(, private)?\)$/, ''))}</b><small>${esc(x.why || String(x.name).replace(/^[^—]*— ?/, '') || '')}</small></span>${st.up && st.pick === x.id ? '<span class="mai-now">in use</span>' : ''}</label>`);
-      return `<h4>Your own AI</h4><p class="mai-sub">${st.up ? 'Every app asks it. Pick the model — the same in all your apps.' : 'Your Mac cannot be reached' + (st.backup ? ' — using the backup keys: ' + st.backups.map(p=>esc(short(p.name))).join(', then ') + '.' : ' and there is no backup key.')}</p>
-        ${rows.join('')}
-        <div class="mai-foot"><a href="${AI_PAGE}" target="_blank" rel="noopener">Keys — managed in your own AI</a></div>`;
+      const nm = n => String(n).replace(/ — .*/, '').replace(/ \((your key, )?on the Mac(, private)?\)$/, '');
+      const foot = `<div class="mai-foot"><a href="${AI_PAGE}" target="_blank" rel="noopener">Keys — managed in your own AI</a></div>`;
+      // the Mac asleep or away: only the backup keys can answer — they are shown, tried in turn
+      if(!st.up){
+        const rows = st.backups.map(p=>{ const r = MoneyAI.resting(p.id); return `<div class="mai-opt"><span class="mai-dot ${r ? 'lim' : 'good'}"></span><span class="t"><b>${esc(short(p.name))}</b><small>${r ? 'at its free limit — back ' + esc(MoneyAI.backAt(r.until)) : 'ready'}</small></span>${st.backup && st.backup.id === p.id ? '<span class="mai-now">in use</span>' : ''}</div>`; });
+        return `<h4>Your own AI is offline</h4><p class="mai-sub">${st.backups.length ? 'Your Mac is asleep or out of reach, so the backup keys answer, one after another:' : 'Your Mac is asleep or out of reach, and this device has no backup key yet.'}</p>${rows.join('')}${foot}`;
+      }
+      // awake: Auto picks for each question and switches by itself; picking one model is there, folded away
+      const auto = st.list.find(x=>x.id === 'auto') || {id: 'auto', dot: 'good'}, others = st.list.filter(x=>x.id !== 'auto');
+      const row = x => `<label class="mai-opt${st.pick === x.id ? ' on' : ''}" title="${esc(x.why)}"><input type="radio" name="mai-mac" data-mac="${esc(x.id)}" ${st.pick === x.id ? 'checked' : ''}>
+        <span class="mai-dot ${x.dot}"></span><span class="t"><b>${esc(nm(x.name))}</b><small>${esc(x.why || String(x.name).replace(/^[^—]*— ?/, '') || '')}</small></span>${st.pick === x.id ? '<span class="mai-now">in use</span>' : ''}</label>`;
+      const picked = st.pick !== 'auto' && others.find(x=>x.id === st.pick);
+      return `<h4>Your own AI</h4><p class="mai-sub">The same in all your apps.</p>
+        ${row(Object.assign({}, auto, {name: 'Auto', why: 'Picks the best model for each question, and switches by itself when one is busy'}))}
+        ${others.length ? `<details class="mai-more"${picked || moreOpen ? ' open' : ''}><summary>${picked ? 'Your pick: ' + esc(nm(picked.name)) : 'Pick one model yourself'}</summary>${others.map(row).join('')}</details>` : ''}
+        ${foot}`;
     }
     const {s, list, inUse} = st;
     const opt = (value, on, title, sub, dot, now) => `<label class="mai-opt${on ? ' on' : ''}"><input type="radio" name="mai-first-${value === 'auto' ? 'a' : 'p'}" data-first="${value}" ${on ? 'checked' : ''}>
@@ -1063,6 +1078,7 @@ MoneyAI.widget = (function(){
   }
   function drawPop(m, st){
     m.pop.innerHTML = popHTML(st || state());
+    const more = m.pop.querySelector('.mai-more'); if(more) more.ontoggle = ()=>{ moreOpen = more.open; };
     m.pop.querySelectorAll('[data-mac]').forEach(r=>r.onchange = ()=>{
       const h = MoneyAI.aiLocal(); h.model = Object.assign({}, h.model, {mac: r.dataset.mac}); h.first = 'mac';
       MoneyAI.saveAiLocal(h); if(typeof MoneyShared !== 'undefined') MoneyShared.markChanged();
