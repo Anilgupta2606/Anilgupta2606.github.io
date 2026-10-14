@@ -87,7 +87,7 @@ const MoneyAI = (function(){
   const aiLocal = () => lsGet(AI_KEY, {keys:{}, order:[], off:[]});
   const saveAiLocal = s => lsSet(AI_KEY, s);
   let etAi = null;
-  async function loadAi(){ const et = await expenseTracker(); etAi = et ? et.ai : null; try{ keysToMac(); }catch(e){} return aiSettings(); }
+  async function loadAi(){ const et = await expenseTracker(); etAi = et ? et.ai : null; try{ keysToMac().then(ok=>{ if(ok && Date.now() - ((lsGet(LIGHTS_KEY, {}) || {}).at || 0) > 600000) macLights(); }); }catch(e){} return aiSettings(); }
   /* Keys found in the apps' own settings, for services the hub has no key for (first visit, or a key added in an app). */
   function adoptAppKeys(){
     const s = aiSettings(), hub = aiLocal(); hub.keys = hub.keys || {};
@@ -372,6 +372,8 @@ const MoneyAI = (function(){
   const LIGHTS_KEY = 'money-ai-lights';
   async function macLights(){
     try{
+      // the Mac's models too: without them the list was only Auto and ChatGPT in an app that had not opened Setup
+      try{ const m = await (await macFetch('/models')).json(); if(m && (m.apple || m.cloud || m.local)) lsSet(MAC_KEY, Object.assign({}, lsGet(MAC_KEY, {}), {info: {apple: m.apple, cloud: m.cloud, local: (m.local || []).map(x=>({name: x.name}))}})); }catch(e){}
       const d = await (await macFetch('/keys/status')).json(), out = {};
       (d.services || []).forEach(x=>{ out[x.kind === 'cloud' ? 'cloud:' + x.id : x.id] = {light: x.light, why: x.why, hasKey: x.hasKey}; });
       lsSet(LIGHTS_KEY, {at: Date.now(), lights: out}); changed(); return out;
@@ -963,7 +965,7 @@ MoneyAI.widget = (function(){
 .mai-dot.good{background:#1FB36B;box-shadow:0 0 0 3px rgb(31 179 107 / .2)}
 .mai-dot.lim{background:#F2A516;box-shadow:0 0 0 3px rgb(242 165 22 / .2)}
 .mai-dot.bad{background:#E5484D}
-.mai-pop{position:absolute;right:0;top:calc(100% + 8px);z-index:1000;width:320px;max-width:calc(100vw - 24px);background:#fff;color:#0B2545;border:1px solid #D5E0EB;border-radius:16px;box-shadow:0 18px 44px -12px rgb(11 37 69 / .35);padding:14px;font:14px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif;text-align:left}
+.mai-pop{position:absolute;right:0;top:calc(100% + 8px);z-index:1000;width:320px;max-width:calc(100vw - 24px);background:#fff;color:#0B2545;border:1px solid #D5E0EB;border-radius:16px;box-shadow:0 18px 44px -12px rgb(11 37 69 / .35);max-height:min(70vh,560px);overflow:auto;overscroll-behavior:contain;padding:14px;font:14px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif;text-align:left}
 .mai-pop[hidden]{display:none}
 .mai-pop.mai-up{top:auto;bottom:calc(100% + 8px)}
 .mai-pop.mai-left{right:auto;left:0}
