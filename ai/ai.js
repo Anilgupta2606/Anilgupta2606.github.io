@@ -1040,7 +1040,7 @@ MoneyAI.widget = (function(){
   function popHTML(st){
     if(st.managed){
       const rows = st.list.map(x=>`<label class="mai-opt${st.pick === x.id ? ' on' : ''}" title="${esc(x.why)}"><input type="radio" name="mai-mac" data-mac="${esc(x.id)}" ${st.pick === x.id ? 'checked' : ''}>
-        <span class="mai-dot ${x.dot}"></span><span class="t"><b>${esc(String(x.name).replace(/ — .*/, ''))}</b><small>${esc(x.why || String(x.name).replace(/^[^—]*— ?/, '') || '')}</small></span>${st.up && st.pick === x.id ? '<span class="mai-now">in use</span>' : ''}</label>`);
+        <span class="mai-dot ${x.dot}"></span><span class="t"><b>${esc(String(x.name).replace(/ — .*/, '').replace(/ \((your key, )?on the Mac(, private)?\)$/, ''))}</b><small>${esc(x.why || String(x.name).replace(/^[^—]*— ?/, '') || '')}</small></span>${st.up && st.pick === x.id ? '<span class="mai-now">in use</span>' : ''}</label>`);
       return `<h4>Your own AI</h4><p class="mai-sub">${st.up ? 'Every app asks it. Pick the model — the same in all your apps.' : 'Your Mac cannot be reached' + (st.backup ? ' — using the backup keys: ' + st.backups.map(p=>esc(short(p.name))).join(', then ') + '.' : ' and there is no backup key.')}</p>
         ${rows.join('')}
         <div class="mai-foot"><a href="${AI_PAGE}" target="_blank" rel="noopener">Keys — managed in your own AI</a></div>`;
