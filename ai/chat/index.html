@@ -329,7 +329,8 @@ code{font-family:var(--mono); font-size:.85em; background:var(--page2); padding:
 .kdot{width:11px; height:11px; border-radius:50%; flex:none; box-shadow:0 0 0 3px color-mix(in srgb, currentColor 18%, transparent)}
 .kdot.green{background:#22c55e; color:#22c55e} .kdot.yellow{background:#f5b301; color:#f5b301} .kdot.red{background:#ef4444; color:#ef4444}
 .krow .kedit{display:flex; gap:8px; flex-wrap:wrap} .krow .kedit input{flex:1 1 180px; min-width:0; padding:9px 11px; border-radius:10px; border:1px solid var(--line); background:var(--page); color:var(--ink); font:inherit}
-.krow .kedit button{padding:8px 12px} .kgroup{margin:16px 0 8px; font:600 12px/1 var(--display); letter-spacing:.06em; text-transform:uppercase; color:var(--ink2)}
+.krow .kedit button{padding:8px 12px} .kmore{margin-top:6px}.kkey{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:2px 0}.kkey button{padding:4px 10px;font-size:12px}
+.kgroup{margin:16px 0 8px; font:600 12px/1 var(--display); letter-spacing:.06em; text-transform:uppercase; color:var(--ink2)}
 .panel h2{font:700 28px var(--display); letter-spacing:-.02em; margin:0 0 4px}
 .panel h3{font:700 15px var(--body); margin:24px 0 10px; display:flex; align-items:center; gap:8px}
 .panel h3 i{width:10px; height:10px; border-radius:50%}
@@ -1700,14 +1701,16 @@ async function loadKeys(){
   let st = null; try{ st = await fetch(HELPER + '/keys/status').then(r=>r.json()); }catch(e){}
   if(!st || !st.services){ box.innerHTML = '<p class="sub">Your Mac\'s AI is not answering — is the helper running?</p>'; return; }
   const row = x => `<div class="krow" data-k="${esc(x.id)}"><div class="khead"><span class="kdot ${esc(x.light)}" title="${esc(x.light)}"></span><b>${esc(x.name)}</b>${x.ending ? `<small>${esc(x.ending)}</small>` : ''}${(st.backup || []).includes(x.id) ? '<small title="Kept by Money Home for when your Mac is off">backup</small>' : ''}</div><small>${esc(x.why)}</small>`
-    + (x.kind === 'cloud' ? `<div class="kedit"><input type="password" autocomplete="off" spellcheck="false" placeholder="${x.hasKey ? 'Paste a new key to replace it' : 'Paste your key (' + esc(x.hint || '') + ')'}"><button class="ghost" data-act="save" type="button">Save</button>${x.hasKey ? '<button class="ghost" data-act="test" type="button">Test</button><button class="ghost" data-act="remove" type="button">Remove</button>' : ''}</div><small><a href="${esc(x.signup)}" target="_blank" rel="noopener">Get a ${x.hasKey ? 'new ' : ''}key</a></small>` : '') + '</div>';
+    + (x.kind === 'cloud' && x.count > 1 ? `<div class="kmore"><small>${x.count} keys — when the one in use hits its limit, the next takes over:</small>` + [{ending: x.ending, now: true}].concat(x.spare || []).map(k=>`<div class="kkey"><small>${esc(k.ending)} · ${k.now ? 'in use' : k.restingUntil ? 'resting — back at ' + new Date(k.restingUntil).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'}) : 'ready, next in turn'}</small><button class="ghost" data-act="remove1" data-end="${esc(k.ending)}" type="button">Remove</button></div>`).join('') + '</div>' : '')
+    + (x.kind === 'cloud' ? `<div class="kedit"><input type="password" autocomplete="off" spellcheck="false" placeholder="${x.hasKey ? 'Add another account\'s key' : 'Paste your key (' + esc(x.hint || '') + ')'}"><button class="ghost" data-act="save" type="button">${x.hasKey ? 'Add' : 'Save'}</button>${x.hasKey ? '<button class="ghost" data-act="test" type="button">Test</button>' + (x.count > 1 ? '' : '<button class="ghost" data-act="remove" type="button">Remove</button>') : ''}</div><small><a href="${esc(x.signup)}" target="_blank" rel="noopener">Get a ${x.hasKey ? 'key from another account' : 'key'}</a></small>` : '') + '</div>';
   const group = (title, kind) => { const L = st.services.filter(x=>x.kind === kind); return L.length ? `<div class="kgroup">${title}</div>` + L.map(row).join('') : ''; };
   box.innerHTML = group('Through your Mac (no key needed)', 'apple') + group('Cloud keys', 'cloud') + group('Models on this Mac', 'mac');
   box.querySelectorAll('.krow [data-act]').forEach(b=>b.onclick = async () => {
     const r = b.closest('.krow'), id = r.dataset.k, act = b.dataset.act, inp = r.querySelector('input');
     b.disabled = true; b.textContent = act === 'test' ? 'Testing…' : act === 'save' ? 'Saving…' : 'Removing…';
     try{
-      if(act === 'save'){ const v = inp.value.trim(); if(v.length < 10){ toast('Paste the whole key first'); return loadKeys(); } const j = await post('/keys', {keys: {[id]: v}}); inp.value = ''; toast((j.saved || []).includes(id) ? 'Saved — testing it now' : 'That does not look like a key'); setTimeout(loadKeys, 6000); }
+      if(act === 'save'){ const v = inp.value.trim(); if(v.length < 10){ toast('Paste the whole key first'); return loadKeys(); } const j = await post('/keys', {keys: {[id]: v}}); inp.value = ''; toast((j.saved || []).includes(id) ? (r.querySelector('[data-act="test"]') ? 'Added — used when the key before it hits its limit' : 'Saved — testing it now') : 'That does not look like a key'); setTimeout(loadKeys, 6000); }
+      else if(act === 'remove1'){ await post('/keys', {remove: id, ending: b.dataset.end}); toast('Removed ' + b.dataset.end); }
       else if(act === 'test'){ const j = await post('/keys/test', {id}); toast(j.ok ? 'It works ✓' : 'Not working: ' + (j.why || '').slice(0, 90)); }
       else if(act === 'remove'){ await post('/keys', {remove: id}); toast('Removed'); }
     }catch(e){ toast('That did not work: ' + e.message); }
