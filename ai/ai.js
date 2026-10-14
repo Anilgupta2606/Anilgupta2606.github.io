@@ -49,6 +49,7 @@ const MoneyAI = (function(){
   const SYNCED_AI = 'tripvault-ai-synced';          // keys that came from another device through Trip Vault's encrypted sync
   /* The keys this device uses, to carry to your other devices inside the encrypted sync (not Ollama: it is this computer's). */
   function shareableAi(){
+    if(aiLocal().keysOnMac) return {keys: {}, order: [], model: {}};      // keys are on the Mac now: none travel between devices
     const s = aiSettings(), keys = {};
     Object.entries(s.keys).forEach(([id, k])=>{ if(!DEVICE_ONLY[id] && s.from[id] !== 'synced') keys[id] = k; });
     return {keys, order: s.order, model: s.model};
@@ -66,7 +67,7 @@ const MoneyAI = (function(){
   const aiLocal = () => lsGet(AI_KEY, {keys:{}, order:[], off:[]});
   const saveAiLocal = s => lsSet(AI_KEY, s);
   let etAi = null;
-  async function loadAi(){ const et = await expenseTracker(); etAi = et ? et.ai : null; return aiSettings(); }
+  async function loadAi(){ const et = await expenseTracker(); etAi = et ? et.ai : null; try{ keysToMac(); }catch(e){} return aiSettings(); }
   /* Keys found in the apps' own settings, for services the hub has no key for (first visit, or a key added in an app). */
   function adoptAppKeys(){
     const s = aiSettings(), hub = aiLocal(); hub.keys = hub.keys || {};
@@ -76,7 +77,18 @@ const MoneyAI = (function(){
     return added;
   }
   /* Keys: the hub's first, then any app's own (Trip Vault, the Expense Tracker, the Ledger), then another device's. */
+  /* YOUR KEYS LIVE IN YOUR OWN AI (on the Mac): once this device has handed its keys over (keysOnMac), no app's keys are
+     used here — only your own AI, and the one backup key it gave this device for when the Mac cannot be reached. */
+  const BACKUP_KEY = 'money-ai-backup';
+  function macManaged(){
+    const own = aiLocal(); if(!own.keysOnMac || own.mac === false) return null;
+    const b = lsGet(BACKUP_KEY, null), keys = {mac: MAC_URL}, from = {mac: 'mac'}, order = ['mac'];
+    if(b && b.id && b.key && PROVIDERS.some(p=>p.id === b.id)){ keys[b.id] = b.key; from[b.id] = 'backup'; order.push(b.id); }
+    PROVIDERS.forEach(p=>{ if(order.indexOf(p.id) < 0) order.push(p.id); });
+    return {keys, from, order, off: [], first: 'mac', fallback: true, model: Object.assign({}, own.model || {}), managed: true, backup: b && b.id || ''};
+  }
   function aiSettings(){
+    const managed = macManaged(); if(managed) return managed;
     const own = aiLocal(), et = etAi || {keys:{}, order:[], off:[], model:{}}, led = lsGet('ledger-ai', {keys:{}, order:[], off:[]});
     const tv = lsGet('tripvault-ai', {keys:{}}), synced = lsGet(SYNCED_AI, {keys:{}});
     const keys = {}, from = {};
@@ -308,6 +320,40 @@ const MoneyAI = (function(){
     setMacRemote({url: base, token: d.token, user});
     await macUp(MAC_URL, true);
     return true;
+  }
+  /* HANDING YOUR KEYS TO YOUR OWN AI: the keys this browser kept (Money Home's, Trip Vault's, the Ledger's, another
+     device's) go to the Mac — only the ones it does not have — and are then cleared here; the Mac hands back one backup
+     key (refreshed daily) for when it cannot be reached. */
+  let handing = null;
+  function keysToMac(force){
+    if(handing && !force) return handing;
+    handing = (async ()=>{
+      const own = aiLocal(); if(own.mac === false || typeof fetch === 'undefined') return false;
+      if(own.keysOnMac && !force && Date.now() - ((lsGet(BACKUP_KEY, {}) || {}).at || 0) < 86400000) return true;
+      if(!(await macUp(MAC_URL))) return false;
+      const legacy = {};
+      [own, lsGet('tripvault-ai', {keys:{}}), lsGet('ledger-ai', {keys:{}}), lsGet(SYNCED_AI, {keys:{}}), etAi || {}].forEach(src=>Object.entries((src && src.keys) || {}).forEach(([id, k])=>{ if(k && !legacy[id] && !DEVICE_ONLY[id] && PROVIDERS.some(p=>p.id === id && !p.keyless)) legacy[id] = String(k).trim(); }));
+      let have = [];
+      try{ const r = await (await macFetch('/keys', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({keys: legacy, onlyMissing: true})})).json(); have = r.have || []; }catch(e){ return false; }
+      // cleared here only once the Mac has them
+      const clear = (k, o) => { if(!o || !o.keys) return; let n = 0; Object.keys(o.keys).forEach(id=>{ if(have.indexOf(id) >= 0){ delete o.keys[id]; n++; } }); if(n) lsSet(k, o); };
+      const now = aiLocal(); clear(AI_KEY, now); clear('tripvault-ai', lsGet('tripvault-ai', null)); clear('ledger-ai', lsGet('ledger-ai', null)); clear(SYNCED_AI, lsGet(SYNCED_AI, null));
+      try{ const b = await (await macFetch('/keys/backup')).json(); lsSet(BACKUP_KEY, b && b.id && b.key ? {id: b.id, key: b.key, at: Date.now()} : {at: Date.now()}); }catch(e){}
+      const after = aiLocal(); after.keysOnMac = true; after.first = 'mac'; saveAiLocal(after);
+      if(typeof MoneyShared !== 'undefined') try{ MoneyShared.markChanged(); }catch(e){}
+      changed(); return true;
+    })().finally(()=>{ setTimeout(()=>{ handing = null; }, 1000); });
+    return handing;
+  }
+  /* each of your AI's models with its light (green works, yellow resting or checking, red no key / rejected / no credit),
+     from the Mac (/keys/status), kept for the dropdown: {[model id]: {light, why}} */
+  const LIGHTS_KEY = 'money-ai-lights';
+  async function macLights(){
+    try{
+      const d = await (await macFetch('/keys/status')).json(), out = {};
+      (d.services || []).forEach(x=>{ out[x.kind === 'cloud' ? 'cloud:' + x.id : x.id] = {light: x.light, why: x.why, hasKey: x.hasKey}; });
+      lsSet(LIGHTS_KEY, {at: Date.now(), lights: out}); changed(); return out;
+    }catch(e){ return (lsGet(LIGHTS_KEY, {}) || {}).lights || {}; }
   }
   // not known to be down (the last check said so): on a phone it drops out of the lists after the first check
   const macMaybe = () => lsGet(MAC_KEY, {}).up !== false;
@@ -700,7 +746,7 @@ const MoneyAI = (function(){
   }
   const setModel = (id, m) => { const h = aiLocal(); h.model = Object.assign({}, h.model, {[id]: m}); saveAiLocal(h); };
 
-  return {macModels, macModelLabel, macRequest, MAC_URL, macUp, macFetch, macRemote, setMacRemote, macSignIn, macBase, PRIVATE_MODELS, trialPrivate, removePrivate, privateCached, PROVIDERS, loadAi, aiSettings, aiLocal, saveAiLocal, adoptAppKeys, aiStatus, rankModels, shareableAi, takeSyncedAi,
+  return {keysToMac, macLights, macManaged, macMaybe, BACKUP_KEY, LIGHTS_KEY, macModels, macModelLabel, macRequest, MAC_URL, macUp, macFetch, macRemote, setMacRemote, macSignIn, macBase, PRIVATE_MODELS, trialPrivate, removePrivate, privateCached, PROVIDERS, loadAi, aiSettings, aiLocal, saveAiLocal, adoptAppKeys, aiStatus, rankModels, shareableAi, takeSyncedAi,
           aiAvailable, aiNames, canSee, canSearch, resting, wake, backAt, chat, generate, json, test, setModel, listModels};
 })();
 
@@ -935,6 +981,14 @@ MoneyAI.widget = (function(){
   const mounts = [];
   function state(){
     const s = MoneyAI.aiSettings(), w = lsGet('money-ai-working', {});
+    if(s.managed){
+      /* your own AI's models, each with its light; offline: the backup key answers */
+      const L = (lsGet(MoneyAI.LIGHTS_KEY, {}) || {}).lights || {}, up = MoneyAI.macMaybe(), pick = s.model.mac || 'auto';
+      const dot = id => { const l = L[id] || (/^cloud:|^local:/.test(id) ? null : L[(id === 'council' ? 'cloud:gemini' : id)]); return !l ? (id === 'auto' || id === 'council' || id === 'deep' ? 'good' : '') : l.light === 'green' ? 'good' : l.light === 'yellow' ? 'lim' : 'bad'; };
+      const list = MoneyAI.macModels(lsGet('money-ai-mac', {}).info).map(([id, name])=>({id, name, dot: dot(id), why: (L[id] || {}).why || ''}));
+      const backup = s.backup ? MoneyAI.PROVIDERS.find(p=>p.id === s.backup) : null;
+      return {s, managed: true, up, pick, list, backup, inUse: up ? list.find(x=>x.id === pick) || list[0] : backup ? {id: backup.id, name: backup.name + ' (backup)'} : null};
+    }
     const answering = MoneyAI.aiStatus();                      // the ones that will be asked, in order
     const inUse = answering.find(x=>!x.resting) || null;       // who answers the next question
     // every AI that is set up, to pick from (not only the ones asked now)
@@ -943,6 +997,10 @@ MoneyAI.widget = (function(){
     return {s, list, inUse};
   }
   function chip(st){
+    if(st.managed){
+      const x = st.inUse, name = !x ? 'offline' : st.up ? short(String(x.name).replace(/ — .*/, '')) : short(x.name);
+      return {dot: !x ? 'bad' : st.up ? (x.dot || 'good') : 'lim', name, model: '', title: !x ? 'Your own AI is off and there is no backup key' : st.up ? 'Your own AI — ' + x.name + '\nClick to switch' : 'Your own AI is offline — using the backup: ' + x.name};
+    }
     const {list, inUse} = st;
     const dot = !list.length ? '' : inUse ? 'good' : 'lim';
     const name = !list.length ? 'set up' : inUse ? short(inUse.name) : 'resting';
@@ -953,7 +1011,15 @@ MoneyAI.widget = (function(){
       : 'Every AI is at its free limit — they try again in a few minutes';
     return {dot, name, model, title};
   }
+  const AI_PAGE = 'https://anilgupta2606.github.io/ai/chat/#keys';
   function popHTML(st){
+    if(st.managed){
+      const rows = st.list.map(x=>`<label class="mai-opt${st.pick === x.id ? ' on' : ''}" title="${esc(x.why)}"><input type="radio" name="mai-mac" data-mac="${esc(x.id)}" ${st.pick === x.id ? 'checked' : ''}>
+        <span class="mai-dot ${x.dot}"></span><span class="t"><b>${esc(String(x.name).replace(/ — .*/, ''))}</b><small>${esc(x.why || String(x.name).replace(/^[^—]*— ?/, '') || '')}</small></span>${st.up && st.pick === x.id ? '<span class="mai-now">in use</span>' : ''}</label>`);
+      return `<h4>Your own AI</h4><p class="mai-sub">${st.up ? 'Every app asks it. Pick the model — the same in all your apps.' : 'Your Mac cannot be reached' + (st.backup ? ' — using the backup key: ' + esc(st.backup.name) + '.' : ' and there is no backup key.')}</p>
+        ${rows.join('')}
+        <div class="mai-foot"><a href="${AI_PAGE}" target="_blank" rel="noopener">Keys — managed in your own AI</a></div>`;
+    }
     const {s, list, inUse} = st;
     const opt = (value, on, title, sub, dot, now) => `<label class="mai-opt${on ? ' on' : ''}"><input type="radio" name="mai-first-${value === 'auto' ? 'a' : 'p'}" data-first="${value}" ${on ? 'checked' : ''}>
       ${dot !== null ? `<span class="mai-dot ${dot}"></span>` : ''}<span class="t"><b>${esc(title)}</b><small>${esc(sub)}</small></span>${now ? '<span class="mai-now">in use</span>' : ''}</label>`;
@@ -972,6 +1038,11 @@ MoneyAI.widget = (function(){
   }
   function drawPop(m, st){
     m.pop.innerHTML = popHTML(st || state());
+    m.pop.querySelectorAll('[data-mac]').forEach(r=>r.onchange = ()=>{
+      const h = MoneyAI.aiLocal(); h.model = Object.assign({}, h.model, {mac: r.dataset.mac}); h.first = 'mac';
+      MoneyAI.saveAiLocal(h); if(typeof MoneyShared !== 'undefined') MoneyShared.markChanged();
+      window.dispatchEvent(new CustomEvent('moneyai-change'));
+    });
     m.pop.querySelectorAll('[data-first]').forEach(r=>r.onchange = ()=>{
       const h = MoneyAI.aiLocal(); h.first = r.dataset.first;
       if(h.first !== 'auto') MoneyAI.wake(h.first);            // picked by hand: try it now
@@ -998,7 +1069,7 @@ MoneyAI.widget = (function(){
     const pop = document.createElement('div'); pop.className = 'mai-pop' + (opts.up ? ' mai-up' : '') + (opts.left ? ' mai-left' : ''); pop.hidden = true; pop.setAttribute('role', 'dialog'); pop.setAttribute('aria-label', 'Which AI answers');
     root.append(btn, pop); el.appendChild(root);
     const m = {root, btn, pop};
-    btn.onclick = ()=>{ const open = pop.hidden; mounts.forEach(close); if(open){ pop.hidden = false; btn.setAttribute('aria-expanded', 'true'); drawPop(m); } };
+    btn.onclick = ()=>{ const open = pop.hidden; mounts.forEach(close); if(open){ pop.hidden = false; btn.setAttribute('aria-expanded', 'true'); drawPop(m); if(MoneyAI.aiSettings().managed) MoneyAI.macLights(); } };
     for(let i = mounts.length - 1; i >= 0; i--) if(!document.contains(mounts[i].root)) mounts.splice(i, 1);   // the page redrew
     mounts.push(m);
     draw(m);
