@@ -328,14 +328,14 @@ const LIGHT = {green: 'ready', yellow: 'rest', red: 'bad'};
 function managedCard(s){
   const L = (()=>{ try{ return (JSON.parse(localStorage.getItem(MoneyAI.LIGHTS_KEY) || '{}').lights) || {}; }catch(e){ return {}; } })();
   const list = MoneyAI.macModels(MAC.models || (()=>{ try{ return JSON.parse(localStorage.getItem('money-ai-mac') || '{}').info; }catch(e){ return null; } })());
-  const backup = s.backup ? MoneyAI.PROVIDERS.find(p=>p.id === s.backup) : null;
+  const backups = (s.backup || []).map(id=>MoneyAI.PROVIDERS.find(p=>p.id === id)).filter(Boolean);
   const rows = list.filter(([id])=>L[id]).map(([id, name])=>`<div class="prov"><div class="pname"><b>${esc(name.replace(/ — .*/, ''))}</b><small>${esc(L[id].why || '')}</small></div><span class="st ${LIGHT[L[id].light] || ''}">${L[id].light === 'green' ? 'ready' : L[id].light === 'yellow' ? 'resting' : 'needs a key'}</span></div>`).join('');
   return `<section class="card" id="ai">
     <h2><span class="n">3</span>AI — your own AI, in every app</h2>
     <p class="cap">Your AI keys are kept in <b>one place: your own AI on your Mac</b>. Every app asks it, and you pick the model from the <b>AI</b> button in any app. To add, replace or remove a key: <a href="https://anilgupta2606.github.io/ai/chat/#keys" target="_blank" rel="noopener">open your AI → 🔑 Your AI keys</a>.</p>
     ${macRow(s)}
     ${rows || '<p class="note">Open this page while your Mac is reachable to see each model’s light.</p>'}
-    <p class="note">${backup ? `When your Mac cannot be reached, this device uses one backup key your AI gave it: <b>${esc(backup.name)}</b> (refreshed daily).` : 'No backup key on this device yet — it is fetched from your Mac the next time it is reachable.'} <button class="btn" id="keys-refresh">Refresh from my AI</button></p>
+    <p class="note">${backups.length ? `When your Mac cannot be reached, this device uses the backup keys your AI gave it, in turn: <b>${backups.map(p=>esc(p.name)).join(' → ')}</b> (refreshed daily).` : 'No backup key on this device yet — it is fetched from your Mac the next time it is reachable.'} <button class="btn" id="keys-refresh">Refresh from my AI</button></p>
   </section>`;
 }
 function aiCard(){
