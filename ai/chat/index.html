@@ -1672,6 +1672,7 @@ const COMMANDS = [
   {c: '/memory', a: 'forget n · clear · off · on · add …', d: 'What it remembers about you — kept automatically, no pinning needed'},
   {c: '/tune', a: 'run · off n · remove n', d: 'Self-tune: the rules it learned from answers that went wrong'},
   {c: '/config', a: 'name value', d: 'Settings and limits (also in Skills → Limits)'},
+  {c: '/design', a: 'a product, e.g. expense tracker mobile web', d: 'A design system for it — style, colours, fonts, UX rules (ui-ux-pro-max, no AI)'},
   {c: '/rea', a: 'an app, a .har or a database on your Mac', d: 'rea looks inside it with evidence — an app\'s windows, IPC and network calls, a capture\'s requests, a database\'s tables'},
   {c: '/blueprint', a: 'a site or an app', d: 'Reverse-engineer it: how it is built and what it does, then a plan to build your own (say “build it” after)'},
   {c: '/review', a: '', d: 'Review the coding project\'s uncommitted changes for bugs (nothing is changed)'},
@@ -1770,6 +1771,7 @@ async function runCommand(line){
     toast('Rewound ' + gone + ' question' + (gone === 1 ? '' : 's'));
   }
   else if(c === '/context') showContext();
+  else if(c === '/design'){ if(!arg) return toast('/design expense tracker, mobile web'); ask('/design ' + arg); }
   else if(c === '/rea'){ if(!arg) return toast('/rea /Applications/Slack.app — or a .har or .sqlite file'); ask('/rea ' + arg); }
   else if(c === '/blueprint'){ if(!arg) return toast('/blueprint notion.so — or an app on your Mac'); ask('/blueprint ' + arg); }
   else if(c === '/memory' || c === '/tune' || c === '/config'){ if(mode !== 'mac') return toast('That is kept on your Mac — open this page there (or over Tailscale)');
