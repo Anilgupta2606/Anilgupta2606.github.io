@@ -58,7 +58,9 @@ const MoneyAI = (function(){
     {id:'gemini', name:'Google Gemini', signupUrl:'https://aistudio.google.com/apikey', placeholder:'AIza…', models:['gemini-flash-latest','gemini-flash-lite-latest'], vision:true, search:true},
     {id:'groq', name:'Groq', signupUrl:'https://console.groq.com/keys', placeholder:'gsk_…', models:['openai/gpt-oss-120b','llama-3.3-70b-versatile','openai/gpt-oss-20b']},
     // Z.ai (GLM's maker): GLM-4.7-Flash and GLM-4.5-Flash free, with no daily cap (their API speaks the OpenAI form)
-    {id:'zai', name:'Z.ai (GLM)', signupUrl:'https://z.ai/manage-apikey/apikey-list', placeholder:'key', models:['glm-4.7-flash','glm-4.5-flash']},
+    {id:'zai', name:'Z.ai (GLM)', signupUrl:'https://z.ai/manage-apikey/apikey-list', placeholder:'key', models:['glm-4.7-flash','glm-4.5-flash','glm-4.6v-flash']},
+    // Cohere (trial key: 1,000 calls a month, 20 a minute): Command A+ and North Mini Code, through its OpenAI-style API
+    {id:'cohere', name:'Cohere (Command)', signupUrl:'https://dashboard.cohere.com/api-keys', placeholder:'key', models:['command-a-plus-05-2026','command-a-03-2025','north-mini-code']},
     // NVIDIA's own API (build.nvidia.com): Nemotron straight from NVIDIA, with its own limits — not OpenRouter's shared 50 a day
     {id:'nvidia', name:'NVIDIA (Nemotron)', signupUrl:'https://build.nvidia.com', placeholder:'nvapi-…', models:['nvidia/nemotron-3-ultra-550b-a55b','nvidia/nemotron-3-super-120b-a12b','openai/gpt-oss-120b']},
     {id:'cerebras', name:'Cerebras', signupUrl:'https://cloud.cerebras.ai', placeholder:'csk-…', models:['gpt-oss-120b','llama-3.3-70b','llama3.1-8b']},
@@ -68,7 +70,7 @@ const MoneyAI = (function(){
     // Local (Ollama) is gone from here: the models on the Mac are reached through Your own AI (local:…), one way for every app
     {id:'anthropic', name:'Anthropic Claude (paid)', signupUrl:'https://console.anthropic.com/settings/keys', placeholder:'sk-ant-…', models:['claude-haiku-4-5-20251001'], vision:true},
   ];
-  const OPENAI_BASE = {groq:'https://api.groq.com/openai/v1', nvidia:'https://integrate.api.nvidia.com/v1', zai:'https://api.z.ai/api/paas/v4', cerebras:'https://api.cerebras.ai/v1', mistral:'https://api.mistral.ai/v1', openrouter:'https://openrouter.ai/api/v1'};
+  const OPENAI_BASE = {groq:'https://api.groq.com/openai/v1', nvidia:'https://integrate.api.nvidia.com/v1', zai:'https://api.z.ai/api/paas/v4', cohere:'https://api.cohere.ai/compatibility/v1', cerebras:'https://api.cerebras.ai/v1', mistral:'https://api.mistral.ai/v1', openrouter:'https://openrouter.ai/api/v1'};
   const DEVICE_ONLY = {ollama: true, webllm: true, mac: true};         // this computer's own: not shared with your other devices
   const SYNCED_AI = 'tripvault-ai-synced';          // keys that came from another device through Trip Vault's encrypted sync
   /* The keys this device uses, to carry to your other devices inside the encrypted sync (not Ollama: it is this computer's). */
@@ -404,7 +406,7 @@ const MoneyAI = (function(){
        auto · chatgpt · pcc · apple (through Siri / on the Mac) · council (Thinking) · deep
        cloud:<service> (a key on the Mac) · local:<model> (a model on the Mac)      -> [[id, label]]
      Picture and video models are not in it: an app asks your AI for words. */
-  const MAC_CLOUD = {gemini: 'Google Gemini', groq: 'Groq — gpt-oss-120b', nvidia: 'NVIDIA — Nemotron', zai: 'Z.ai — GLM', cerebras: 'Cerebras — gpt-oss-120b', mistral: 'Mistral', openrouter: 'OpenRouter', anthropic: 'Anthropic Claude'};
+  const MAC_CLOUD = {gemini: 'Google Gemini', groq: 'Groq — gpt-oss-120b', nvidia: 'NVIDIA — Nemotron', zai: 'Z.ai — GLM', cohere: 'Cohere — Command', cerebras: 'Cerebras — gpt-oss-120b', mistral: 'Mistral', openrouter: 'OpenRouter', anthropic: 'Anthropic Claude'};
   function macModels(info){
     const d = info || {}, a = d.apple || {}, cloud = d.cloud || [], local = (d.local || []).map(m=>m.name || m).filter(n=>n && !/embed|guard|vision|llava/i.test(n));
     const out = [['auto', 'Auto — the right model for each question (ChatGPT when the Mac has it)']];
@@ -598,7 +600,7 @@ const MoneyAI = (function(){
   async function bestModels(id, key, tier){
     if(id === 'webllm') return [key];
     // NVIDIA lists a hundred models of every maker: its own short list (Nemotron first) is the one used
-    if(id === 'nvidia' || id === 'zai') return PROVIDERS.find(p=>p.id === id).models;
+    if(id === 'nvidia' || id === 'zai' || id === 'cohere') return PROVIDERS.find(p=>p.id === id).models;
     const cache = lsGet(MODELS_KEY, {}), c = cache[id], tag = key.slice(-6);
     // a day's cache for the online services; the models on this computer are read fresh (a new one may just have been downloaded)
     let names = id !== 'ollama' && id !== 'mac' && c && c.key === tag && Date.now() - c.at < 86400000 && c.names && c.names.length ? c.names : null;

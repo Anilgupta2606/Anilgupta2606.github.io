@@ -1431,6 +1431,33 @@ if(SR && 'speechSynthesis' in window){
   const speak = text => new Promise(res=>{ speechSynthesis.cancel(); const parts = text.match(/[^.!?]+[.!?]*/g) || [text]; let i = 0;
     const next = () => { if(!on || i >= parts.length) return res(); const u = new SpeechSynthesisUtterance(parts[i++].trim()); const v = voice(); if(v) u.voice = v; u.lang = lang; u.rate = 1.04; u.onend = next; u.onerror = () => res(); speechSynthesis.speak(u); };
     next(); });
+  /* on the Mac helper (here or over Tailscale): a natural voice made on the Mac (Kokoro; macOS's voice if not), fetched part by
+     part — the next part is made while this one plays. It fails: the browser's own voice for the rest. */
+  const player = new Audio(); player.preload = 'auto'; let talking = null, macVoiceOff = 0;
+  // a phone plays sound only from a tap: one silent play in the tap that starts voice mode lets the answers play later
+  const unlock = () => { try{ player.src = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YQAAAAA='; const p = player.play(); if(p) p.catch(()=>{}); }catch(e){} };
+  const groups = text => { const out = []; let cur = '';
+    for(const x of text.match(/[^.!?।]+[.!?।]*/g) || [text]){ if(cur && (cur + x).length > (out.length ? 280 : 140)){ out.push(cur.trim()); cur = ''; } cur += x; }
+    if(cur.trim()) out.push(cur.trim()); return out; };
+  const fetchPart = (t, signal) => fetch(HELPER + '/speak', {method: 'POST', headers: {'content-type': 'application/json'}, body: JSON.stringify({text: t, lang: lang === 'hi-IN' ? 'hi' : 'en'}), signal})
+    .then(r=>{ if(!r.ok) throw new Error('speak ' + r.status); return r.blob(); });
+  const playBlob = (b, ctl) => new Promise(res=>{ const url = URL.createObjectURL(b);
+    const done = (ok = true) => { player.onended = player.onerror = null; ctl.signal.removeEventListener('abort', cut); try{ URL.revokeObjectURL(url); }catch(e){} res(ok); };
+    const cut = () => { try{ player.pause(); }catch(e){} done(); };
+    ctl.signal.addEventListener('abort', cut); player.onended = ()=>done(); player.onerror = ()=>done(false); player.src = url;
+    const p = player.play(); if(p) p.catch(()=>done(false)); });
+  const macSpeak = async text => { const parts = groups(text), ctl = new AbortController(); talking = ctl;
+    try{ let next = fetchPart(parts[0], ctl.signal);
+      for(let i = 0; i < parts.length; i++){ let b;
+        try{ b = await next; }catch(e){ if(!on || ctl.signal.aborted) return; macVoiceOff = Date.now(); talking = null; return speak(parts.slice(i).join(' ')); }
+        if(!on || ctl.signal.aborted) return;
+        next = i + 1 < parts.length ? fetchPart(parts[i + 1], ctl.signal) : null; if(next) next.catch(()=>{});
+        // the phone would not play it (or it could not be read): the browser's voice for the rest
+        if(!(await playBlob(b, ctl)) && on && !ctl.signal.aborted){ macVoiceOff = Date.now(); talking = null; return speak(parts.slice(i).join(' ')); }
+        if(!on || ctl.signal.aborted) return; } }
+    finally{ if(talking === ctl) talking = null; } };
+  const hush = () => { if(talking){ talking.abort(); talking = null; } try{ player.pause(); }catch(e){} speechSynthesis.cancel(); };
+  const sayAnswer = text => !text ? Promise.resolve() : mode === 'mac' && Date.now() - macVoiceOff > 120000 ? macSpeak(text) : speak(text);
   const listen = () => { if(!on) return; state('listening', 'Listening…', lang === 'hi-IN' ? 'अपना सवाल बोलिए' : 'Say your question');
     rec = new SR(); rec.lang = lang; rec.interimResults = true; rec.continuous = false; let heard = '';
     rec.onresult = e => { heard = Array.from(e.results).map(r=>r[0].transcript).join(''); $('#vheard').textContent = heard; };
@@ -1440,14 +1467,14 @@ if(SR && 'speechSynthesis' in window){
       quiet = 0; state('thinking', 'Thinking…', heard);
       lastAnswer = null; await ask(heard, {voice: true});
       if(!on) return;
-      state('speaking', 'Speaking…', 'Tap the orb to interrupt'); await speak(spokenText(lastAnswer)); listen(); };
+      state('speaking', 'Speaking…', 'Tap the orb to interrupt'); await sayAnswer(spokenText(lastAnswer)); listen(); };
     rec.start(); };
-  const start = () => { on = true; quiet = 0; bar.hidden = false; $('#talk').classList.add('on'); $('#mVoice').classList.add('on'); listen(); };
-  const stop = () => { on = false; try{ rec && rec.abort(); }catch(e){} rec = null; speechSynthesis.cancel(); bar.hidden = true; $('#talk').classList.remove('on'); $('#mVoice').classList.remove('on'); };
+  const start = () => { on = true; quiet = 0; if(mode === 'mac') unlock(); bar.hidden = false; $('#talk').classList.add('on'); $('#mVoice').classList.add('on'); listen(); };
+  const stop = () => { on = false; try{ rec && rec.abort(); }catch(e){} rec = null; hush(); bar.hidden = true; $('#talk').classList.remove('on'); $('#mVoice').classList.remove('on'); };
   $('#talk').onclick = () => on ? stop() : start();
   $('#vend').onclick = stop;
   $('#vlang').onclick = () => { setLang(lang === 'hi-IN' ? 'en-IN' : 'hi-IN'); if(rec){ try{ rec.abort(); }catch(e){} } };
-  $('#vorb').onclick = () => { if(speechSynthesis.speaking){ speechSynthesis.cancel(); } else if(!rec && !busy){ quiet = 0; listen(); } };
+  $('#vorb').onclick = () => { if(talking || speechSynthesis.speaking){ hush(); } else if(!rec && !busy){ quiet = 0; listen(); } };
   document.addEventListener('keydown', e=>{ if(e.key === 'Escape' && on) stop(); });
 }
 // a phone: a shorter hint in the box (the full one does not fit)
