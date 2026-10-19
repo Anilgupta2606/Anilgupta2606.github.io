@@ -1195,7 +1195,7 @@ const IMG_PICK = [['auto', 'Auto pictures', 'Best first: FLUX.2 klein 9B (first 
   ['flux-1-schnell', 'FLUX.1 schnell', 'good and cheap (~125 a day free)'], ['flux-2-klein-9b', 'FLUX.2 klein 9B', 'excellent and fast; ~7 a day free'], ['flux-2-dev', 'FLUX.2 dev', 'the most detailed; ~2–3 a day free'], ['phoenix', 'Leonardo Phoenix', 'follows the description closely; ~4 a day free'], ['lucid-origin', 'Leonardo Lucid Origin', 'rich, polished; ~3 a day free'],
   ['flux-2-klein-4b', 'FLUX.2 klein 4B', 'cheap; can be slow'], ['sdxl-lightning', 'SDXL Lightning', 'fast; loose'], ['dreamshaper', 'DreamShaper 8', 'fast, painterly; loose'], ['gemini', 'Gemini 3.1 Flash Image', 'Google; needs billing on your key'], ['pollinations', 'Pollinations', 'free, no key; a small mark'], ['playground', 'Apple Image Playground', 'illustration styles (its Shortcut needed)'], ['drawthings', 'Draw Things', 'on this Mac, its chosen model (API Server on)'], ['diffusionbee', 'DiffusionBee', 'on this Mac: private, offline; slower (~40 s)']];
 // the video models (cli/animatediff.mjs): AnimateDiff for real motion, the zoom or pan as the fallback
-const VID_PICK = [['auto', 'Auto videos', 'Wan 2.2 or LTX-Video online (5–8 s), then AnimateDiff (2 s), then a zoom or pan'], ['wan', 'Wan 2.2 online', 'the best looking; animates a picture — up to 5 s'], ['ltx', 'LTX-Video online', 'the longest — up to 8.5 s; quick'], ['animatediff', 'AnimateDiff', '2 s; online, then this Mac — never the zoom or pan'], ['animatediff-online', 'AnimateDiff online', 'ByteDance\'s free Hugging Face Space — seconds'], ['animatediff-mac', 'AnimateDiff on this Mac', 'private, offline — about 7 minutes on 8 GB (ai animatediff install)'], ['kenburns', 'Zoom or pan', 'the older way: a slow camera move across one picture, 6 s']];
+const VID_PICK = [['motion', 'Motion graphics (HyperFrames)', 'designed: kinetic titles, numbers counting up, charts drawing themselves, a voice — free, on this Mac'], ['auto', 'Auto videos', 'Wan 2.2 or LTX-Video online (5–8 s), then AnimateDiff (2 s), then a zoom or pan'], ['wan', 'Wan 2.2 online', 'the best looking; animates a picture — up to 5 s'], ['ltx', 'LTX-Video online', 'the longest — up to 8.5 s; quick'], ['animatediff', 'AnimateDiff', '2 s; online, then this Mac — never the zoom or pan'], ['animatediff-online', 'AnimateDiff online', 'ByteDance\'s free Hugging Face Space — seconds'], ['animatediff-mac', 'AnimateDiff on this Mac', 'private, offline — about 7 minutes on 8 GB (ai animatediff install)'], ['kenburns', 'Zoom or pan', 'the older way: a slow camera move across one picture, 6 s']];
 const pickLabel = () => pick.kind === 'sogpt' ? 'SoGPT 1.1' : pick.kind === 'deep' ? 'Deep think' : pick.kind === 'auto' ? autoLabel : pick.kind === 'local' ? pick.model : pick.kind === 'private' ? 'Private AI (in this browser)' : pick.kind === 'council' ? 'Thinking' : (CLOUD_NAMES[pick.provider] || pick.provider);
 async function openPicker(){
   const box = $('#picker');
@@ -1672,6 +1672,7 @@ const COMMANDS = [
   {c: '/memory', a: 'forget n · clear · off · on · add …', d: 'What it remembers about you — kept automatically, no pinning needed'},
   {c: '/tune', a: 'run · off n · remove n', d: 'Self-tune: the rules it learned from answers that went wrong'},
   {c: '/config', a: 'name value', d: 'Settings and limits (also in Skills → Limits)'},
+  {c: '/rea', a: 'an app, a .har or a database on your Mac', d: 'rea looks inside it with evidence — an app\'s windows, IPC and network calls, a capture\'s requests, a database\'s tables'},
   {c: '/blueprint', a: 'a site or an app', d: 'Reverse-engineer it: how it is built and what it does, then a plan to build your own (say “build it” after)'},
   {c: '/review', a: '', d: 'Review the coding project\'s uncommitted changes for bugs (nothing is changed)'},
   {c: '/init', a: '', d: 'Make the coding project\'s notes, so SoGPT knows it'},
@@ -1769,6 +1770,7 @@ async function runCommand(line){
     toast('Rewound ' + gone + ' question' + (gone === 1 ? '' : 's'));
   }
   else if(c === '/context') showContext();
+  else if(c === '/rea'){ if(!arg) return toast('/rea /Applications/Slack.app — or a .har or .sqlite file'); ask('/rea ' + arg); }
   else if(c === '/blueprint'){ if(!arg) return toast('/blueprint notion.so — or an app on your Mac'); ask('/blueprint ' + arg); }
   else if(c === '/memory' || c === '/tune' || c === '/config'){ if(mode !== 'mac') return toast('That is kept on your Mac — open this page there (or over Tailscale)');
     const j = await post(c === '/memory' ? '/memory' : c === '/tune' ? '/tune' : '/settings', c === '/memory' ? {memory: arg} : {cmd: arg}).catch(e=>({text: 'Could not reach your Mac: ' + e.message}));
