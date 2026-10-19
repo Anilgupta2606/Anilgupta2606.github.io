@@ -1674,6 +1674,7 @@ const COMMANDS = [
   {c: '/config', a: 'name value', d: 'Settings and limits (also in Skills → Limits)'},
   {c: '/design', a: 'a product, e.g. expense tracker mobile web', d: 'A design system for it — style, colours, fonts, UX rules (ui-ux-pro-max, no AI)'},
   {c: '/rea', a: 'an app, a .har or a database on your Mac', d: 'rea looks inside it with evidence — an app\'s windows, IPC and network calls, a capture\'s requests, a database\'s tables'},
+  {c: '/upstream', a: 'run · apply n · drop n', d: 'What changed in the repos our skills came from — suggestions to apply (SoGPT, with tests)'},
   {c: '/blueprint', a: 'a site or an app', d: 'Reverse-engineer it: how it is built and what it does, then a plan to build your own (say “build it” after)'},
   {c: '/review', a: '', d: 'Review the coding project\'s uncommitted changes for bugs (nothing is changed)'},
   {c: '/init', a: '', d: 'Make the coding project\'s notes, so SoGPT knows it'},
@@ -1773,6 +1774,7 @@ async function runCommand(line){
   else if(c === '/context') showContext();
   else if(c === '/design'){ if(!arg) return toast('/design expense tracker, mobile web'); ask('/design ' + arg); }
   else if(c === '/rea'){ if(!arg) return toast('/rea /Applications/Slack.app — or a .har or .sqlite file'); ask('/rea ' + arg); }
+  else if(c === '/upstream') ask('/upstream' + (arg ? ' ' + arg : ''));
   else if(c === '/blueprint'){ if(!arg) return toast('/blueprint notion.so — or an app on your Mac'); ask('/blueprint ' + arg); }
   else if(c === '/memory' || c === '/tune' || c === '/config'){ if(mode !== 'mac') return toast('That is kept on your Mac — open this page there (or over Tailscale)');
     const j = await post(c === '/memory' ? '/memory' : c === '/tune' ? '/tune' : '/settings', c === '/memory' ? {memory: arg} : {cmd: arg}).catch(e=>({text: 'Could not reach your Mac: ' + e.message}));
@@ -2095,6 +2097,9 @@ async function loadSkills(){
   if(tu) box.insertAdjacentHTML('beforeend', `<h3 class="skh">Learned tweaks · ${tu.tweaks.length}</h3><p class="sub">Self-tune learns these at night from answers that went wrong (👎, corrections, claims its sources did not hold) — a rule is kept only when it clearly wins. Waiting to learn from: ${tu.waiting}.${tu.last && tu.last.day ? ' Last run ' + esc(tu.last.day) + ': kept ' + tu.last.kept + '.' : ''}</p>`
     + tu.tweaks.map(t=>`<div class="krow skrow" data-tw="${esc(t.id)}"><div class="khead"><span class="kdot ${t.on === false ? 'grey' : 'green'}"></span><b>${esc(t.rule)}</b><label title="Use this tweak"><input type="checkbox" data-tw-on ${t.on === false ? '' : 'checked'}></label></div><small>For questions about: ${esc((t.words || []).join(', '))} · learned from “${esc(String((t.from || {}).q || '').slice(0, 80))}”</small><div class="kedit"><button class="ghost" data-tw-rm type="button">Remove</button></div></div>`).join('')
     + '<div class="kedit"><button class="ghost" id="tuneNow" type="button">Run self-tune now</button></div>');
+  let up = null; try{ up = await fetch(HELPER + '/upstream').then(r=>r.json()); }catch(e){}
+  if(up) box.insertAdjacentHTML('beforeend', `<h3 class="skh">Upstream · ${up.suggestions.length}</h3><p class="sub">Weekly, your AI reads what changed in the ${up.repos} repos the built-in skills came from and suggests what would improve ours — nothing changes by itself. ${up.last ? 'Last look ' + new Date(up.last.at).toLocaleDateString() + '.' : 'Not run yet.'}</p>` + up.suggestions.map((x, i)=>`<div class="krow skrow"><div class="khead"><b>${esc(x.repo)}</b></div><small>${esc(x.why || '')}</small><small>${esc(String(x.change || '').slice(0, 240))}</small><div class="kedit"><button class="ghost" data-up="apply ${i + 1}" type="button">Apply (SoGPT, with tests)</button><button class="ghost" data-up="drop ${i + 1}" type="button">Drop</button></div></div>`).join('') + '<div class="kedit"><button class="ghost" data-up="run" type="button">Look now</button></div>');
+  box.querySelectorAll('[data-up]').forEach(b=>b.onclick = () => { openSkills(false); ask('/upstream ' + b.dataset.up); });
   if(st) box.insertAdjacentHTML('beforeend', `<h3 class="skh">Limits</h3><p class="sub">Change any of these here or with /config in the terminal.</p>` + st.list.map(x=>`<div class="krow setrow" data-set="${esc(x.key)}"><div class="khead"><b>${esc(x.about)}</b>${typeof x.def === 'boolean' ? `<label><input type="checkbox" data-set-v ${x.value ? 'checked' : ''}></label>` : `<input type="number" inputmode="numeric" data-set-v value="${esc(x.value)}" min="${x.min}" max="${x.max}" style="width:72px">`}</div><small>${esc(x.key)}${x.value !== x.def ? ' · default ' + esc(String(x.def)) : ''}${x.min !== undefined ? ' · ' + x.min + '–' + x.max : ''}</small></div>`).join(''));
   box.querySelectorAll('[data-tw-on]').forEach(c=>c.onchange = async () => { await post('/tune', {id: c.closest('[data-tw]').dataset.tw, on: c.checked}).catch(()=>null); toast(c.checked ? 'Tweak on' : 'Tweak off'); loadSkills(); });
   box.querySelectorAll('[data-tw-rm]').forEach(b=>b.onclick = async () => { await post('/tune', {remove: b.closest('[data-tw]').dataset.tw}).catch(()=>null); toast('Removed'); loadSkills(); });
