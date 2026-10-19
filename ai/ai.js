@@ -55,14 +55,14 @@ const MoneyAI = (function(){
     // for ATS. Tried first wherever the Mac's helper answers (on a phone through Tailscale); skipped quietly elsewhere.
     // Words only: an app's request never becomes a picture or a video.
     {id:'mac', name:'Your own AI (on your Mac)', signupUrl:'https://anilgupta2606.github.io/ai/chat/', placeholder:'http://127.0.0.1:8899', models:['auto', 'chatgpt'], keyless:true},
+    // NVIDIA's own API (build.nvidia.com): Nemotron straight from NVIDIA, with its own limits — not OpenRouter's shared 50 a day
+    {id:'nvidia', name:'NVIDIA (Nemotron)', signupUrl:'https://build.nvidia.com', placeholder:'nvapi-…', models:['nvidia/nemotron-3-ultra-550b-a55b','nvidia/nemotron-3-super-120b-a12b','openai/gpt-oss-120b']},
     {id:'gemini', name:'Google Gemini', signupUrl:'https://aistudio.google.com/apikey', placeholder:'AIza…', models:['gemini-flash-latest','gemini-flash-lite-latest'], vision:true, search:true},
     {id:'groq', name:'Groq', signupUrl:'https://console.groq.com/keys', placeholder:'gsk_…', models:['openai/gpt-oss-120b','llama-3.3-70b-versatile','openai/gpt-oss-20b']},
     // Z.ai (GLM's maker): GLM-4.7-Flash and GLM-4.5-Flash free, with no daily cap (their API speaks the OpenAI form)
     {id:'zai', name:'Z.ai (GLM)', signupUrl:'https://z.ai/manage-apikey/apikey-list', placeholder:'key', models:['glm-4.7-flash','glm-4.5-flash','glm-4.6v-flash']},
     // Cohere (trial key: 1,000 calls a month, 20 a minute): Command A+ and North Mini Code, through its OpenAI-style API
     {id:'cohere', name:'Cohere (Command)', signupUrl:'https://dashboard.cohere.com/api-keys', placeholder:'key', models:['command-a-plus-05-2026','command-a-03-2025','north-mini-code']},
-    // NVIDIA's own API (build.nvidia.com): Nemotron straight from NVIDIA, with its own limits — not OpenRouter's shared 50 a day
-    {id:'nvidia', name:'NVIDIA (Nemotron)', signupUrl:'https://build.nvidia.com', placeholder:'nvapi-…', models:['nvidia/nemotron-3-ultra-550b-a55b','nvidia/nemotron-3-super-120b-a12b','openai/gpt-oss-120b']},
     {id:'cerebras', name:'Cerebras', signupUrl:'https://cloud.cerebras.ai', placeholder:'csk-…', models:['gpt-oss-120b','llama-3.3-70b','llama3.1-8b']},
     {id:'mistral', name:'Mistral', signupUrl:'https://console.mistral.ai/api-keys', placeholder:'key', models:['mistral-small-latest','mistral-medium-latest']},
     {id:'openrouter', name:'OpenRouter', signupUrl:'https://openrouter.ai/keys', placeholder:'sk-or-…', models:['openrouter/free','meta-llama/llama-3.3-70b-instruct:free']},

@@ -315,6 +315,7 @@ code{font-family:var(--mono); font-size:.85em; background:var(--page2); padding:
 .trow2{display:flex; gap:10px; align-items:flex-start; padding:12px 0; border-bottom:1px solid var(--line); font-size:14px}
 .trow2 .tt{flex:1; min-width:0} .trow2 small{display:block; color:var(--mut); font-size:12.5px}
 .trow2 .acts{display:flex; gap:6px; flex-wrap:wrap}
+.turn.compacted{opacity:.55}
 .cform select{background:var(--page); border:1px solid var(--line); border-radius:10px; padding:8px 10px; font-size:14px; color:var(--ink)}
 .cform .two{display:flex; gap:8px} .cform .two > *{flex:1}
 .cform{display:flex; flex-direction:column; gap:8px; margin-top:10px}
@@ -334,6 +335,9 @@ code{font-family:var(--mono); font-size:.85em; background:var(--page2); padding:
 .kdot{width:11px; height:11px; border-radius:50%; flex:none; box-shadow:0 0 0 3px color-mix(in srgb, currentColor 18%, transparent)}
 .kdot.grey{background:#9aa0aa; color:#9aa0aa}
 .skrow .khead input[type=checkbox]{width:18px; height:18px; accent-color:var(--think)}
+.skfrom a{word-break:break-word}
+.memsw{font-size:12px; font-weight:400; margin-left:8px}
+.setrow .khead{justify-content:space-between; gap:10px}
 .skh{font-size:13px; margin:16px 0 6px; color:var(--muted, inherit); text-transform:uppercase; letter-spacing:.04em}
 .kdot.green{background:#22c55e; color:#22c55e} .kdot.yellow{background:#f5b301; color:#f5b301} .kdot.red{background:#ef4444; color:#ef4444}
 .krow .kedit{display:flex; gap:8px; flex-wrap:wrap} .krow .kedit input{flex:1 1 180px; min-width:0; padding:9px 11px; border-radius:10px; border:1px solid var(--line); background:var(--page); color:var(--ink); font:inherit}
@@ -624,7 +628,7 @@ button, a, summary, label{touch-action:manipulation}
 <aside class="panel" id="taskPanel" aria-label="Scheduled tasks">
   <button class="ghost close" id="closeTasks">Close</button>
   <h2>Scheduled</h2>
-  <p class="sub">A question asked for you at a time — "every weekday at 9:15, a Nifty summary". Each result lands in its own chat (⏰) with a notification on your Mac. Runs while the Mac is awake; a time it slept through runs when it wakes.</p>
+  <p class="sub">A question asked for you at a time — "every weekday at 9:15, a Nifty summary". Each result lands in its own chat (⏰) with a notification on your Mac. Runs while the Mac is awake; a time it slept through runs when it wakes. Loops (🔁, <code>/loop 15m …</code>) ask every few minutes and stop by themselves after 24 h.</p>
   <div id="tasks"></div>
 </aside>
 <aside class="panel" id="keysPanel" aria-label="Your AI keys">
@@ -700,8 +704,9 @@ const keepText = (t, n) => { t = String(t || ''); const s = (/Saved on this Mac:
 // Every saved turn matters to a conversation, but a long chat cannot be sent to
 // an 8k-context local model verbatim. Keep all questions and a concise answer
 // from every older turn, while retaining much more detail for the latest turns.
+// (/compact: turns taken into a summary are not sent; the summary turn is, whole, in their place)
 const conversationTurns = saved => {
-  const all = (saved || []).slice(-60), recent = 3, older = Math.max(0, all.length - recent);
+  const all = (saved || []).filter(t=>!(t.answer || {}).compacted).slice(-60), recent = 3, older = Math.max(0, all.length - recent);
   const oldPair = older ? Math.max(180, Math.min(900, Math.floor(9000 / older))) : 0;
   // older turns: squeezed onto one line; the latest ones keep their line breaks (code in them stays readable)
   const compact = (text, limit, lines) => {
@@ -711,7 +716,8 @@ const conversationTurns = saved => {
     return s.length > limit && !saved ? s.slice(0, Math.max(0, limit - 1)) + '…' : s;
   };
   return all.flatMap((turn, i) => {
-    const detailed = i >= older, pair = detailed ? 2400 : oldPair;
+    const detailed = i >= older || !!(turn.answer || {}).summary, pair = detailed ? 2400 : oldPair;
+    if((turn.answer || {}).summary) return [{role: 'user', content: 'Summary of our conversation so far (made by /compact):\n' + compact(turn.answer.text, 2400, true)}, {role: 'assistant', content: 'Noted — I will keep that in mind.'}];
     const question = compact(turn.q, detailed ? 1000 : Math.max(70, Math.floor(pair * .45)), detailed);
     const answer = compact((turn.answer || {}).text, detailed ? 1400 : Math.max(100, pair - question.length), detailed);
     return [{role: 'user', content: question}, {role: 'assistant', content: answer}];
@@ -962,7 +968,7 @@ function finish(el, q, out, steps, traces, pending){
   const model = out.model || (/no AI/.test(out.by || '') ? 'Worked out exactly (no AI)' : '');
   const badge = out.verify ? trustBadge(out.verify) : out.trust && !out.saved && pending ? `<span class="conf pending" title="A second model is checking each claim against the sources">Checking claims…</span>` : '';
   el.querySelector('.slot').innerHTML = `<div class="a"><div class="badges">${model ? `<span class="model" title="The AI model that wrote this answer">✦ ${esc(model)}</span>` : ''}${badge}</div>${render(out)}
-    <div class="foot"><span class="by">${esc(out.by || '')}</span>${out.saved ? '<button class="ghost fresh" type="button">Ask fresh</button>' : ''}<button class="ghost cp" type="button" title="Copy the answer">Copy</button><button class="ghost rt" type="button" title="Ask again from scratch">Retry</button><button class="ghost up" type="button" title="Good answer — keep it">👍</button><button class="ghost down" type="button" title="Wrong — tell it what is right">👎</button>${mode === 'mac' && out.text ? '<button class="ghost pin" type="button" title="Pin as important — every chat can use it (What it learned → Pinned)">📌</button>' : ''}</div></div>`;
+    <div class="foot"><span class="by">${esc(out.by || '')}</span>${out.saved ? '<button class="ghost fresh" type="button">Ask fresh</button>' : ''}<button class="ghost cp" type="button" title="Copy the answer">Copy</button><button class="ghost say" type="button" title="Read this answer out loud" aria-label="Read aloud">🔊</button><button class="ghost rt" type="button" title="Ask again from scratch">Retry</button><button class="ghost up" type="button" title="Good answer — keep it">👍</button><button class="ghost down" type="button" title="Wrong — tell it what is right">👎</button>${mode === 'mac' && out.text ? '<button class="ghost pin" type="button" title="Pin as important — every chat can use it (What it learned → Pinned)">📌</button>' : ''}</div></div>`;
   drawDiagrams(el);                                          // a ```mermaid diagram in the answer, drawn
   enhance(el);                                               // its maths drawn and its code coloured
   el.querySelector('.foot .down').onclick = () => teachBox(el, q);
@@ -970,6 +976,7 @@ function finish(el, q, out, steps, traces, pending){
   if(pinB) pinB.onclick = async () => { const r = await post('/memory', {pin: {text: String(out.text || '').slice(0, 4000), q, chatId: sessionId, chatTitle: chatName || q}}).catch(()=>null); if(r && r.pin){ pinB.textContent = '📌 Pinned'; pinB.disabled = true; toast('Pinned — any chat can use it now'); } else toast('Could not pin it'); };
   el.querySelector('.foot .cp').onclick = e => { const b = e.currentTarget; (navigator.clipboard ? navigator.clipboard.writeText(out.text || '') : Promise.reject()).then(()=>{ b.textContent = 'Copied'; setTimeout(()=>{ b.textContent = 'Copy'; }, 1500); }).catch(()=>toast('Select the text to copy it')); };
   el.querySelector('.foot .rt').onclick = () => ask(q, {fresh: true});
+  const sayB = el.querySelector('.foot .say'); if(sayB) sayB.onclick = () => window.readAloud ? window.readAloud(out, sayB) : toast('This browser cannot read aloud');
   if(out.kind === 'clarify'){ const a = el.querySelector('.a'); a.classList.add('ask'); a.querySelector('.foot').insertAdjacentHTML('beforebegin', '<p class="asknote">Tap an answer, or type your own below.</p>'); }
   if(out.followups && out.followups.length) setTimeout(()=>showFollow(el, out.followups));
   el.querySelector('.foot .up').onclick = async e => {
@@ -1056,6 +1063,8 @@ async function ask(q, opt){
   const done = out => {
     if(deletedSessions.has(requestSessionId)) return;
     lastAnswer = out;
+    // asked by speaking (the 🎤): the answer is spoken back too (voice mode speaks its own)
+    if(window.spokenAsk && !(opt && opt.voice)){ window.spokenAsk = false; if(window.readAloud) setTimeout(()=>window.readAloud(out), 50); }
     if(steps[0] && steps[0].t === 'Starting') steps.shift();
     finish(el, q, out, steps, traces, true);
     const imgs = out.images || [];
@@ -1157,8 +1166,10 @@ async function loadLearned(){
   if(!d){ $('#learned').innerHTML = '<p class="err">Could not load.</p>'; return; }
   const cases = d.cases || [];
   const lc = $('#learnedCount'); lc.hidden = !cases.length; lc.textContent = cases.length;
-  let pinned = []; if(mode === 'mac'){ try{ pinned = (await fetch(HELPER + '/memory').then(r=>r.json())).pins || []; }catch(e){} }
+  let pinned = [], mem = null; if(mode === 'mac'){ try{ mem = await fetch(HELPER + '/memory').then(r=>r.json()); pinned = mem.pins || []; }catch(e){} }
+  const autoMem = (mem && mem.auto) || [];
   $('#learned').innerHTML =
+    (mem ? `<h3><i style="background:var(--think)"></i>🧠 What I remember about you <label class="memsw" title="Remember automatically"><input type="checkbox" id="memAuto" ${mem.autoOn ? 'checked' : ''}> automatic</label></h3><p class="sub">Kept by itself from what you tell me about yourself — no pinning needed. Never passwords, keys or account numbers.</p>` + (autoMem.length ? `<ul style="list-style:none;padding:0">${autoMem.map(a=>`<li class="lesson you">${esc(a.text)}<div class="forget"><button class="ghost" data-mforget="${esc(a.id)}" type="button">Forget</button></div></li>`).join('')}</ul>` : '<p class="sub">Nothing yet.</p>') : '') +
     `<h3><i style="background:var(--calc)"></i>📌 Pinned (every chat can use these)</h3>` + (pinned.length ? `<ul style="list-style:none;padding:0">${pinned.map(p=>`<li class="lesson you">${p.kind === 'chat' ? '💬 The whole chat “' + esc(p.chatTitle || 'untitled') + '”' : esc((p.q ? p.q + ' — ' : '') + p.text.slice(0, 240)) + (p.text.length > 240 ? '…' : '')}<div class="foot"><span>${p.kind === 'chat' ? 'Pinned chat' : esc(p.chatTitle ? 'From “' + p.chatTitle.slice(0, 60) + '”' : 'A note')} · ${esc(String(p.at).slice(0, 10))}</span><button class="ghost" type="button" data-unpin="${esc(p.id)}">Unpin</button></div></li>`).join('')}</ul>` : '<p class="sub">Nothing pinned yet — 📌 under an answer keeps it for every chat (in the terminal: /pin).</p>') +
     `<h3><i style="background:var(--read)"></i>Lessons from particular questions</h3>` + (cases.length ? `<ul>${cases.map(c=>`<li class="lesson${c.taught ? ' you' : ''}">${esc(c.lesson)}<div class="foot"><span>${c.taught ? 'You taught this' : 'Caught by its own check'}${c.n > 1 ? ' · ' + c.n + ' times' : ''}</span><button class="ghost" data-id="${esc(c.id)}" type="button">Forget</button></div></li>`).join('')}</ul>` : '<p class="sub">None yet. When its check catches a mistake, or you teach it, the lesson shows here.</p>') +
     `<h3><i style="background:var(--think)"></i>About you (/remember)</h3>` + ((d.profile || []).length ? `<ul style="list-style:none;padding:0">${d.profile.map(p=>`<li class="lesson you">${esc(p.text)}<div class="foot"><span>Given to every answer</span><button class="ghost" data-id="${esc(p.id)}" type="button">Forget</button></div></li>`).join('')}</ul>` : '<p class="sub">Nothing yet. Type <code>/remember I live in Pune</code>.</p>') +
@@ -1168,6 +1179,8 @@ async function loadLearned(){
     `<h3><i style="background:var(--search)"></i>Rules every answer is checked against</h3><ol>${Object.values(d.rules || {}).map(r=>`<li>${esc(r)}</li>`).join('')}</ol>` +
     `<h3><i style="background:var(--think)"></i>Your own rules</h3>` + ((d.yours || []).length ? `<ul>${d.yours.map(r=>`<li>${esc(r)}</li>`).join('')}</ul>` : '') + (d.rulesFile ? `<p class="sub">Add lines starting with “- ” to <code>${esc(d.rulesFile)}</code></p>` : '<p class="sub">Kept on your Mac (~/.money-ai/rules.md).</p>');
   $('#learned').querySelectorAll('[data-id]').forEach(b=>b.onclick = async () => { await api.forget(b.dataset.id); loadLearned(); });
+  $('#learned').querySelectorAll('[data-mforget]').forEach(b=>b.onclick = async () => { await post('/memory', {memory: 'forget ' + b.dataset.mforget}).catch(()=>null); loadLearned(); });
+  const ma = $('#memAuto'); if(ma) ma.onchange = async () => { await post('/memory', {memory: ma.checked ? 'on' : 'off'}).catch(()=>null); toast(ma.checked ? 'Automatic memory on' : 'Automatic memory off'); };
   $('#learned').querySelectorAll('[data-unpin]').forEach(b=>b.onclick = async () => { await post('/memory', {unpin: b.dataset.unpin}).catch(()=>null); loadLearned(); });
 }
 const pill = (id, text, cls) => { const p = $(id); p.hidden = false; p.className = 'pill ' + (cls || ''); p.innerHTML = (/model/.test(cls || '') ? '✦ ' : '<i></i>') + esc(text);
@@ -1540,7 +1553,8 @@ if(SR){
     if(rec){ rec.stop(); return; }
     rec = new SR(); rec.lang = navigator.language && /^en|^hi/.test(navigator.language) ? navigator.language : 'en-IN'; rec.interimResults = true; rec.continuous = false;
     const before = $('#q').value;
-    rec.onresult = e => { $('#q').value = (before ? before + ' ' : '') + Array.from(e.results).map(r=>r[0].transcript).join(''); grow(); };
+    rec.onresult = e => { $('#q').value = (before ? before + ' ' : '') + Array.from(e.results).map(r=>r[0].transcript).join(''); grow(); window.spokenAsk = true; };
+    if(window.unlockAudio) window.unlockAudio();         // a phone plays the spoken answer only after a tap
     rec.onend = () => { rec = null; mic.classList.remove('on'); $('#q').focus(); };
     rec.onerror = e => { if(e.error === 'not-allowed') toast('Allow the microphone for this page to speak'); else if(e.error !== 'no-speech' && e.error !== 'aborted') toast('Voice: ' + e.error); };
     mic.classList.add('on'); rec.start();
@@ -1608,6 +1622,11 @@ if(SR && 'speechSynthesis' in window){
     rec.start(); };
   const start = () => { on = true; quiet = 0; if(mode === 'mac') unlock(); bar.hidden = false; $('#talk').classList.add('on'); $('#mVoice').classList.add('on'); listen(); };
   const stop = () => { on = false; try{ rec && rec.abort(); }catch(e){} rec = null; hush(); bar.hidden = true; $('#talk').classList.remove('on'); $('#mVoice').classList.remove('on'); };
+  // 🔊 under any answer (and the answer to a question asked with the 🎤): read out with the same voice, outside voice mode
+  window.unlockAudio = () => { if(mode === 'mac') unlock(); };
+  window.readAloud = async (out, btn) => { if(on && !btn) return; if(talking || speechSynthesis.speaking){ hush(); if(btn){ btn.textContent = '🔊'; return; } }
+    const was = on; on = true; if(btn) btn.textContent = '⏹';
+    try{ await sayAnswer(spokenText(out)); }finally{ if(!was) on = false; if(btn) btn.textContent = '🔊'; } };
   $('#talk').onclick = () => on ? stop() : start();
   $('#vend').onclick = stop;
   $('#vlang').onclick = () => { setLang(lang === 'hi-IN' ? 'en-IN' : 'hi-IN'); if(rec){ try{ rec.abort(); }catch(e){} } };
@@ -1633,7 +1652,8 @@ const COMMANDS = [
   {c: '/file', a: '', d: 'Attach a file (PDF, text, CSV, code)'},
   {c: '/cloud', a: 'on | off', d: 'Let a bigger cloud model write the hard answers'},
   {c: '/theme', a: 'auto | light | dark', d: 'Change the look'},
-  {c: '/schedule', a: '', d: 'Scheduled tasks — a question asked for you every day at a time'},
+  {c: '/schedule', a: '09:00 weekdays a question', d: 'A question asked for you each day at a time (list · remove n; alone: the Scheduled panel)'},
+  {c: '/loop', a: '15m a question', d: 'Ask it every 15 minutes (1m at least; x10: at most 10 runs; --market: 09:15–15:30 IST) into its own 🔁 chat, stops after 24 h · list · stop [n|all]'},
   {c: '/image', a: 'a description', d: 'Make a picture from a description (the model: ✦ menu → Pictures)'},
   {c: '/video', a: 'a description', d: 'A video with real motion, free — "/video a 8 second …", or longer in scenes: "/video a 1 minute … with narration" ("continue the video" adds what the free allowance did not); "/gif …" for a GIF (the model: ✦ menu → Videos)'},
   {c: '/compare', a: 'a description', d: 'The same picture by 4 models side by side ("/compare best …": the 4 best)'},
@@ -1645,6 +1665,15 @@ const COMMANDS = [
   {c: '/deep', a: 'a hard question', d: 'Deep mode: deeper research, then ChatGPT and Apple Private Cloud each write it and ChatGPT merges them'},
   {c: '/chats', a: '', d: 'Your past chats — open one to carry on (also /resume)'},
   {c: '/new', a: '', d: 'Start a new chat (the last one stays in Chats)'},
+  {c: '/clear', a: '', d: 'Start a new chat (the same as /new)'},
+  {c: '/compact', a: '', d: 'The older turns of this chat in one short summary, kept as context (the last 2 stay as they are)'},
+  {c: '/rewind', a: '', d: 'Take back the last question and its answer (/rewind 2: the last two)'},
+  {c: '/context', a: '', d: 'What the next answer will see: turns, goal, rules, pins, project, model'},
+  {c: '/memory', a: 'forget n · clear · off · on · add …', d: 'What it remembers about you — kept automatically, no pinning needed'},
+  {c: '/tune', a: 'run · off n · remove n', d: 'Self-tune: the rules it learned from answers that went wrong'},
+  {c: '/config', a: 'name value', d: 'Settings and limits (also in Skills → Limits)'},
+  {c: '/review', a: '', d: 'Review the coding project\'s uncommitted changes for bugs (nothing is changed)'},
+  {c: '/init', a: '', d: 'Make the coding project\'s notes, so SoGPT knows it'},
   {c: '/model', a: '', d: 'Choose the model that answers (the ✦ menu)'},
   {c: '/project', a: '', d: 'Choose the coding project (SoGPT 1.1 works on it)'},
   {c: '/usage', a: '', d: 'Usage and health: models, who asked, what needs a look'},
@@ -1671,6 +1700,41 @@ function pickCommand(c){
 }
 let goal = store.get('ai.goal', '');
 function showGoal(){ const g = $('#goalbar'); g.hidden = !goal; g.innerHTML = goal ? `<span>🎯 Goal: <b title="${esc(goal)}">${esc(goal)}</b><button type="button" aria-label="Clear the goal">×</button></span>` : ''; if(goal) g.querySelector('button').onclick = () => { goal = ''; store.set('ai.goal', ''); showGoal(); toast('Goal cleared'); }; }
+// a command's result shown in the chat (not kept in it, like /help)
+const note = (q, text, model) => { const el = turnEl(q); finish(el, q, {text, model, by: model}, []); el.scrollIntoView({behavior: 'smooth', block: 'start'}); };
+const turnChars = h => ('User: ' + h.q + '\nAssistant: ' + ((h.answer || {}).text || '')).length;
+/* /compact: the older turns in one summary written on the Mac by a fast model; the last 2 turns as they were. The turns
+   summarised stay in the chat (dimmed) but are not sent again. No helper or no model: only the last 4 turns are sent. */
+async function compactChat(){
+  const sid = sessionId, live = history.filter(h=>!(h.answer || {}).compacted);
+  if(activeRequests.has(sid)) return toast('Wait for the answer (or stop it) first');
+  if(live.length < 3) return toast('Nothing to compact yet — the last 2 turns are always kept as they are');
+  toast('Summarising the older turns…');
+  let r = null;
+  if(mode === 'mac'){ try{ r = await post('/session', {compact: true, turns: history}); }catch(e){} }
+  if(!r || !r.ok && !r.why){ const gone = live.slice(0, -4);
+    r = {ok: gone.length > 0, offline: true, summarised: gone.length, why: 'Nothing to leave out — the chat is short already', before: live.reduce((n, h)=>n + turnChars(h), 0), after: live.slice(-4).reduce((n, h)=>n + turnChars(h), 0),
+      turns: history.map(h=>gone.includes(h) ? Object.assign({}, h, {answer: Object.assign({}, h.answer, {compacted: true})}) : h)}; }
+  if(!r.ok) return toast(r.why || 'Could not compact this chat');
+  if(sid !== sessionId) return;                              // another chat was opened meanwhile
+  history = r.turns; store.set('moneyai.history', history); saveChat(); drawHistory();
+  const pc = Math.max(0, Math.round(100 - r.after / Math.max(1, r.before) * 100));
+  toast((r.offline ? 'No model answered: the last 4 turns are kept' : r.summarised + ' older turn' + (r.summarised === 1 ? '' : 's') + ' in one summary') + ' — ' + pc + '% shorter');
+}
+// /context: what the next answer will see
+async function showContext(){
+  const turns = conversationTurns(history), chars = turns.reduce((n, m)=>n + m.content.length, 0), sum = history.some(h=>(h.answer || {}).summary && !h.answer.compacted);
+  let rules = store.get('ai.rules', []).length, pins = '—', project = 'none (/project)';
+  if(mode === 'mac'){
+    try{ rules = ((await api.learned()).yours || []).length; }catch(e){}
+    try{ pins = String(((await fetch(HELPER + '/memory').then(r=>r.json())).pins || []).length); }catch(e){}
+    try{ const P = await fetch(HELPER + '/projects').then(r=>r.json()), id = store.get('ai.project', '') || P.selected, x = (P.list || []).find(p=>p.id === id); if(x) project = x.name; }catch(e){}
+  }
+  const rows = [['Turns sent with the next question', Math.floor(turns.length / 2) - (sum ? 1 : 0) + (sum ? ' + the /compact summary' : '') + ' · about ' + Math.ceil(chars / 3.2).toLocaleString('en-IN') + ' tokens (' + history.length + ' in the chat)'],
+    ['Goal', goal || 'none (/goal)'], ['Your rules', rules + ' (/rule)'], ['Pinned', pins + ' — given when a question is about them'], ['Attached files', attachments.length ? attachments.map(a=>a.name).join(', ') : 'none'],
+    ['Coding project', project], ['Model', $('#stModel') ? $('#stModel').textContent.trim() || 'Auto' : 'Auto'], ['Mode', [toolMode && MODES[toolMode], store.get('ai.cloud', false) ? 'cloud on' : 'cloud off'].filter(Boolean).join(' · ')]];
+  note('/context', rows.map(([k, v])=>'- **' + k + ':** ' + v).join('\n'), 'Context');
+}
 async function runCommand(line){
   const m = /^(\/\w+)\s*([\s\S]*)$/.exec(line.trim()); if(!m) return false;
   const [, c, rest] = m, arg = rest.trim();
@@ -1684,9 +1748,30 @@ async function runCommand(line){
   else if(c === '/file') $('#fileIn').click();
   else if(c === '/cloud'){ const on = !/^off$/i.test(arg); store.set('ai.cloud', on); $('#cloudTog').checked = on; toast('Cloud AI for hard questions: ' + (on ? 'on' : 'off')); }
   else if(c === '/theme'){ const t = /^(light|dark)$/i.test(arg) ? arg.toLowerCase() : 'auto'; store.set('ai.theme', t); applyTheme(t); toast('Theme: ' + t); }
-  else if(c === '/new') newChat();
+  else if(c === '/new' || c === '/clear') newChat();
   else if(c === '/chats' || c === '/resume') openChats(true);
-  else if(c === '/schedule') openTasks(true);
+  // /loop and /schedule: kept and asked by the helper on the Mac (with the page closed too); the panel lists them
+  else if(c === '/schedule' && !arg) openTasks(true);
+  else if(c === '/loop' && (!arg || /^(list|ls)$/i.test(arg))) openTasks(true);
+  else if(c === '/loop' || c === '/schedule'){
+    if(mode !== 'mac') return toast('Loops and scheduled questions run on your Mac — open this page there (or over Tailscale)');
+    const r = await post('/task', c === '/loop' ? {loop: arg} : {schedule: arg}).catch(()=>null);
+    if(!r) return toast('The helper on the Mac did not answer');
+    note(c + ' ' + arg, r.text, c === '/loop' ? 'Loops' : 'Scheduled'); if($('#taskPanel').classList.contains('open')) loadTasks();
+  }
+  else if(c === '/compact') compactChat();
+  else if(c === '/rewind'){
+    if(activeRequests.has(sessionId)) return toast('Wait for the answer (or stop it) first');
+    const n = Math.max(1, parseInt(arg, 10) || 1), keep = Math.max(Math.min(1, history.length), history.length - n), gone = history.length - keep;
+    if(!gone) return toast(history.length ? 'Only one question in this chat — /new starts a new one' : 'Nothing to rewind');
+    history = history.slice(0, keep); store.set('moneyai.history', history); saveChat(); drawHistory(); setTitle();
+    toast('Rewound ' + gone + ' question' + (gone === 1 ? '' : 's'));
+  }
+  else if(c === '/context') showContext();
+  else if(c === '/memory' || c === '/tune' || c === '/config'){ if(mode !== 'mac') return toast('That is kept on your Mac — open this page there (or over Tailscale)');
+    const j = await post(c === '/memory' ? '/memory' : c === '/tune' ? '/tune' : '/settings', c === '/memory' ? {memory: arg} : {cmd: arg}).catch(e=>({text: 'Could not reach your Mac: ' + e.message}));
+    note(c + (arg ? ' ' + arg : ''), j.text || j.error || 'Done.', c === '/memory' ? 'Memory' : c === '/tune' ? 'Self-tune' : 'Settings'); }
+  else if(c === '/review' || c === '/init'){ if(mode !== 'mac') return toast('Coding projects are on your Mac — open this page there (or over Tailscale)'); if(!store.get('ai.project', '')) return toast('Choose a coding project first (/project)'); ask(c); }
   else if(c === '/data-usage' || c === '/usage') openUsage(true);
   else if(c === '/model') $('#stModel').click();
   else if(c === '/project' || c === '/projects') $('#openProjects').click();
@@ -1755,7 +1840,7 @@ async function openChat(id){
 }
 function drawHistory(finished){
   $('#turns').innerHTML = ''; $('#hello').hidden = history.length > 0;
-  history.forEach(h=>{ const el = turnEl(h.q); finish(el, h.q, h.answer, h.steps || [], h.traces || []); });
+  history.forEach(h=>{ const el = turnEl(h.q); finish(el, h.q, h.answer, h.steps || [], h.traces || []); if(h.answer && h.answer.compacted){ el.classList.add('compacted'); el.title = 'In the /compact summary — not sent with new questions'; } });
   // Keep the in-progress question visible if the user returns to its chat.
   // the question still being answered: its own block put back, with the steps so far, still updating (a fresh empty
   // block had been drawn, and the thinking went on out of sight)
@@ -1840,12 +1925,17 @@ const DAYS_TXT = d => { const k = JSON.stringify(d); return k === '[0,1,2,3,4,5,
 async function loadTasks(){
   const box = $('#tasks');
   if(mode !== 'mac'){ box.innerHTML = '<p class="sub" style="margin-top:12px">Scheduled tasks run on your Mac. Open this page on the Mac (with the helper running) to add them; their results reach every device through your chats.</p>'; return; }
-  let list = []; try{ list = (await fetch(HELPER + '/tasks').then(r=>r.json())).list || []; }catch(e){}
-  box.innerHTML = (list.length ? list.map(t=>`<div class="trow2"><input type="checkbox" data-on="${esc(t.id)}" ${t.on !== false ? 'checked' : ''} aria-label="On"><span class="tt"><b>${esc(t.prompt)}</b><small>${esc(t.time)} · ${esc(DAYS_TXT(t.days))}${t.cloud ? ' · cloud AI' : ''}${t.last ? ' · last run ' + esc(t.last) : ''}</small></span><span class="acts"><button class="ghost" type="button" data-run="${esc(t.id)}">Run now</button><button class="ghost" type="button" data-del="${esc(t.id)}">Delete</button></span></div>`).join('') : '<p class="sub" style="margin-top:12px">Nothing scheduled yet.</p>') +
+  let all = []; try{ all = (await fetch(HELPER + '/tasks').then(r=>r.json())).list || []; }catch(e){}
+  // loops (/loop) first, each with Stop; then the daily questions
+  const list = all.filter(t=>t.kind !== 'loop'), loops = all.filter(t=>t.kind === 'loop');
+  const every = ms => ms % 3600000 === 0 ? ms / 3600000 + 'h' : ms % 60000 === 0 ? ms / 60000 + 'm' : Math.round(ms / 1000) + 's';
+  const when = iso => new Date(iso).toLocaleString('en-IN', {dateStyle: 'medium', timeStyle: 'short'});
+  box.innerHTML = (loops.length ? '<h3>🔁 Loops</h3>' + loops.map(t=>`<div class="trow2"><span class="tt"><b>${esc(t.prompt)}</b><small>every ${esc(every(t.every))}${t.runs ? ' · run ' + (t.done || 0) + ' of ' + t.runs : t.done ? ' · ' + t.done + ' run' + (t.done === 1 ? '' : 's') : ''}${t.market ? ' · market hours only' : ''}${t.runningSince ? ' · running now' : ''} · stops ${esc(when(t.until))}</small></span><span class="acts"><button class="ghost" type="button" data-run="${esc(t.id)}">Run now</button><button class="ghost" type="button" data-del="${esc(t.id)}">Stop</button></span></div>`).join('') + '<h3>⏰ Every day</h3>' : '') +
+    (list.length ? list.map(t=>`<div class="trow2"><input type="checkbox" data-on="${esc(t.id)}" ${t.on !== false ? 'checked' : ''} aria-label="On"><span class="tt"><b>${esc(t.prompt)}</b><small>${esc(t.time)} · ${esc(DAYS_TXT(t.days))}${t.cloud ? ' · cloud AI' : ''}${t.last ? ' · last run ' + esc(t.last) : ''}</small></span><span class="acts"><button class="ghost" type="button" data-run="${esc(t.id)}">Run now</button><button class="ghost" type="button" data-del="${esc(t.id)}">Delete</button></span></div>`).join('') : '<p class="sub" style="margin-top:12px">Nothing scheduled yet.</p>') + (loops.length ? '' : '<p class="sub" style="margin-top:12px">A loop: type <code>/loop 15m a question</code> in the box.</p>') +
     `<h3>Add a task</h3><form class="cform" id="tform"><input id="tp" placeholder="What to ask, e.g. Nifty 50 technical summary with key levels" required maxlength="1000"><div class="two"><input id="tt" type="time" value="09:00" required><select id="td"><option value="daily">Every day</option><option value="weekdays">Weekdays</option><option value="weekends">Weekends</option></select></div><label class="tog" style="margin:0"><input type="checkbox" id="tc"><span>Use the cloud AI (faster for analysis)</span></label><button class="btn">Schedule it</button></form>`;
   const upd = async (t, ch) => { await post('/task', Object.assign({}, t, ch)); loadTasks(); };
   box.querySelectorAll('[data-on]').forEach(i=>i.onchange = () => upd(list.find(t=>t.id === i.dataset.on), {on: i.checked}));
-  box.querySelectorAll('[data-del]').forEach(b=>b.onclick = async () => { await post('/task', {id: b.dataset.del, delete: true}); loadTasks(); toast('Task deleted'); });
+  box.querySelectorAll('[data-del]').forEach(b=>b.onclick = async () => { await post('/task', {id: b.dataset.del, delete: true}); loadTasks(); toast(b.textContent === 'Stop' ? 'Loop stopped — its answers stay in its 🔁 chat' : 'Task deleted'); });
   box.querySelectorAll('[data-run]').forEach(b=>b.onclick = async () => { await post('/task', {id: b.dataset.run, run: true}); toast('Running — the result will appear in its ⏰ chat'); setTimeout(loadChats, 60000); });
   $('#tform').onsubmit = async e => { e.preventDefault(); const r = await post('/task', {prompt: $('#tp').value, time: $('#tt').value, days: $('#td').value, cloud: $('#tc').checked}).catch(()=>null); toast(r && r.id ? 'Scheduled' : 'Could not schedule that'); loadTasks(); };
 }
@@ -1985,13 +2075,26 @@ async function loadSkills(){
   let d = null; try{ d = await fetch(HELPER + '/skills').then(r=>r.json()); }catch(e){}
   if(!d || !d.skills){ box.innerHTML = '<p class="sub">Your Mac\'s AI is not answering — is the helper running?</p>'; return; }
   const when = t => t ? new Date(t).toLocaleString([], {day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit'}) : 'never';
-  const repo = s => /^https?:/.test(s.source) ? `<a href="${esc(s.source)}" target="_blank" rel="noopener">${esc(String(s.source).replace('https://github.com/', ''))}</a>` : esc(s.source);
+  // where a skill came from: its GitHub repo (or the article) as a link
+  const link = u => `<a href="${esc(u)}" target="_blank" rel="noopener">${esc(String(u).replace(/^https:\/\/(www\.)?(github\.com\/)?/, '').replace(/\/$/, ''))}</a>`;
+  const repo = s => (s.links || []).length ? '🔗 ' + s.links.map(link).join(' · ') : /^https?:/.test(s.source) ? '🔗 ' + link(s.source) : esc(s.source);
   // installed tools, then the built-in ones (rules and ways of working taken from GitHub repos into the AI's own code)
   const row = s => { const state = s.pending ? ['yellow', 'Planned — not installed yet (reply “install it” in its chat)'] : s.off ? ['grey', 'Switched off — ' + (s.builtin ? 'not used until you switch it on' : 'kept installed, not used')] : s.tested && s.tested.ok ? ['green', 'Working — checked ' + when(s.tested.at)] : s.tested ? ['red', 'Not working — ' + (s.tested.why || 'failed its check').replace(/\s+/g, ' ').slice(0, 140)] : ['green', s.core ? 'Always on — part of how answers are kept honest' : 'On — press Test to check it'];
-    return `<div class="krow skrow" data-k="${esc(s.slug)}" data-b="${s.builtin ? 1 : ''}"><div class="khead"><span class="kdot ${state[0]}"></span><b>${esc(s.name)}</b>${s.pending || s.core ? '' : `<label title="Use this skill"><input type="checkbox" data-act="on" ${s.off ? '' : 'checked'}></label>`}</div><small>${esc(s.description)}</small><small>${esc(state[1])}</small><div class="kedit">${s.pending ? '' : '<button class="ghost" data-act="test" type="button">Test</button>'}${s.builtin ? '' : '<button class="ghost" data-act="remove" type="button">Remove</button>'}</div><small>${s.builtin ? 'From ' : ''}${repo(s)}</small></div>`; };
+    return `<div class="krow skrow" data-k="${esc(s.slug)}" data-b="${s.builtin ? 1 : ''}"><div class="khead"><span class="kdot ${state[0]}"></span><b>${esc(s.name)}</b>${s.pending || s.core ? '' : `<label title="Use this skill"><input type="checkbox" data-act="on" ${s.off ? '' : 'checked'}></label>`}</div><small>${esc(s.description)}</small><small>${esc(state[1])}</small><div class="kedit">${s.pending ? '' : '<button class="ghost" data-act="test" type="button">Test</button>'}${s.builtin ? '' : '<button class="ghost" data-act="remove" type="button">Remove</button>'}</div><small class="skfrom">${repo(s)}</small></div>`; };
   const b = d.builtin || [];
   box.innerHTML = `<h3 class="skh">Installed · ${d.skills.length}</h3>` + (d.skills.length ? d.skills.map(row).join('') : '<p class="sub">None yet. Ask in the chat: <b>integrate https://github.com/owner/repo</b></p>')
     + (b.length ? `<h3 class="skh">Built in · ${b.length}</h3><p class="sub">Ideas and rules taken from GitHub repos into your AI's own code.</p>` + b.map(row).join('') : '');
+  // SELF-TUNE's learned tweaks, and the limits (settings) — changed here without changing code
+  let tu = null, st = null; try{ [tu, st] = await Promise.all([fetch(HELPER + '/tune').then(r=>r.json()), fetch(HELPER + '/settings').then(r=>r.json())]); }catch(e){}
+  if(tu) box.insertAdjacentHTML('beforeend', `<h3 class="skh">Learned tweaks · ${tu.tweaks.length}</h3><p class="sub">Self-tune learns these at night from answers that went wrong (👎, corrections, claims its sources did not hold) — a rule is kept only when it clearly wins. Waiting to learn from: ${tu.waiting}.${tu.last && tu.last.day ? ' Last run ' + esc(tu.last.day) + ': kept ' + tu.last.kept + '.' : ''}</p>`
+    + tu.tweaks.map(t=>`<div class="krow skrow" data-tw="${esc(t.id)}"><div class="khead"><span class="kdot ${t.on === false ? 'grey' : 'green'}"></span><b>${esc(t.rule)}</b><label title="Use this tweak"><input type="checkbox" data-tw-on ${t.on === false ? '' : 'checked'}></label></div><small>For questions about: ${esc((t.words || []).join(', '))} · learned from “${esc(String((t.from || {}).q || '').slice(0, 80))}”</small><div class="kedit"><button class="ghost" data-tw-rm type="button">Remove</button></div></div>`).join('')
+    + '<div class="kedit"><button class="ghost" id="tuneNow" type="button">Run self-tune now</button></div>');
+  if(st) box.insertAdjacentHTML('beforeend', `<h3 class="skh">Limits</h3><p class="sub">Change any of these here or with /config in the terminal.</p>` + st.list.map(x=>`<div class="krow setrow" data-set="${esc(x.key)}"><div class="khead"><b>${esc(x.about)}</b>${typeof x.def === 'boolean' ? `<label><input type="checkbox" data-set-v ${x.value ? 'checked' : ''}></label>` : `<input type="number" inputmode="numeric" data-set-v value="${esc(x.value)}" min="${x.min}" max="${x.max}" style="width:72px">`}</div><small>${esc(x.key)}${x.value !== x.def ? ' · default ' + esc(String(x.def)) : ''}${x.min !== undefined ? ' · ' + x.min + '–' + x.max : ''}</small></div>`).join(''));
+  box.querySelectorAll('[data-tw-on]').forEach(c=>c.onchange = async () => { await post('/tune', {id: c.closest('[data-tw]').dataset.tw, on: c.checked}).catch(()=>null); toast(c.checked ? 'Tweak on' : 'Tweak off'); loadSkills(); });
+  box.querySelectorAll('[data-tw-rm]').forEach(b=>b.onclick = async () => { await post('/tune', {remove: b.closest('[data-tw]').dataset.tw}).catch(()=>null); toast('Removed'); loadSkills(); });
+  const tn = $('#tuneNow'); if(tn) tn.onclick = async () => { tn.disabled = true; tn.textContent = 'Self-tuning… (this uses AI calls)'; try{ const j = await post('/tune', {run: true}); toast(String(j.text || '').split('\n')[0].replace(/\*/g, '').slice(0, 120)); }catch(e){ toast('That did not work: ' + e.message); } loadSkills(); };
+  box.querySelectorAll('[data-set-v]').forEach(i=>i.onchange = async () => { const key = i.closest('[data-set]').dataset.set;
+    try{ const j = await post('/settings', {key, value: i.type === 'checkbox' ? i.checked : i.value}); toast(j.error ? j.error : key + ' = ' + j.value); }catch(e){ toast('Not saved: ' + e.message); } loadSkills(); });
   box.querySelectorAll('[data-act]').forEach(btn=>{ const r = btn.closest('.skrow'), k = r.dataset.k, builtin = !!r.dataset.b;
     if(btn.dataset.act === 'on') btn.onchange = async () => { await post('/skills', {slug: k, on: btn.checked, builtin}); toast(btn.checked ? 'Switched on' : 'Switched off'); loadSkills(); };
     else btn.onclick = async () => { btn.disabled = true; btn.textContent = btn.dataset.act === 'test' ? 'Testing…' : 'Removing…';
