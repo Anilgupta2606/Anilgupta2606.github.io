@@ -1790,6 +1790,7 @@ async function runCommand(line){
   else if(c === '/video' || c === '/gif'){ if(arg) ask((c === '/gif' ? 'Make a GIF of ' : 'Make a video of ') + arg); else toast('Describe it after ' + c); }
   else if(c === '/compare'){ const best = /^best\b/i.test(arg || ''), d0 = String(arg || '').replace(/^best\b\s*/i, ''); if(d0) ask('Generate an image of ' + d0, {imageModel: best ? 'compare-best' : 'compare'}); else toast('Describe the picture after /compare'); }
   else if(c === '/image'){ if(arg) ask('Generate an image of ' + arg); else toast('Describe the picture after /image'); }
+  else if(c === '/help' && mode === 'mac'){ let md = ''; try{ md = (await fetch(HELPER + '/help').then(r=>r.json())).markdown || ''; }catch(e){} if(md){ note('/help', '**Commands here:** ' + COMMANDS.map(x=>'`' + x.c + '`').join(' ') + '\n\n' + md.replace(/^# .*\n/, ''), 'Help'); } else { const el = turnEl('/help'); finish(el, '/help', {text: COMMANDS.map(x=>'- `' + x.c + (x.a ? ' ' + x.a : '') + '` — ' + x.d).join('\n'), model: 'Help'}, []); } }
   else if(c === '/help'){ const el = turnEl('/help'); finish(el, '/help', {text: COMMANDS.map(x=>'- `' + x.c + (x.a ? ' ' + x.a : '') + '` — ' + x.d).join('\n'), model: 'Commands', by: 'Type / in the box to see these'}, []); }
   else { toast('No such command — type / to see them'); return true; }
   return true;
