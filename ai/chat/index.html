@@ -135,7 +135,12 @@ main{flex:1; width:100%; max-width:840px; margin:0 auto; padding:28px 20px 190px
 
 /* a question and its answer */
 .turn{margin:0 0 40px}
-.q{display:flex; justify-content:flex-end; margin:0 0 14px}
+.q{display:flex; justify-content:flex-end; margin:0 0 14px; flex-wrap:wrap}
+.q .und{border:0; background:rgb(255 255 255 / .25); color:inherit; border-radius:999px; width:20px; height:20px; margin-left:8px; font-size:11px; line-height:20px; cursor:pointer; vertical-align:middle; padding:0}
+.diagram{margin:12px 0; border:1px solid var(--line); border-radius:12px; padding:12px; background:var(--card); overflow-x:auto}
+.diagram .dgraph svg{max-width:100%; height:auto}
+.diagram .dsrc{margin-top:8px; font-size:12.5px} .diagram .dsrc pre{white-space:pre-wrap}
+.undtext{flex-basis:100%; text-align:right; font-size:12.5px; color:var(--think); margin-top:4px; font-style:italic}
 .q div{background:var(--ink); color:var(--page); border-radius:20px 20px 6px 20px; padding:11px 16px; max-width:80%; font-weight:500; white-space:pre-wrap}
 .work{display:flex; gap:12px; align-items:flex-start; margin:0 0 12px}
 .work .orb{margin-top:3px}
@@ -393,6 +398,14 @@ main{max-width:800px; padding:22px 20px 170px}
 .vlang,.vend{padding:4px 12px; font-size:12.5px} .talk.on{color:var(--think)}
 .toolsMenu{left:48px; width:310px}
 @media (max-width:600px){ .toolsMenu{left:4px; width:calc(100vw - 28px)} .box{position:relative} .modechip{position:absolute; left:8px; top:-34px; box-shadow:var(--shadow); background:var(--card); border:1px solid var(--line)} }
+.modes{max-width:800px; margin:8px auto 0; display:flex; gap:6px; overflow-x:auto; scrollbar-width:none; -webkit-overflow-scrolling:touch; padding:1px 2px}
+.modes::-webkit-scrollbar{display:none}
+.mchip{flex:none; border:1px solid var(--line); background:var(--card); color:var(--ink); border-radius:999px; padding:6px 12px; font:inherit; font-size:13px; line-height:1.2; white-space:nowrap; cursor:pointer; transition:background .15s, color .15s}
+.mchip:hover{border-color:var(--think)}
+.mchip.on{background:var(--think-bg); color:var(--think); border-color:transparent; font-weight:600}
+.mchip.voice{margin-left:auto}
+.mchip.model{font-weight:600}
+@media (max-width:600px){ .modes{margin-top:6px} .mchip{padding:6px 10px; font-size:12.5px} .mchip.voice{margin-left:0} }
 .modechip{display:inline-flex; align-items:center; gap:4px; flex:none; background:var(--think-bg); color:var(--think); border-radius:999px; padding:3px 4px 3px 10px; font-size:12.5px; font-weight:600; white-space:nowrap; align-self:center}
 .modechip button{border:0; background:none; color:inherit; cursor:pointer; font-size:15px; line-height:1; width:20px; height:20px; border-radius:50%} .modechip button:hover{background:rgb(0 0 0 / .08)}
 .tools.on{color:var(--think)}
@@ -561,6 +574,17 @@ button, a, summary, label{touch-action:manipulation}
     <button class="clip mic" type="button" id="mic" aria-label="Speak your question" title="Speak (🎤)" hidden><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0014 0M12 18v3"/></svg></button>
     <button class="send" id="ask" aria-label="Ask"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg></button>
   </form>
+  <!-- HOW TO ANSWER, as chips under the box (like other chat apps): the model (Auto by default), Think, Deep, Research,
+       a picture, a video — one at a time, tap again to turn it off — and voice mode -->
+  <div class="modes" id="modes" role="toolbar" aria-label="How to answer">
+    <button type="button" class="mchip model" id="mModel" title="Which model answers (Auto picks the best for each question)">✦ <span id="mModelName">Auto</span> ▾</button>
+    <button type="button" class="mchip" data-m="council" title="Two models write it, an editor merges them">💭 Think</button>
+    <button type="button" class="mchip" data-m="deep" title="Deeper research; ChatGPT and Private Cloud write it, merged">🧠 Deep</button>
+    <button type="button" class="mchip" data-m="research" title="More searches and pages read, with sources">🔎 Research</button>
+    <button type="button" class="mchip" data-m="image" title="A picture from your words">🎨 Image</button>
+    <button type="button" class="mchip" data-m="video" title="A short video, made on your Mac">🎞 Video</button>
+    <button type="button" class="mchip voice" id="mVoice" title="Voice mode — talk, and hear the answer" hidden>〰 Voice</button>
+  </div>
   <div class="hint"><span>Enter to ask · Shift+Enter new line · ⌘K new chat · 🎤 dictate · ▮▮ voice mode</span><button class="link" id="clear" type="button">New chat</button></div>
 </div>
 
@@ -704,6 +728,8 @@ function markdown(text, urls){
     const head = /^(#{1,4})\s+(.+)/.exec(line);
     const item = /^\s*(?:([-*•])|(\d+)[.)])\s+(.+)/.exec(line);
     if(code){ flushPara(); flushList(); const c = codes[+code[1]];
+      // a diagram (mermaid): drawn as a picture, with its source a tap away
+      if(/^mermaid$/i.test(c.lang || '')){ out.push(`<div class="diagram"><div class="dgraph">Drawing the diagram…</div><details class="dsrc"><summary>Diagram source</summary><pre><code>${esc(c.code)}</code></pre></details></div>`); continue; }
       out.push(`<div class="code"><div class="codehead"><span>${esc(c.lang || 'code')}</span><button class="copy" type="button">Copy</button></div><pre><code>${esc(c.code)}</code></pre></div>`); continue; }
     if(head){ flushPara(); flushList(); out.push(`<h4>${inline(head[2], urls)}</h4>`); continue; }
     if(item){ flushPara(); const tag = item[2] ? 'ol' : 'ul'; if(!list || list.tag !== tag){ flushList(); list = {tag, items: []}; } list.items.push(item[3]); continue; }
@@ -793,12 +819,16 @@ function turnEl(q, files){
 }
 function finish(el, q, out, steps, traces, pending){
   steps = steps || []; traces = traces || [];
+  // ✎ on your message when it was put into clear words first: tap it to see what was understood (and answered)
+  if(out && out.understood && !el.querySelector('.q .und')){ const qd = el.querySelector('.q > div'); if(qd){ const b = document.createElement('button'); b.type = 'button'; b.className = 'und'; b.title = 'Understood as: ' + out.understood; b.setAttribute('aria-label', 'What your message was understood as'); b.textContent = '✎';
+    b.onclick = e => { e.stopPropagation(); const open = el.querySelector('.undtext'); if(open){ open.remove(); return; } const d = document.createElement('div'); d.className = 'undtext'; d.textContent = 'Understood as: ' + out.understood; qd.after(d); }; qd.appendChild(b); } }
   const n = traces.length || steps.length, dots = traces.length ? traces.map(t=>`<i class="${KIND[t.kind] || 'think'}"></i>`) : steps.map(s=>`<i class="${s.k}"></i>`);
   el.querySelector('.work').outerHTML = n ? `<details class="how"><summary><span class="dots">${dots.join('')}</span>How it got here · ${n} step${n === 1 ? '' : 's'}${out.secs ? ' · ' + out.secs + ' s' : ''}</summary>${traces.length ? timeline(traces) : `<div class="steps">${steps.map(s=>stepHtml(s)).join('')}</div>`}</details>` : '';
   const model = out.model || (/no AI/.test(out.by || '') ? 'Worked out exactly (no AI)' : '');
   const badge = out.verify ? trustBadge(out.verify) : out.trust && !out.saved && pending ? `<span class="conf pending" title="A second model is checking each claim against the sources">Checking claims…</span>` : '';
   el.querySelector('.slot').innerHTML = `<div class="a"><div class="badges">${model ? `<span class="model" title="The AI model that wrote this answer">✦ ${esc(model)}</span>` : ''}${badge}</div>${render(out)}
     <div class="foot"><span class="by">${esc(out.by || '')}</span>${out.saved ? '<button class="ghost fresh" type="button">Ask fresh</button>' : ''}<button class="ghost cp" type="button" title="Copy the answer">Copy</button><button class="ghost rt" type="button" title="Ask again from scratch">Retry</button><button class="ghost up" type="button" title="Good answer — keep it">👍</button><button class="ghost down" type="button" title="Wrong — tell it what is right">👎</button>${mode === 'mac' && out.text ? '<button class="ghost pin" type="button" title="Pin as important — every chat can use it (What it learned → Pinned)">📌</button>' : ''}</div></div>`;
+  drawDiagrams(el);                                          // a ```mermaid diagram in the answer, drawn
   el.querySelector('.foot .down').onclick = () => teachBox(el, q);
   const pinB = el.querySelector('.foot .pin');
   if(pinB) pinB.onclick = async () => { const r = await post('/memory', {pin: {text: String(out.text || '').slice(0, 4000), q, chatId: sessionId, chatTitle: chatName || q}}).catch(()=>null); if(r && r.pin){ pinB.textContent = '📌 Pinned'; pinB.disabled = true; toast('Pinned — any chat can use it now'); } else toast('Could not pin it'); };
@@ -875,6 +905,7 @@ async function ask(q, opt){
     post('/session', {id: requestSessionId, q, goal: requestGoal, chatName: requestChatName, pending: true}).then(()=>loadChats()).catch(()=>{});
   }
   const el = turnEl(q, files), box = el.querySelector('.steps'), live = el.querySelector('.live'), steps = [], traces = [];
+  request.el = el;                             // kept: coming back to this chat puts this very block back, steps and all
   const addTrace = t => { traces.push(t); const open = Array.from(live.querySelectorAll('details')).map(d=>d.open); live.innerHTML = timeline(traces, true); live.querySelectorAll('details').forEach((d, i)=>{ if(open[i]) d.open = true; }); };
   el.scrollIntoView({behavior: 'smooth', block: 'start'});
   const step = t => {
@@ -894,7 +925,7 @@ async function ask(q, opt){
     const imgs = out.images || [];
     const vids = out.videos || [];
     if(imgs.length) Promise.all(imgs.map(im=>preview(im.b64))).then(p=>{ const h = requestHistory.find(x=>x.answer && x.answer.text === out.text); if(h){ h.answer.images = p.map((t, i)=>t ? {thumb: t, label: imgs[i].label, file: imgs[i].file, mime: imgs[i].mime} : null).filter(Boolean); saveChat({id: requestSessionId, history: requestHistory, goal: requestGoal, chatName: requestChatName}); } });
-    requestHistory.push({q, answer: {kind: out.kind, videos: vids.length ? vids.map(v=>({note: 'The video is saved on your Mac: ' + String(v.file || '').replace(/^\/Users\/[^/]+/, '~')})) : undefined, images: imgs.length ? imgs.map(im=>({file: im.file, label: im.label, mime: im.mime})).filter(im=>im.file) : undefined, text: out.text, sources: out.sources, read: out.read, by: out.by, secs: out.secs, model: out.model, chart: out.chart, trust: out.trust ? {confidence: out.trust.confidence, checked: out.trust.checked, ok: out.trust.ok} : undefined, saved: out.saved}, steps, traces: slim(traces)});
+    requestHistory.push({q, answer: {kind: out.kind, videos: vids.length ? vids.map(v=>({note: 'The video is saved on your Mac: ' + String(v.file || '').replace(/^\/Users\/[^/]+/, '~')})) : undefined, images: imgs.length ? imgs.map(im=>({file: im.file, label: im.label, mime: im.mime})).filter(im=>im.file) : undefined, text: out.text, understood: out.understood, sources: out.sources, read: out.read, by: out.by, secs: out.secs, model: out.model, chart: out.chart, trust: out.trust ? {confidence: out.trust.confidence, checked: out.trust.checked, ok: out.trust.ok} : undefined, saved: out.saved}, steps, traces: slim(traces)});
     const kept = requestHistory.slice(-60).map((h, i, all)=>i < all.length - 8 ? Object.assign({}, h, {traces: (h.traces || []).map(t=>({kind: t.kind, title: t.title}))}) : h);
     requestHistory.splice(0, requestHistory.length, ...kept);
     if(sessionId === requestSessionId){
@@ -943,7 +974,7 @@ async function ask(q, opt){
       out.secs = Math.round((Date.now() - t0) / 1000);
       done(out);
     } else {
-      const r = await fetch(HELPER + '/ask', {method: 'POST', headers: {'content-type': 'application/json'}, signal: request.controller.signal, body: JSON.stringify({question: q, deep: !!opt.deep || pick.kind === 'deep' || pick.kind === 'deeplocal', research: !!opt.research, sogpt: pick.kind === 'sogpt', imageModel: opt.imageModel || store.get('ai.imageModel', 'auto'), videoModel: store.get('ai.videoModel', 'auto') !== 'auto' ? store.get('ai.videoModel') : undefined, model: pick.kind === 'local' ? pick.model : undefined, provider: opt.provider || (pick.kind === 'cloud' ? pick.provider : pick.kind === 'council' ? 'council' : undefined), history: turns, cloud: cloudKeys(), fresh: !!opt.fresh, attachments: files.map(f=>f.image ? {name: f.name, image: f.image} : f), goal: requestGoal, session: requestSessionId, disabled, project: store.get('ai.project', '') || null, forceVideo: !!opt.forceVideo, lastKind: (requestHistory.length && requestHistory[requestHistory.length - 1].answer.kind) || ''})});
+      const r = await fetch(HELPER + '/ask', {method: 'POST', headers: {'content-type': 'application/json'}, signal: request.controller.signal, body: JSON.stringify({question: q, voice: !!opt.voice, deep: !!opt.deep || pick.kind === 'deep' || pick.kind === 'deeplocal', research: !!opt.research, sogpt: pick.kind === 'sogpt', imageModel: opt.imageModel || store.get('ai.imageModel', 'auto'), videoModel: store.get('ai.videoModel', 'auto') !== 'auto' ? store.get('ai.videoModel') : undefined, model: pick.kind === 'local' ? pick.model : undefined, provider: opt.provider || (pick.kind === 'cloud' ? pick.provider : pick.kind === 'council' ? 'council' : undefined), history: turns, cloud: cloudKeys(), fresh: !!opt.fresh, attachments: files.map(f=>f.image ? {name: f.name, image: f.image} : f), goal: requestGoal, session: requestSessionId, disabled, project: store.get('ai.project', '') || null, forceVideo: !!opt.forceVideo, lastKind: (requestHistory.length && requestHistory[requestHistory.length - 1].answer.kind) || ''})});
       if(!r.ok) throw new Error((await r.json().catch(()=>({}))).error || 'It answered ' + r.status);
       const reader = r.body.getReader(), dec = new TextDecoder();
       let buf = '', out = null;
@@ -1010,7 +1041,7 @@ let pick = store.get('ai.pick', {kind: 'auto'});
 const CLOUD_NAMES = {apple: 'Apple Intelligence (on this Mac)', chatgpt: 'ChatGPT (through Siri)', pcc: 'Apple Private Cloud', gemini: 'Google Gemini', groq: 'Groq — gpt-oss-120b (OpenAI\'s open model)', cerebras: 'Cerebras — gpt-oss-120b', mistral: 'Mistral', openrouter: 'OpenRouter (free models)', anthropic: 'Anthropic Claude'};
 let autoLabel = 'Auto';
 // the picture models (the relay's Cloudflare models, Pollinations, Image Playground) and Compare
-const IMG_PICK = [['auto', 'Auto pictures', 'FLUX.1 schnell; styles by Image Playground; backups when Cloudflare cannot (then Draw Things, DiffusionBee on this Mac)'], ['compare', 'Compare 4 models', 'FLUX.1 schnell, FLUX.2 klein 4B, SDXL Lightning, Pollinations — side by side'], ['compare-best', 'Compare the 4 best', 'FLUX.2 klein 9B, FLUX.2 dev, Phoenix, Lucid Origin — most of a day\'s free allowance'],
+const IMG_PICK = [['auto', 'Auto pictures', 'Best first: FLUX.2 klein 9B (first 5 a day), then FLUX.1 schnell; a style (cartoon, sketch…) by Image Playground; then Gemini, Pollinations, Draw Things, DiffusionBee as backups'], ['compare', 'Compare 4 models', 'FLUX.1 schnell, FLUX.2 klein 4B, SDXL Lightning, Pollinations — side by side'], ['compare-best', 'Compare the 4 best', 'FLUX.2 klein 9B, FLUX.2 dev, Phoenix, Lucid Origin — most of a day\'s free allowance'],
   ['flux-1-schnell', 'FLUX.1 schnell', 'good and cheap (~125 a day free)'], ['flux-2-klein-9b', 'FLUX.2 klein 9B', 'excellent and fast; ~7 a day free'], ['flux-2-dev', 'FLUX.2 dev', 'the most detailed; ~2–3 a day free'], ['phoenix', 'Leonardo Phoenix', 'follows the description closely; ~4 a day free'], ['lucid-origin', 'Leonardo Lucid Origin', 'rich, polished; ~3 a day free'],
   ['flux-2-klein-4b', 'FLUX.2 klein 4B', 'cheap; can be slow'], ['sdxl-lightning', 'SDXL Lightning', 'fast; loose'], ['dreamshaper', 'DreamShaper 8', 'fast, painterly; loose'], ['gemini', 'Gemini 3.1 Flash Image', 'Google; needs billing on your key'], ['pollinations', 'Pollinations', 'free, no key; a small mark'], ['playground', 'Apple Image Playground', 'illustration styles (its Shortcut needed)'], ['drawthings', 'Draw Things', 'on this Mac, its chosen model (API Server on)'], ['diffusionbee', 'DiffusionBee', 'on this Mac: private, offline; slower (~40 s)']];
 // the video models (cli/animatediff.mjs): AnimateDiff for real motion, the zoom or pan as the fallback
@@ -1138,6 +1169,18 @@ async function swap(){
     if(typeof MoneyShared !== 'undefined' && MoneyShared.quiet) MoneyShared.quiet();
   }catch(e){}
 }
+/* DIAGRAMS: Mermaid (from cdnjs, loaded the first time one is shown) draws each ```mermaid block of an answer */
+let mermaidReady = null;
+async function drawDiagrams(root){
+  const boxes = [...(root || document).querySelectorAll('.diagram:not([data-drawn])')]; if(!boxes.length) return;
+  try{
+    if(!mermaidReady) mermaidReady = loadScript('https://cdnjs.cloudflare.com/ajax/libs/mermaid/11.15.0/mermaid.min.js').then(()=>{ const dark = matchMedia('(prefers-color-scheme: dark)').matches && document.documentElement.dataset.theme !== 'light' || document.documentElement.dataset.theme === 'dark'; window.mermaid.initialize({startOnLoad: false, securityLevel: 'strict', theme: dark ? 'dark' : 'default'}); });
+    await mermaidReady;
+    for(const b of boxes){ b.dataset.drawn = '1'; const src = b.querySelector('code').textContent;
+      try{ const {svg} = await window.mermaid.render('dg' + Math.random().toString(36).slice(2), src); b.querySelector('.dgraph').innerHTML = svg; }
+      catch(e){ b.querySelector('.dgraph').textContent = 'This diagram could not be drawn — its source is below.'; b.querySelector('.dsrc').open = true; } }
+  }catch(e){ boxes.forEach(b=>{ b.querySelector('.dgraph').textContent = 'Diagrams need the internet the first time — the source is below.'; }); }
+}
 const loadScript = src => new Promise((res, rej)=>{ const s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = rej; document.head.appendChild(s); });
 async function detect(){
   let d = null;
@@ -1203,12 +1246,20 @@ document.addEventListener('click', e=>{ const b = e.target.closest && e.target.c
 /* TOOLS: a mode for your next questions (it stays until you take it off): picture, video, deep think, research, best answer */
 let toolMode = null;
 const MODES = {image: '🎨 Create image', video: '🎞 Make a video', deep: '🧠 Deep think', research: '🔎 Research', council: '💭 Thinking'};
-const setMode = m => { toolMode = MODES[m] ? m : null; $('#modeChip').hidden = !toolMode; $('#modeName').textContent = toolMode ? MODES[toolMode] : ''; $('#toolsBtn').classList.toggle('on', !!toolMode);
+const setMode = m => { toolMode = MODES[m] ? m : null; $('#modeChip').hidden = true;
+  document.querySelectorAll('#modes [data-m]').forEach(b=>{ b.classList.toggle('on', b.dataset.m === toolMode); b.setAttribute('aria-pressed', b.dataset.m === toolMode ? 'true' : 'false'); }); $('#modeName').textContent = toolMode ? MODES[toolMode] : ''; $('#toolsBtn').classList.toggle('on', !!toolMode);
   $('#q').placeholder = toolMode === 'image' ? 'Describe the picture…' : toolMode === 'video' ? 'Describe the video…' : matchMedia('(max-width: 600px)').matches ? 'Ask anything…' : 'Ask anything… ( / for commands)'; $('#q').focus(); };
 const toolsMenu = on => { $('#toolsMenu').hidden = !on; if(on) attachMenu(false); };
 $('#toolsBtn').onclick = e => { e.stopPropagation(); toolsMenu($('#toolsMenu').hidden); };
 $('#toolsMenu').querySelectorAll('[data-mode]').forEach(b=>b.onclick = () => { setMode(b.dataset.mode); toolsMenu(false); });
 $('#modeOff').onclick = () => setMode(null);
+// the chips: a mode on (tap again: off), the model picker, voice mode
+document.querySelectorAll('#modes [data-m]').forEach(b=>b.onclick = () => setMode(toolMode === b.dataset.m ? null : b.dataset.m));
+$('#toolsBtn').hidden = true;
+$('#mModel').onclick = e => { e.stopPropagation(); openPicker(); };
+// the model chip names what answers (Auto, or the model you picked) — kept in step with the picker
+const syncModelChip = () => { const t = $('#stModel').textContent.replace('✦', '').replace(/\s*▾\s*$/, '').trim(); $('#mModelName').textContent = t ? t.slice(0, 28) : 'Auto'; };
+new MutationObserver(syncModelChip).observe($('#stModel'), {childList: true, characterData: true, subtree: true}); syncModelChip();
 document.addEventListener('click', e=>{ if(!$('#toolsMenu').hidden && !e.target.closest('#toolsMenu, #toolsBtn')) toolsMenu(false); });
 const send = v => {
   if(/^\/\w/.test(v.trim())) return runCommand(v);
@@ -1362,7 +1413,7 @@ if(SR){
    Tap the orb while it speaks to interrupt; End (or Esc) stops. English or Hindi (the EN button). The answer is read
    in a short spoken form — code, tables and links stay on the screen. */
 if(SR && 'speechSynthesis' in window){
-  const bar = $('#voicebar'); $('#talk').hidden = false;
+  const bar = $('#voicebar'); $('#talk').hidden = false; $('#mVoice').hidden = false; $('#mVoice').onclick = () => $('#talk').click();
   let on = false, rec = null, quiet = 0, lang = store.get('ai.voiceLang', 'en-IN');
   const setLang = l => { lang = l; store.set('ai.voiceLang', l); $('#vlang').textContent = l === 'hi-IN' ? 'हिं' : 'EN'; };
   setLang(lang);
@@ -1387,12 +1438,12 @@ if(SR && 'speechSynthesis' in window){
     rec.onend = async () => { rec = null; if(!on) return;
       if(!heard.trim()){ if(++quiet >= 2){ state('', 'Paused', 'Tap the orb to talk'); return; } return listen(); }
       quiet = 0; state('thinking', 'Thinking…', heard);
-      lastAnswer = null; await ask(heard);
+      lastAnswer = null; await ask(heard, {voice: true});
       if(!on) return;
       state('speaking', 'Speaking…', 'Tap the orb to interrupt'); await speak(spokenText(lastAnswer)); listen(); };
     rec.start(); };
-  const start = () => { on = true; quiet = 0; bar.hidden = false; $('#talk').classList.add('on'); listen(); };
-  const stop = () => { on = false; try{ rec && rec.abort(); }catch(e){} rec = null; speechSynthesis.cancel(); bar.hidden = true; $('#talk').classList.remove('on'); };
+  const start = () => { on = true; quiet = 0; bar.hidden = false; $('#talk').classList.add('on'); $('#mVoice').classList.add('on'); listen(); };
+  const stop = () => { on = false; try{ rec && rec.abort(); }catch(e){} rec = null; speechSynthesis.cancel(); bar.hidden = true; $('#talk').classList.remove('on'); $('#mVoice').classList.remove('on'); };
   $('#talk').onclick = () => on ? stop() : start();
   $('#vend').onclick = stop;
   $('#vlang').onclick = () => { setLang(lang === 'hi-IN' ? 'en-IN' : 'hi-IN'); if(rec){ try{ rec.abort(); }catch(e){} } };
@@ -1534,8 +1585,10 @@ function drawHistory(finished){
   $('#turns').innerHTML = ''; $('#hello').hidden = history.length > 0;
   history.forEach(h=>{ const el = turnEl(h.q); finish(el, h.q, h.answer, h.steps || [], h.traces || []); });
   // Keep the in-progress question visible if the user returns to its chat.
+  // the question still being answered: its own block put back, with the steps so far, still updating (a fresh empty
+  // block had been drawn, and the thinking went on out of sight)
   const request = !finished && activeRequests.get(sessionId);
-  if(request) turnEl(request.q, request.files);
+  if(request){ if(request.el){ $('#turns').appendChild(request.el); $('#hello').hidden = true; } else turnEl(request.q, request.files); }
 }
 const ago = iso => { const m = Math.round((Date.now() - new Date(iso)) / 60000); return m < 1 ? 'just now' : m < 60 ? m + ' min ago' : m < 1440 ? Math.round(m / 60) + ' h ago' : Math.round(m / 1440) + ' d ago'; };
 // the chat list in the sidebar: newest first, grouped by day, searchable

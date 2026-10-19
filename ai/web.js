@@ -562,7 +562,10 @@ Rules: ${Object.values(RULES).join('; ')}.${(m=>m.length ? '\nMistakes you made 
     }
     // R4: numbers not in what was read (a year, a list number and small counts are fine)
     if(c.sources && c.sources.length){
-      const foreign = Array.from(new Set(nums(bare.replace(/(^|\n)\s*\d+[.)]\s/g, ' ')).filter(n=>!have.has(n) && !/^(19|20)\d\d$/.test(n) && (n.length >= 3 || /\./.test(n)))));
+      // (a figure rounded from one that was read — 4.6 for 4.64, 145 for 145.12 — is the same figure)
+      const haveNums = Array.from(have).map(Number).filter(isFinite);
+      const rounded = n => { const d = (String(n).split('.')[1] || '').length, v = Number(n); return haveNums.some(h=>Math.abs(Number(h.toFixed(d)) - v) < 1e-9); };
+      const foreign = Array.from(new Set(nums(bare.replace(/(^|\n)\s*\d+[.)]\s/g, ' ')).filter(n=>!have.has(n) && !rounded(n) && !/^(19|20)\d\d$/.test(n) && (n.length >= 3 || /\./.test(n)))));
       if(foreign.length) out.push({rule: 'R4', text: 'These numbers are not in what was read: ' + foreign.slice(0, 5).join(', ') + '.'});
     }
     // R2: an answer built on sources that cites none of them (each number's own source is R4's job)

@@ -33,15 +33,31 @@ const ALIASES = [
   [/\b(ethereum|eth)\b/i, 'ETH-USD', 'Ethereum'],
   [/\b(usd ?inr|dollar.*rupee|rupee.*dollar|inr)\b/i, 'INR=X', 'US dollar in rupees'],
 ];
+// words of a question that are not the name of what to analyse ("why do you think … is going down?")
+const NOT_A_NAME = /\b(why|what|whats|what's|how|is|are|was|were|the|a|an|of|for|to|in|on|at|you|your|i|me|my|we|do|does|did|think|going|go|goes|down|up|below|above|next|nest|after|before|support|supports|resistance|levels?|show|chart|charts|technical|analysis|price|prices|today|now|will|would|can|could|should|it|its|this|that|and|or|stock|stocks|share|shares|drop|drops|dropping|dropped|fall|falls|falling|rise|rises|rising|reasons?|buy|sell|hold|target|please|tell|about|trend|view|outlook|news|happening|happened|with|from|than|there|their|any|some|more|less|get|give|see)\b/gi;
+const NOT_TICKERS = new Set(['AI', 'ETF', 'ETFS', 'NSE', 'BSE', 'NYSE', 'USD', 'INR', 'RSI', 'MACD', 'EMA', 'SMA', 'DMA', 'IPO', 'CEO', 'Q1', 'Q2', 'Q3', 'Q4', 'US', 'UK', 'EU', 'OK', 'PE', 'EPS', 'ATH', 'FII', 'DII', 'GDP', 'RBI', 'SEBI', 'I', 'A']);
+async function search(text){
+  const d = await get('https://query2.finance.yahoo.com/v1/finance/search?quotesCount=6&newsCount=0&q=' + encodeURIComponent(text));
+  const qs = (d.quotes || []).filter(x=>x.symbol && /EQUITY|INDEX|ETF|CRYPTOCURRENCY|CURRENCY|FUTURE|MUTUALFUND/.test(x.quoteType || ''));
+  const pick = qs.find(x=>x.exchange === 'NSI') || qs.find(x=>x.exchange === 'BSE') || qs[0];       // an Indian listing first
+  return pick ? {symbol: pick.symbol, name: pick.shortname || pick.longname || pick.symbol} : null;
+}
+/* WHAT TO ANALYSE, from a question: a ticker in brackets ("oracle (ORCL)"), after an exchange ("NSE: TCS"), or in capitals
+   (JUNIORBEES — on NSE it is JUNIORBEES.NS: the bare name answered 404), looked up with an Indian listing first; else the
+   question without its question words (the whole sentence found nothing) */
 export async function resolve(q){
   q = String(q || '').trim();
   for(const [re, symbol, name] of ALIASES) if(re.test(q)) return {symbol, name};
-  if(/^[\^A-Z0-9.=\-]{1,15}$/.test(q)) return {symbol: q, name: q};                      // already a symbol
-  const d = await get('https://query2.finance.yahoo.com/v1/finance/search?quotesCount=6&newsCount=0&q=' + encodeURIComponent(q.replace(/\b(share|stock|price|technical|analysis|chart)s?\b/gi, '').trim()));
-  const qs = (d.quotes || []).filter(x=>x.symbol && /EQUITY|INDEX|ETF|CRYPTOCURRENCY|CURRENCY|FUTURE|MUTUALFUND/.test(x.quoteType || ''));
-  const pick = qs.find(x=>x.exchange === 'NSI') || qs.find(x=>x.exchange === 'BSE') || qs[0];       // an Indian listing first
-  if(!pick) throw new Error('No market found for "' + q + '"');
-  return {symbol: pick.symbol, name: pick.shortname || pick.longname || pick.symbol};
+  if(/^[\^][A-Z0-9.]{1,12}$|^[A-Z0-9-]{1,12}(=X|=F|-USD)$|^[A-Z0-9&-]{1,15}\.(NS|BO)$/.test(q)) return {symbol: q, name: q};      // already a full symbol
+  const cands = [];
+  for(const m of q.matchAll(/\(([A-Z][A-Z0-9&.-]{0,14})\)/g)) cands.push(m[1]);
+  for(const m of q.matchAll(/\b(?:NSE|BSE|NYSE|NASDAQ)\s*:\s*([A-Z][A-Z0-9&-]{0,14})\b/g)) cands.push(m[1]);
+  for(const m of q.matchAll(/\b([A-Z][A-Z0-9&-]{1,14})\b/g)) if(!NOT_TICKERS.has(m[1])) cands.push(m[1]);
+  for(const c of [...new Set(cands)].slice(0, 4)){ const hit = await search(c).catch(()=>null); if(hit) return hit; }
+  const words = q.replace(NOT_A_NAME, ' ').replace(/[^\w&.\s-]|\b\d[\d.,]*\b/g, ' ').replace(/\s+/g, ' ').trim();
+  const hit = (words && await search(words).catch(()=>null)) || await search(q.replace(/\b(share|stock|price|technical|analysis|chart)s?\b/gi, '').trim()).catch(()=>null);
+  if(!hit) throw new Error('No market found for "' + q + '"');
+  return hit;
 }
 
 export async function candles(symbol, timeframe){
