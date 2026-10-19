@@ -409,12 +409,11 @@ const MoneyAI = (function(){
   const MAC_CLOUD = {gemini: 'Google Gemini', groq: 'Groq — gpt-oss-120b', nvidia: 'NVIDIA — Nemotron', zai: 'Z.ai — GLM', cohere: 'Cohere — Command', cerebras: 'Cerebras — gpt-oss-120b', mistral: 'Mistral', openrouter: 'OpenRouter', anthropic: 'Anthropic Claude'};
   function macModels(info){
     const d = info || {}, a = d.apple || {}, cloud = d.cloud || [], local = (d.local || []).map(m=>m.name || m).filter(n=>n && !/embed|guard|vision|llava/i.test(n));
-    const out = [['auto', 'Auto — the right model for each question (ChatGPT when the Mac has it)']];
+    const out = [['auto', 'Auto (recommended) — your AI picks the best available model for each request']];
     if(a.chatgpt) out.push(['chatgpt', 'ChatGPT (through Siri)']);
     if(a.pcc) out.push(['pcc', 'Apple Private Cloud']);
     if(a.apple) out.push(['apple', 'Apple Intelligence (on the Mac)']);
-    if(cloud.length >= 2) out.push(['council', 'Thinking — two cloud models write it, an editor merges them']);
-    if(a.chatgpt && a.pcc) out.push(['deep', 'Deep think — more research; ChatGPT and Private Cloud merged']);
+    // (Thinking and Deep think are modes on the AI's own page, not models: an app asks for words)
     cloud.forEach(c=>out.push(['cloud:' + c, (MAC_CLOUD[c] || c) + ' (your key, on the Mac)']));
     local.forEach(n=>out.push(['local:' + n, n + ' (on the Mac, private)']));
     if(!d.apple && !cloud.length && !local.length) out.push(['chatgpt', 'ChatGPT (through Siri)']);
