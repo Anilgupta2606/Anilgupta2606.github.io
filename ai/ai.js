@@ -528,7 +528,9 @@ const MoneyAI = (function(){
     const headers = {Authorization:'Bearer ' + key};
     if(id === 'openrouter'){ headers['HTTP-Referer'] = location.origin; headers['X-Title'] = 'Money Home'; }
     let maxTok = 8192;
-    const body = json => Object.assign({model, temperature: temp(opts), max_tokens: maxTok, messages:[{role:'system', content:system}].concat(turns)}, json ? {response_format: {type: 'json_object'}} : {});
+    // GLM (Z.ai) thinks before it answers: with thinking on, a short limit was spent on its reasoning and the answer came back
+    // empty — off for ordinary requests
+    const body = json => Object.assign({model, temperature: temp(opts), max_tokens: maxTok, messages:[{role:'system', content:system}].concat(turns)}, json ? {response_format: {type: 'json_object'}} : {}, id === 'zai' ? {thinking: {type: 'disabled'}} : {});
     let res = await post(base + '/chat/completions', headers, body(!!opts.schema), signal, 90000);
     // a model that takes fewer output tokens ("`max_tokens` must be less than or equal to `4096`"): asked again within it
     if(res.status === 400){ const said = await res.clone().text().catch(()=>''), m = /max_tokens[^0-9]{0,80}?(\d{3,6})/i.exec(said);

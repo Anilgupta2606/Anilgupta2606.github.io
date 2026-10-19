@@ -332,6 +332,8 @@ code{font-family:var(--mono); font-size:.85em; background:var(--page2); padding:
 .krow .khead b{flex:1; font-size:15px}
 .krow small{color:var(--ink2); line-height:1.35}
 .kdot{width:11px; height:11px; border-radius:50%; flex:none; box-shadow:0 0 0 3px color-mix(in srgb, currentColor 18%, transparent)}
+.kdot.grey{background:#9aa0aa; color:#9aa0aa}
+.skrow .khead input[type=checkbox]{width:18px; height:18px; accent-color:var(--think)}
 .kdot.green{background:#22c55e; color:#22c55e} .kdot.yellow{background:#f5b301; color:#f5b301} .kdot.red{background:#ef4444; color:#ef4444}
 .krow .kedit{display:flex; gap:8px; flex-wrap:wrap} .krow .kedit input{flex:1 1 180px; min-width:0; padding:9px 11px; border-radius:10px; border:1px solid var(--line); background:var(--page); color:var(--ink); font:inherit}
 .krow .kedit button{padding:8px 12px} .kmore{margin-top:6px}.kkey{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:2px 0}.kkey button{padding:4px 10px;font-size:12px}
@@ -484,6 +486,7 @@ button, a, summary, label{touch-action:manipulation}
     <button class="navbtn" id="openTasks" type="button"><i>⏰</i>Scheduled</button>
     <button class="navbtn" id="openProjects" type="button"><i>⌘</i>Projects</button>
     <button class="navbtn" id="openConn" type="button"><i>🔌</i>Connectors</button>
+    <button class="navbtn" id="openSkills" type="button" hidden><i>🧰</i>Skills</button>
     <button class="navbtn" id="openUsage" type="button"><i>📊</i>Usage</button>
     <button class="navbtn" id="openLearned" type="button"><i>✦</i><span>What it learned</span><b class="count" id="learnedCount" hidden></b></button>
   </div>
@@ -581,6 +584,7 @@ button, a, summary, label{touch-action:manipulation}
     <button type="button" class="mchip" data-m="council" title="Two models write it, an editor merges them">💭 Think</button>
     <button type="button" class="mchip" data-m="deep" title="Deeper research; ChatGPT and Private Cloud write it, merged">🧠 Deep</button>
     <button type="button" class="mchip" data-m="research" title="More searches and pages read, with sources">🔎 Research</button>
+    <button type="button" class="mchip" data-m="agents" title="Several agents work on parts of the task at the same time, then their findings are merged">🤖 Agents</button>
     <button type="button" class="mchip" data-m="image" title="A picture from your words">🎨 Image</button>
     <button type="button" class="mchip" data-m="video" title="A short video, made on your Mac">🎞 Video</button>
     <button type="button" class="mchip voice" id="mVoice" title="Voice mode — talk, and hear the answer" hidden>〰 Voice</button>
@@ -633,6 +637,12 @@ button, a, summary, label{touch-action:manipulation}
   <h2>Connectors</h2>
   <p class="sub">What it may use to answer. Switch anything off and it will not be used.</p>
   <div id="conn"></div>
+</aside>
+<aside class="panel" id="skillsPanel" aria-label="Skills">
+  <button class="ghost close" id="closeSkills">Close</button>
+  <h2>Skills</h2>
+  <p class="sub">Tools your AI added to itself, on this Mac. Each one tests itself every day; a broken one updates itself, or is switched off until it works. Add one by asking in the chat: <b>integrate https://github.com/owner/repo</b>.</p>
+  <div id="skillsList"></div>
 </aside>
 <div class="toast" id="toast" hidden></div>
 <aside class="panel" id="panel" aria-label="What it learned">
@@ -974,7 +984,7 @@ async function ask(q, opt){
       out.secs = Math.round((Date.now() - t0) / 1000);
       done(out);
     } else {
-      const r = await fetch(HELPER + '/ask', {method: 'POST', headers: {'content-type': 'application/json'}, signal: request.controller.signal, body: JSON.stringify({question: q, voice: !!opt.voice, deep: !!opt.deep || pick.kind === 'deep' || pick.kind === 'deeplocal', research: !!opt.research, sogpt: pick.kind === 'sogpt', imageModel: opt.imageModel || store.get('ai.imageModel', 'auto'), videoModel: store.get('ai.videoModel', 'auto') !== 'auto' ? store.get('ai.videoModel') : undefined, model: pick.kind === 'local' ? pick.model : undefined, provider: opt.provider || (pick.kind === 'cloud' ? pick.provider : pick.kind === 'council' ? 'council' : undefined), history: turns, cloud: cloudKeys(), fresh: !!opt.fresh, attachments: files.map(f=>f.image ? {name: f.name, image: f.image} : f), goal: requestGoal, session: requestSessionId, disabled, project: store.get('ai.project', '') || null, forceVideo: !!opt.forceVideo, lastKind: (requestHistory.length && requestHistory[requestHistory.length - 1].answer.kind) || ''})});
+      const r = await fetch(HELPER + '/ask', {method: 'POST', headers: {'content-type': 'application/json'}, signal: request.controller.signal, body: JSON.stringify({question: q, voice: !!opt.voice, agents: !!opt.agents, deep: !!opt.deep || pick.kind === 'deep' || pick.kind === 'deeplocal', research: !!opt.research, sogpt: pick.kind === 'sogpt', imageModel: opt.imageModel || store.get('ai.imageModel', 'auto'), videoModel: store.get('ai.videoModel', 'auto') !== 'auto' ? store.get('ai.videoModel') : undefined, model: pick.kind === 'local' ? pick.model : undefined, provider: opt.provider || (pick.kind === 'cloud' ? pick.provider : pick.kind === 'council' ? 'council' : undefined), history: turns, cloud: cloudKeys(), fresh: !!opt.fresh, attachments: files.map(f=>f.image ? {name: f.name, image: f.image} : f), goal: requestGoal, session: requestSessionId, disabled, project: store.get('ai.project', '') || null, forceVideo: !!opt.forceVideo, lastKind: (requestHistory.length && requestHistory[requestHistory.length - 1].answer.kind) || ''})});
       if(!r.ok) throw new Error((await r.json().catch(()=>({}))).error || 'It answered ' + r.status);
       const reader = r.body.getReader(), dec = new TextDecoder();
       let buf = '', out = null;
@@ -1056,10 +1066,9 @@ async function openPicker(){
   const cloud = info.cloud && info.cloud.length ? info.cloud : (typeof MoneyAI !== 'undefined' ? Object.keys(browserKeys()) : []);
   const privateOk = false;                                         // Private AI (in this browser) was removed from Setup
   const item = (p, icon, title, sub) => `<button type="button" role="menuitem" data-p='${esc(JSON.stringify(p))}' class="${JSON.stringify(p) === JSON.stringify(pick) ? 'on' : ''}"><i>${icon}</i><span><b>${esc(title)}</b><small>${esc(sub)}</small></span></button>`;
-  box.innerHTML = item({kind: 'auto'}, '✦', 'Auto (recommended)', info.apple && info.apple.chatgpt ? 'The right model for each question: ChatGPT (through Siri) for money, hard questions and code; Apple Private Cloud for web answers; this Mac for your files, chat and pictures' : 'The right model for each question: general, code, pictures, hard questions')
+  box.innerHTML = item({kind: 'auto'}, '✦', 'Auto (recommended)', info.apple && info.apple.chatgpt ? 'The right model for each question, with backups: ChatGPT (through Siri) for most answers, Apple Private Cloud for personal ones, NVIDIA Nemotron first for code; your cloud keys when those are busy' : 'The right model for each question: general, code, pictures, hard questions')
     + (mode === 'mac' ? item({kind: 'sogpt'}, '🧩', 'SoGPT 1.1', 'Coding: questions go to the selected project — it reads it, edits, runs the tests, and a second model rechecks') : '')
-    + (cloud.length >= 2 ? item({kind: 'council'}, '💭', 'Thinking', 'Research here, then two top cloud models write it and an editor merges them — the most reliable') : '')
-    + (info.apple && (info.apple.chatgpt || info.apple.pcc) ? item({kind: 'deep'}, '🧠', 'Deep think', 'Deeper research here (more searches and pages), then ChatGPT and Apple Private Cloud each write it and ChatGPT merges them') : '')
+    // (Thinking and Deep think are chips under the box now — 💭 Think, 🧠 Deep — not models)
     + ''                                                               // (Deep on this Mac was removed: qwen3:8b, used 3 times)
     + (info.local.length ? '<h6>On this Mac</h6>' + info.local.map(m=>item({kind: 'local', model: m.name}, '💻', m.name, (m.role ? m.role + ' · ' : '') + m.gb + ' GB')).join('') : '')
     + (info.apple && (info.apple.apple || info.apple.chatgpt || info.apple.pcc) ? '<h6>Apple Intelligence</h6>'
@@ -1193,7 +1202,7 @@ async function detect(){
     showModel(d.model || 'No model (ollama pull qwen3:4b-instruct)', !!d.model);
     // with Apple Intelligence set up, Auto mostly writes with ChatGPT and Private Cloud — the label says so
     fetch(HELPER + '/models').then(r=>r.json()).then(m=>{ if(m && m.apple && (m.apple.chatgpt || m.apple.pcc)) showModel([m.apple.chatgpt ? 'ChatGPT' : '', m.apple.pcc ? 'Private Cloud' : '', 'this Mac'].filter(Boolean).join(' + '), true); }).catch(()=>{});
-    if(mode === 'mac'){ $('#openKeys').hidden = false; if(location.hash === '#keys') setTimeout(()=>openKeys(true), 0); }     // Money Home's "Keys" link lands here
+    if(mode === 'mac'){ $('#openKeys').hidden = false; $('#openSkills').hidden = false; if(location.hash === '#keys') setTimeout(()=>openKeys(true), 0); }     // Money Home's "Keys" link lands here
     fetch(HELPER + '/warm', {method: 'POST', headers: {'content-type': 'application/json'}, body: '{}'}).catch(()=>{});     // load the model now, not on the first question
     swap();
   } else if(engineHere()){
@@ -1245,7 +1254,7 @@ document.addEventListener('click', e=>{ const b = e.target.closest && e.target.c
   (navigator.clipboard ? navigator.clipboard.writeText(code) : Promise.reject()).then(()=>{ b.textContent = 'Copied'; setTimeout(()=>{ b.textContent = 'Copy'; }, 1500); }).catch(()=>{ b.textContent = 'Select and copy'; }); });
 /* TOOLS: a mode for your next questions (it stays until you take it off): picture, video, deep think, research, best answer */
 let toolMode = null;
-const MODES = {image: '🎨 Create image', video: '🎞 Make a video', deep: '🧠 Deep think', research: '🔎 Research', council: '💭 Thinking'};
+const MODES = {image: '🎨 Create image', video: '🎞 Make a video', deep: '🧠 Deep think', research: '🔎 Research', council: '💭 Thinking', agents: '🤖 Agents'};
 const setMode = m => { toolMode = MODES[m] ? m : null; $('#modeChip').hidden = true;
   document.querySelectorAll('#modes [data-m]').forEach(b=>{ b.classList.toggle('on', b.dataset.m === toolMode); b.setAttribute('aria-pressed', b.dataset.m === toolMode ? 'true' : 'false'); }); $('#modeName').textContent = toolMode ? MODES[toolMode] : ''; $('#toolsBtn').classList.toggle('on', !!toolMode);
   $('#q').placeholder = toolMode === 'image' ? 'Describe the picture…' : toolMode === 'video' ? 'Describe the video…' : matchMedia('(max-width: 600px)').matches ? 'Ask anything…' : 'Ask anything… ( / for commands)'; $('#q').focus(); };
@@ -1268,6 +1277,7 @@ const send = v => {
   if(toolMode === 'video') return ask(/\b(video|gif|animat)/i.test(v) ? v : 'Make a video of ' + v, {forceVideo: true});
   if(toolMode === 'deep') return ask(v, {deep: true});
   if(toolMode === 'research') return ask(v, {research: true});
+  if(toolMode === 'agents') return ask(v, {agents: true});
   if(toolMode === 'council') return ask(v, {provider: 'council'});
   return ask(v);
 };
@@ -1277,8 +1287,8 @@ document.querySelectorAll('.tries button').forEach(b=>b.onclick = () => ask(b.da
 const openPanel = on => { $('#panel').classList.toggle('open', on); $('#scrim').classList.toggle('open', on); if(on) loadLearned(); };
 $('#openLearned').onclick = () => openPanel(true);
 $('#closeLearned').onclick = () => openPanel(false);
-$('#scrim').onclick = () => { openKeys(false); openPw(false); openUsage(false); openPanel(false); openConn(false); openChats(false); openTasks(false); openProjects(false); };
-document.addEventListener('keydown', e=>{ if(e.key === 'Escape'){ openKeys(false); openPw(false); openUsage(false); openPanel(false); openConn(false); openChats(false); openTasks(false); openProjects(false); } });
+$('#scrim').onclick = () => { openSkills(false); openKeys(false); openPw(false); openUsage(false); openPanel(false); openConn(false); openChats(false); openTasks(false); openProjects(false); };
+document.addEventListener('keydown', e=>{ if(e.key === 'Escape'){ openSkills(false); openKeys(false); openPw(false); openUsage(false); openPanel(false); openConn(false); openChats(false); openTasks(false); openProjects(false); } });
 $('#clear').onclick = () => newChat();
 /* ---------------------------------------------------------------- files you attach: read here, in this browser
    (text as it is; a PDF's text with Mozilla's pdf.js), then sent with the question as numbered sources */
@@ -1500,6 +1510,11 @@ const COMMANDS = [
   {c: '/image', a: 'a description', d: 'Make a picture from a description (the model: ✦ menu → Pictures)'},
   {c: '/video', a: 'a description', d: 'A video with real motion, free — "/video a 8 second …", or longer in scenes: "/video a 1 minute … with narration" ("continue the video" adds what the free allowance did not); "/gif …" for a GIF (the model: ✦ menu → Videos)'},
   {c: '/compare', a: 'a description', d: 'The same picture by 4 models side by side ("/compare best …": the 4 best)'},
+  {c: '/think', a: 'a question', d: 'Two models write it, an editor merges them (the 💭 Think chip)'},
+  {c: '/research', a: 'a question', d: 'More searches and pages read, with sources (the 🔎 Research chip)'},
+  {c: '/agents', a: 'a big task', d: 'Several agents work on parts of it at the same time, then merge (the 🤖 Agents chip)'},
+  {c: '/skills', a: '', d: 'The tools your AI added to itself — on/off, test, remove (add one: integrate <GitHub link>)'},
+  {c: '/keys', a: '', d: 'Your AI keys, with their lights'},
   {c: '/deep', a: 'a hard question', d: 'Deep mode: deeper research, then ChatGPT and Apple Private Cloud each write it and ChatGPT merges them'},
   {c: '/chats', a: '', d: 'Your past chats — open one to carry on (also /resume)'},
   {c: '/new', a: '', d: 'Start a new chat (the last one stays in Chats)'},
@@ -1548,6 +1563,9 @@ async function runCommand(line){
   else if(c === '/data-usage' || c === '/usage') openUsage(true);
   else if(c === '/model') $('#stModel').click();
   else if(c === '/project' || c === '/projects') $('#openProjects').click();
+  else if(c === '/think' || c === '/research' || c === '/agents'){ if(arg) ask(arg, c === '/think' ? {provider: 'council'} : c === '/research' ? {research: true} : {agents: true}); else toast('Write the question after ' + c); }
+  else if(c === '/skills') openSkills(true);
+  else if(c === '/keys') openKeys(true);
   else if(c === '/deep'){ const qq = String(arg || '').replace(/^local\b\s*/i, ''); if(qq) ask(qq, {deep: true}); else toast('Write the question after /deep'); }
   else if(c === '/video' || c === '/gif'){ if(arg) ask((c === '/gif' ? 'Make a GIF of ' : 'Make a video of ') + arg); else toast('Describe it after ' + c); }
   else if(c === '/compare'){ const best = /^best\b/i.test(arg || ''), d0 = String(arg || '').replace(/^best\b\s*/i, ''); if(d0) ask('Generate an image of ' + d0, {imageModel: best ? 'compare-best' : 'compare'}); else toast('Describe the picture after /compare'); }
@@ -1834,6 +1852,24 @@ async function loadConn(){
     if(!/\{query\}/.test(c.url) || !/^https:\/\//.test(c.url)) return toast('The address must start with https:// and contain {query}');
     const before = connList.length; await save(connList.concat([c])); toast(connList.length > before ? 'Connector added' : 'That connector was not accepted'); };
 }
+/* SKILLS: each skill with its light (working · off · broken, and why · planned), on/off, and a Test that runs its own check */
+async function loadSkills(){
+  const box = $('#skillsList'); box.innerHTML = '<p class="sub">Loading…</p>';
+  let d = null; try{ d = await fetch(HELPER + '/skills').then(r=>r.json()); }catch(e){}
+  if(!d || !d.skills){ box.innerHTML = '<p class="sub">Your Mac\'s AI is not answering — is the helper running?</p>'; return; }
+  if(!d.skills.length){ box.innerHTML = '<p class="sub">No skills yet. Ask in the chat: <b>integrate https://github.com/owner/repo</b></p>'; return; }
+  const when = t => t ? new Date(t).toLocaleString([], {day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit'}) : 'never';
+  box.innerHTML = d.skills.map(s=>{ const state = s.pending ? ['yellow', 'Planned — not installed yet (reply “install it” in its chat)'] : s.off ? ['grey', 'Switched off — kept installed, not used'] : s.tested && s.tested.ok ? ['green', 'Working — checked ' + when(s.tested.at)] : ['red', 'Not working — ' + ((s.tested && s.tested.why) || 'failed its check').replace(/\s+/g, ' ').slice(0, 140)];
+    return `<div class="krow skrow" data-k="${esc(s.slug)}"><div class="khead"><span class="kdot ${state[0]}"></span><b>${esc(s.name)}</b>${s.pending ? '' : `<label title="Use this skill"><input type="checkbox" data-act="on" ${s.off ? '' : 'checked'}></label>`}</div><small>${esc(s.description)}</small><small>${esc(state[1])}</small><div class="kedit">${s.pending ? '' : '<button class="ghost" data-act="test" type="button">Test</button>'}<button class="ghost" data-act="remove" type="button">Remove</button></div><small><a href="${esc(s.source)}" target="_blank" rel="noopener">${esc(String(s.source).replace('https://github.com/', ''))}</a></small></div>`; }).join('');
+  box.querySelectorAll('[data-act]').forEach(b=>{ const k = b.closest('.skrow').dataset.k;
+    if(b.dataset.act === 'on') b.onchange = async () => { await post('/skills', {slug: k, on: b.checked}); toast(b.checked ? 'Switched on' : 'Switched off'); loadSkills(); };
+    else b.onclick = async () => { b.disabled = true; b.textContent = b.dataset.act === 'test' ? 'Testing…' : 'Removing…';
+      try{ const j = await post('/skills', b.dataset.act === 'test' ? {slug: k, test: true} : {slug: k, remove: true}); toast(b.dataset.act === 'test' ? (j.ok ? 'It works ✓' : 'Not working: ' + String(j.why || '').slice(0, 90)) : 'Removed'); }catch(e){ toast('That did not work: ' + e.message); }
+      loadSkills(); }; });
+}
+const openSkills = on => { $('#skillsPanel').classList.toggle('open', on); $('#scrim').classList.toggle('open', on); if(on) loadSkills(); };
+$('#openSkills').onclick = () => openSkills(true);
+$('#closeSkills').onclick = () => openSkills(false);
 const openConn = on => { $('#connPanel').classList.toggle('open', on); $('#scrim').classList.toggle('open', on); if(on) loadConn(); };
 $('#openConn').onclick = () => openConn(true);
 $('#closeConn').onclick = () => openConn(false);
