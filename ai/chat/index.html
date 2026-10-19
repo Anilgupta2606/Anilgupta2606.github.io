@@ -1672,6 +1672,7 @@ const COMMANDS = [
   {c: '/memory', a: 'forget n · clear · off · on · add …', d: 'What it remembers about you — kept automatically, no pinning needed'},
   {c: '/tune', a: 'run · off n · remove n', d: 'Self-tune: the rules it learned from answers that went wrong'},
   {c: '/config', a: 'name value', d: 'Settings and limits (also in Skills → Limits)'},
+  {c: '/blueprint', a: 'a site or an app', d: 'Reverse-engineer it: how it is built and what it does, then a plan to build your own (say “build it” after)'},
   {c: '/review', a: '', d: 'Review the coding project\'s uncommitted changes for bugs (nothing is changed)'},
   {c: '/init', a: '', d: 'Make the coding project\'s notes, so SoGPT knows it'},
   {c: '/model', a: '', d: 'Choose the model that answers (the ✦ menu)'},
@@ -1768,6 +1769,7 @@ async function runCommand(line){
     toast('Rewound ' + gone + ' question' + (gone === 1 ? '' : 's'));
   }
   else if(c === '/context') showContext();
+  else if(c === '/blueprint'){ if(!arg) return toast('/blueprint notion.so — or an app on your Mac'); ask('/blueprint ' + arg); }
   else if(c === '/memory' || c === '/tune' || c === '/config'){ if(mode !== 'mac') return toast('That is kept on your Mac — open this page there (or over Tailscale)');
     const j = await post(c === '/memory' ? '/memory' : c === '/tune' ? '/tune' : '/settings', c === '/memory' ? {memory: arg} : {cmd: arg}).catch(e=>({text: 'Could not reach your Mac: ' + e.message}));
     note(c + (arg ? ' ' + arg : ''), j.text || j.error || 'Done.', c === '/memory' ? 'Memory' : c === '/tune' ? 'Self-tune' : 'Settings'); }
