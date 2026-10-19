@@ -76,6 +76,7 @@ input:focus,select:focus{outline:2px solid var(--gold);outline-offset:1px}
 .priv{background:color-mix(in srgb,var(--gold) 7%,transparent);border-radius:12px;padding-inline:10px}
 .priv .res{color:var(--ink2)}
 .priv .res details{margin-top:6px}
+.mlights{margin:10px 0}.mlights summary{cursor:pointer;color:var(--muted,#667)}
 .bgroup{font:700 13px var(--body);color:var(--mut);margin:14px 0 4px}
 .lesson{display:grid;grid-template-columns:minmax(0,1fr) 90px auto;gap:10px;align-items:center;padding:9px 0;border-top:1px solid var(--line)}
 .lesson.off{opacity:.5}
@@ -203,14 +204,14 @@ function macRow(s){
   const viaTs = MoneyAI.macBase() !== MoneyAI.MAC_URL;
   const st = !on ? ['off', ''] : MAC.up === null ? ['checking…', ''] : MAC.up ? [viaTs ? 'ready · Tailscale' : 'ready', 'ready'] : ['not here', ''];
   return `<div class="prov mac">
-    <div class="pname"><b>Your own AI (on your Mac)</b><small>~/AI — ChatGPT, Private Cloud, Thinking, Deep, your cloud keys and the models on the Mac, in every app; free, no daily limits; used first, as in ATS · no key</small></div>
+    <div class="pname"><b>Your own AI (on your Mac)</b><small>Every app asks it first. It has all your models — ChatGPT and Private Cloud through Siri, Nemotron, Gemini, Groq, GLM, Cohere, Mistral, OpenRouter and the ones on the Mac — and Auto picks the best that answers, with the next one as backup.</small></div>
     <span class="st ${st[1]}">${st[0]}</span>
     <div class="keyin"><select data-macmodel aria-label="Which model your own AI uses"${on ? '' : ' disabled'}>${(()=>{ const L = macModelList(); if(!L.some(([v])=>v === pinned)) L.push([pinned, pinned + ' (not on the Mac now)']); return L; })()
       .map(([v, t])=>`<option value="${esc(v)}"${v === pinned ? ' selected' : ''}>${esc(t)}</option>`).join('')}</select></div>
     <div class="tools">${on ? `<button class="btn" data-test="mac"${MAC.up ? '' : ' disabled'}>Test</button><button class="btn" id="mac-off">Turn off</button>` : `<button class="btn primary" id="mac-on">Turn on</button>`}</div>
     <div class="res">${res ? (res.busy ? '<span class="spin"></span> Asking your Mac…' : res.ok ? `Works · ${esc(res.model)} answered in ${(res.ms / 1000).toFixed(1)} s` : `<span class="bad">${esc(res.error || 'No answer')}</span>`)
       : !on ? 'Off: your apps use the AIs below.'
-      : MAC.up ? `${viaTs ? 'Reached through Tailscale.' : 'Found on this Mac.'} Trip Vault, the Expense Tracker, the Ledger and Money Home ask it first${apple.chatgpt ? ', with ChatGPT' : ' (ChatGPT is not set up in Apple Intelligence, so the Mac picks)'}; when it does not answer, the next AI below takes over. <a href="${MoneyAI.MAC_URL}/" target="_blank" rel="noopener">Open its page</a>`
+      : MAC.up ? `${viaTs ? 'Reached through Tailscale.' : 'Found on this Mac.'} Trip Vault, the Expense Tracker, the Ledger and Money Home ask it first; ${pinned === 'auto' ? 'Auto picks the best available model for each request' : 'it uses the model you chose'}; when the Mac cannot be reached, the backup keys below take over. <a href="${MoneyAI.MAC_URL}/" target="_blank" rel="noopener">Open its page</a>`
       : MAC.up === false ? 'Not reachable from this device. On a phone: sign in to your Mac below (through Tailscale). On the Mac in Chrome: allow <b>Local network access</b> for this site (the icon left of the address → Site settings), or sign in below. Or the Mac’s helper is off (<code>ai serve</code>). Meanwhile your apps use the next AI below. <button class="btn" id="mac-recheck">Check again</button>'
       : 'Looking for it on this device…'}</div>
     ${on ? macRemoteHtml() : ''}
@@ -334,7 +335,7 @@ function managedCard(s){
     <h2><span class="n">3</span>AI — your own AI, in every app</h2>
     <p class="cap">Your AI keys are kept in <b>one place: your own AI on your Mac</b>. Every app asks it, and you pick the model from the <b>AI</b> button in any app. To add, replace or remove a key: <a href="https://anilgupta2606.github.io/ai/chat/#keys" target="_blank" rel="noopener">open your AI → 🔑 Your AI keys</a>.</p>
     ${macRow(s)}
-    ${rows || '<p class="note">Open this page while your Mac is reachable to see each model’s light.</p>'}
+    ${rows ? `<details class="mlights"><summary>Each model’s light (${list.filter(([id])=>L[id] && L[id].light === 'green').length} ready of ${list.filter(([id])=>L[id]).length})</summary>${rows}</details>` : '<p class="note">Open this page while your Mac is reachable to see each model’s light.</p>'}
     <p class="note">${backups.length ? `When your Mac cannot be reached, this device uses the backup keys your AI gave it, in turn: <b>${backups.map(p=>esc(p.name)).join(' → ')}</b> (refreshed daily).` : 'No backup key on this device yet — it is fetched from your Mac the next time it is reachable.'} <button class="btn" id="keys-refresh">Refresh from my AI</button></p>
   </section>`;
 }
