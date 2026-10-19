@@ -334,6 +334,7 @@ code{font-family:var(--mono); font-size:.85em; background:var(--page2); padding:
 .kdot{width:11px; height:11px; border-radius:50%; flex:none; box-shadow:0 0 0 3px color-mix(in srgb, currentColor 18%, transparent)}
 .kdot.grey{background:#9aa0aa; color:#9aa0aa}
 .skrow .khead input[type=checkbox]{width:18px; height:18px; accent-color:var(--think)}
+.skh{font-size:13px; margin:16px 0 6px; color:var(--muted, inherit); text-transform:uppercase; letter-spacing:.04em}
 .kdot.green{background:#22c55e; color:#22c55e} .kdot.yellow{background:#f5b301; color:#f5b301} .kdot.red{background:#ef4444; color:#ef4444}
 .krow .kedit{display:flex; gap:8px; flex-wrap:wrap} .krow .kedit input{flex:1 1 180px; min-width:0; padding:9px 11px; border-radius:10px; border:1px solid var(--line); background:var(--page); color:var(--ink); font:inherit}
 .krow .kedit button{padding:8px 12px} .kmore{margin-top:6px}.kkey{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:2px 0}.kkey button{padding:4px 10px;font-size:12px}
@@ -461,7 +462,7 @@ main{max-width:800px; padding:22px 20px 170px}
 :is(.a,.draft) th.r, :is(.a,.draft) td.r{text-align:right} :is(.a,.draft) th.c, :is(.a,.draft) td.c{text-align:center}
 :is(.a,.draft) hr{border:0; border-top:1px solid var(--line); margin:14px 0}
 :is(.a,.draft) blockquote{margin:0 0 10px; padding:2px 0 2px 12px; border-left:3px solid var(--line); color:var(--ink2)}
-.a.ask{border-color:color-mix(in srgb, var(--search) 45%, var(--line))} .a.ask > p:first-of-type{font-weight:600} .asknote{color:var(--mut); font-size:13px; margin:8px 0 0}
+.a.ask{border-color:color-mix(in srgb, var(--search) 45%, var(--line))} .a.ask > p:first-of-type, .a.ask > .md > p:first-of-type{font-weight:600} .asknote{color:var(--mut); font-size:13px; margin:8px 0 0}
 :is(.a,.draft) a.ln{color:var(--search); text-decoration:underline; text-underline-offset:2px}
 @media (max-width:600px){ :is(.a,.draft) table{font-size:.86em} :is(.a,.draft) th, :is(.a,.draft) td{padding:6px 9px} }
 /* iPhone: no grey flash on a tap and a press you can feel; no zoom when a box is tapped (16 px); scrolling that does not
@@ -474,7 +475,33 @@ button, a, summary, label{touch-action:manipulation}
   body{background-attachment:scroll}
   header.topbar, header.old{backdrop-filter:none; -webkit-backdrop-filter:none; background:color-mix(in srgb, var(--page) 97%, transparent)}
 }
+/* code blocks follow the page's theme (light page: light code), coloured by highlight.js in GitHub's light / dark colours */
+:root{--code-bg:#f6f7fd; --code-head:#eceefb; --code-line:#dfe2f3; --code-ink:#1f2340; --code-mut:#5d5b85; --code-btn:#c9cce6;
+  --hl-kw:#cf222e; --hl-str:#0a3069; --hl-num:#0550ae; --hl-fn:#8250df; --hl-com:#6e7781; --hl-type:#953800; --hl-name:#116329}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){--code-bg:#16152f; --code-head:#1e1d40; --code-line:#2a2850; --code-ink:#ecebff; --code-mut:#a9a6d8; --code-btn:#3a3870;
+  --hl-kw:#ff7b72; --hl-str:#a5d6ff; --hl-num:#79c0ff; --hl-fn:#d2a8ff; --hl-com:#8b949e; --hl-type:#ffa657; --hl-name:#7ee787} }
+:root[data-theme="dark"]{--code-bg:#16152f; --code-head:#1e1d40; --code-line:#2a2850; --code-ink:#ecebff; --code-mut:#a9a6d8; --code-btn:#3a3870;
+  --hl-kw:#ff7b72; --hl-str:#a5d6ff; --hl-num:#79c0ff; --hl-fn:#d2a8ff; --hl-com:#8b949e; --hl-type:#ffa657; --hl-name:#7ee787}
+.code{background:var(--code-bg); border-color:var(--code-line)} .codehead{background:var(--code-head); color:var(--code-mut)}
+.copy{border-color:var(--code-btn); color:var(--code-ink)} .code pre code{color:var(--code-ink)}
+.hljs-keyword,.hljs-doctag,.hljs-template-tag,.hljs-template-variable,.hljs-variable.language_{color:var(--hl-kw)}
+.hljs-title,.hljs-title.class_,.hljs-title.function_{color:var(--hl-fn)}
+.hljs-attr,.hljs-attribute,.hljs-literal,.hljs-meta,.hljs-number,.hljs-operator,.hljs-variable,.hljs-selector-attr,.hljs-selector-class,.hljs-selector-id{color:var(--hl-num)}
+.hljs-regexp,.hljs-string,.hljs-meta .hljs-string{color:var(--hl-str)} .hljs-built_in,.hljs-symbol,.hljs-type{color:var(--hl-type)}
+.hljs-comment,.hljs-code,.hljs-formula{color:var(--hl-com); font-style:italic} .hljs-name,.hljs-quote,.hljs-selector-tag,.hljs-selector-pseudo{color:var(--hl-name)}
+.hljs-section{color:var(--hl-fn); font-weight:700} .hljs-strong{font-weight:700} .hljs-emphasis{font-style:italic} .hljs-addition{color:var(--hl-name)} .hljs-deletion{color:var(--hl-kw)}
+/* maths (KaTeX): a wide formula scrolls sideways on a phone instead of widening the page */
+.md .katex{font-size:1.06em} .md .katex-display{overflow-x:auto; overflow-y:hidden; padding:4px 0; margin:6px 0 12px; overscroll-behavior-x:contain}
+.md .tex-err{font-family:var(--mono); font-size:.9em; color:var(--warn-ink)}
 </style>
+<!-- answers: Markdown (marked), sanitising (DOMPurify), maths (KaTeX + auto-render), code colours (highlight.js) - exact
+     versions from cdnjs, checked by their hashes. Deferred: the page never waits for them; if one does not load, the
+     page's own renderer (markdown() below) draws the answer. -->
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/marked/18.1.1/lib/marked.umd.min.js" integrity="sha384-7sjOQLpS2mL+qbjUOYVEk350vVNi+nPTKMQFruUWMDTzgcxzTJiwye3rHDJCJ9ZL" crossorigin="anonymous"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.4.17/purify.min.js" integrity="sha384-P0JNneQf81HOl9VwNXK76cQ9VMD6Nfsnepxb0cCOg8+UzEdzgPHAPV4wVQrvYQSx" crossorigin="anonymous"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.19.0/katex.min.js" integrity="sha384-QFFtAGzvvj+bfgCGxXJlNZZR1nXEZgvG8tDLCCY1F19xl20WlfTYgguB4VcNdxYk" crossorigin="anonymous"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.19.0/contrib/auto-render.min.js" integrity="sha384-bjyGPfbij8/NDKJhSGZNP/khQVgtHUE5exjm4Ydllo42FwIgYsdLO2lXGmRBf5Mz" crossorigin="anonymous"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.2/highlight.min.js" integrity="sha384-pZ4gLQJIEk/VKnGk59xUSQK8Ne/erZQR9cpnPXPLB9iN1tXsVkRVfHYGdFYrSkv1" crossorigin="anonymous"></script>
 </head>
 <body>
 <aside class="sidebar" id="sidebar" aria-label="Chats and settings">
@@ -641,7 +668,7 @@ button, a, summary, label{touch-action:manipulation}
 <aside class="panel" id="skillsPanel" aria-label="Skills">
   <button class="ghost close" id="closeSkills">Close</button>
   <h2>Skills</h2>
-  <p class="sub">Tools your AI added to itself, on this Mac. Each one tests itself every day; a broken one updates itself, or is switched off until it works. Add one by asking in the chat: <b>integrate https://github.com/owner/repo</b>.</p>
+  <p class="sub">What your AI can use: tools it installed on this Mac, and ideas built into its own code from GitHub repos. Switch any off here. Each one tests itself every day; a broken one updates itself, or is switched off until it works. Add one by asking in the chat: <b>integrate https://github.com/owner/repo</b>.</p>
   <div id="skillsList"></div>
 </aside>
 <div class="toast" id="toast" hidden></div>
@@ -750,6 +777,104 @@ function markdown(text, urls){
   flushPara(); flushList();
   return out.join('');
 }
+/* RICH ANSWERS: marked writes the Markdown, DOMPurify cleans it before it is shown (the model's and the web's text never
+   runs), KaTeX draws the maths, highlight.js colours the code - all from the <script defer> tags in <head>. Without
+   marked or DOMPurify (offline, the CDN down), markdown() above draws the answer, as before. */
+const rich = () => typeof marked !== 'undefined' && !!marked.Marked && typeof DOMPurify !== 'undefined' && !!DOMPurify.isSupported;
+let mdEngine = null, mdUrls = {}, libsSettled = false;
+// $…$ is maths only when it looks like maths: "$45 and $50", "$45-$50", "$5/$10" and ₹ prices stay text
+// (no space just inside either $, no digit just after the closing one, and "$5 coffee…" style text is not maths)
+const TEX_DOLLAR = /^\$(?![\s$])((?:\\.|[^$\\\n])+?)(?<![\s\\])\$(?!\d)/;
+const texLike = s => !/^\d/.test(s) || !/\s/.test(s) || /[\\^_=]/.test(s);
+const texSpan = (tex, display) => `<span class="tex">${display ? '\\[' : '\\('}${esc(tex)}${display ? '\\]' : '\\)'}</span>`;
+const MD_TAGS = ['a', 'b', 'i', 'em', 'strong', 'del', 's', 'code', 'pre', 'br', 'p', 'div', 'span', 'h4', 'ul', 'ol', 'li', 'blockquote', 'hr', 'table', 'thead', 'tbody', 'tr', 'th', 'td', 'sup', 'sub', 'details', 'summary', 'button'];
+function mdSetup(){
+  if(mdEngine) return mdEngine;
+  const m = new marked.Marked({gfm: true, breaks: true});
+  m.use({extensions: [
+    {name: 'texBlock', level: 'block', start: s => { const i = s.search(/^[ \t]*(\$\$|\\\[)/m); return i < 0 ? undefined : i; },
+      tokenizer(s){ const x = /^[ \t]*(?:\$\$([\s\S]+?)\$\$|\\\[([\s\S]+?)\\\])[ \t]*(?:\n+|$)/.exec(s); if(x) return {type: 'texBlock', raw: x[0], tex: (x[1] || x[2]).trim()}; },
+      renderer: t => `<div class="texblock">${texSpan(t.tex, true)}</div>`},
+    {name: 'tex', level: 'inline', start: s => { const i = s.search(/\$|\\[([]/); return i < 0 ? undefined : i; },
+      tokenizer(s){
+        let x = /^\$\$([^$\n]+?)\$\$/.exec(s) || /^\\\[([\s\S]+?)\\\]/.exec(s); if(x) return {type: 'tex', raw: x[0], tex: x[1], display: true};
+        x = /^\\\(([\s\S]+?)\\\)/.exec(s); if(x) return {type: 'tex', raw: x[0], tex: x[1]};
+        x = TEX_DOLLAR.exec(s); if(x && texLike(x[1])) return {type: 'tex', raw: x[0], tex: x[1]};
+      },
+      renderer: t => texSpan(t.tex, t.display)},
+    // [n]: a link to source n (as the page's own renderer does)
+    {name: 'cite', level: 'inline', start: s => { const i = s.search(/\[\d/); return i < 0 ? undefined : i; },
+      tokenizer(s){ const x = /^\[(\d{1,3})\](?![(\[:])/.exec(s); if(x) return {type: 'cite', raw: x[0], n: x[1]}; },
+      renderer: t => webUrl(mdUrls[t.n]) ? `<sup><a href="${esc(mdUrls[t.n])}" target="_blank" rel="noopener">${t.n}</a></sup>` : `<sup><a>${t.n}</a></sup>`}],
+  renderer: {
+    code({text, lang}){ lang = String(lang || '').trim().split(/\s/)[0];
+      // a diagram (mermaid): drawn as a picture by drawDiagrams, with its source a tap away
+      if(/^mermaid$/i.test(lang)) return `<div class="diagram"><div class="dgraph">Drawing the diagram…</div><details class="dsrc"><summary>Diagram source</summary><pre><code>${esc(text)}</code></pre></details></div>`;
+      const known = /^[\w+#.-]{1,30}$/.test(lang) && typeof hljs !== 'undefined' && hljs.getLanguage(lang);
+      let body = esc(text), cls = known ? 'language-' + lang.toLowerCase() : '';
+      if(known){ try{ body = hljs.highlight(text, {language: lang, ignoreIllegals: true}).value; cls += ' hljs'; }catch(e){} }
+      return `<div class="code"><div class="codehead"><span>${esc(lang || 'code')}</span><button class="copy" type="button">Copy</button></div><pre><code${cls ? ` class="${cls}"` : ''}>${body}</code></pre></div>`; },
+    heading({tokens}){ return `<h4>${this.parser.parseInline(tokens)}</h4>`; },
+    paragraph({tokens, text}){ const h = this.parser.parseInline(tokens); return /^⚠/.test(text) ? `<div class="warn">${h}</div>` : /^✔/.test(text) ? `<p class="ok">${h}</p>` : `<p>${h}</p>`; },
+    // HTML the model wrote is shown as text (only a <br> in a table cell is kept), as it always was
+    html({text}){ return /^<br\s*\/?>$/i.test(text.trim()) ? '<br>' : esc(text); },
+    link({href, tokens}){ const t = this.parser.parseInline(tokens); return /^(https?:|mailto:)/i.test(href || '') ? `<a class="ln" href="${esc(href)}" target="_blank" rel="noopener">${t}</a>` : t; },
+    image({href, text}){ return webUrl(href) ? `<a class="ln" href="${esc(href)}" target="_blank" rel="noopener">${esc(text || 'picture')}</a>` : esc(text); },
+    checkbox({checked}){ return checked ? '☑ ' : '☐ '; },
+    table(t){ return '<div class="tbl">' + marked.Renderer.prototype.table.call(this, t) + '</div>'; },
+    tablecell(t){ const tag = t.header ? 'th' : 'td', al = t.align === 'center' ? ' class="c"' : t.align === 'right' ? ' class="r"' : ''; return `<${tag}${al}>${this.parser.parseInline(t.tokens)}</${tag}>`; }
+  }});
+  if(typeof hljs !== 'undefined') try{ hljs.configure({ignoreUnescapedHTML: true}); }catch(e){}
+  return mdEngine = m;
+}
+// ⚠ and ✔ lines stand alone (a notice), outside code blocks
+const notices = t => String(t || '').split(/(```[\s\S]*?(?:```|$))/).map((p, i)=>i % 2 ? p : p.replace(/^([ \t]*[⚠✔].*)$/gm, '\n$1\n')).join('');
+function richMd(text, urls){
+  const m = mdSetup(); mdUrls = urls || {};
+  const html = m.parse(notices(text));
+  return DOMPurify.sanitize(html, {ALLOWED_TAGS: MD_TAGS, ALLOWED_ATTR: ['href', 'target', 'rel', 'class', 'type', 'start'], ALLOWED_URI_REGEXP: /^(?:https?:|mailto:)/i, ALLOW_DATA_ATTR: false});
+}
+// an answer's text as HTML: rich when the libraries are here, else the page's own renderer (kept to be redrawn rich when
+// they arrive late)
+const mdSrc = new Map(); let mdN = 0;
+function answerMd(text, urls, draft){
+  if(rich()){ try{ return '<div class="md">' + richMd(text, urls) + '</div>'; }catch(e){ console.warn('rich answer', e); } }
+  if(draft || libsSettled) return '<div class="md">' + markdown(text, urls) + '</div>';
+  const id = ++mdN; mdSrc.set(id, {text, urls}); return `<div class="md" data-mid="${id}">${markdown(text, urls)}</div>`;
+}
+// after an answer is shown: its maths drawn, its code coloured (a draft: maths only, and code in a named language)
+let katexCss = false;
+function enhance(root, draft){
+  if(!root) return;
+  if(!draft && typeof hljs !== 'undefined') root.querySelectorAll('.code pre code:not(.hljs)').forEach(c=>{ if(c.textContent.length > 30000) return;
+    const lang = ((c.closest('.code').querySelector('.codehead span') || {}).textContent || '').trim().toLowerCase();     // the language its header names, if known
+    if(!/language-/.test(c.className) && /^[\w+#.-]{1,30}$/.test(lang) && hljs.getLanguage(lang)) c.classList.add('language-' + lang);
+    try{ hljs.highlightElement(c); }catch(e){} });
+  if(typeof renderMathInElement === 'function' && /\$\$|\\\(|\\\[/.test(root.textContent)){
+    if(!katexCss){ katexCss = true; const l = document.createElement('link'); l.rel = 'stylesheet'; l.href = 'https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.19.0/katex.min.css'; l.integrity = 'sha384-3rdsX6e5mueWyoweR9NIVmtEsUkokpBT/0ALqKKIBMr9j4qhHkaIkAcGgsE6uVlp'; l.crossOrigin = 'anonymous'; document.head.appendChild(l); }
+    root.querySelectorAll('.md').forEach(m=>{ try{ renderMathInElement(m, {delimiters: [{left: '$$', right: '$$', display: true}, {left: '\\[', right: '\\]', display: true}, {left: '\\(', right: '\\)', display: false}],
+      ignoredTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code', 'option'], ignoredClasses: ['code', 'dsrc'], throwOnError: false, errorColor: 'var(--warn-ink)', strict: 'ignore', trust: false}); }catch(e){} });
+  }
+}
+// answers drawn before the libraries arrived: drawn again, rich
+function upgradeAnswers(){
+  libsSettled = true;
+  if(rich()) document.querySelectorAll('.md[data-mid]').forEach(m=>{ const s = mdSrc.get(+m.dataset.mid); m.removeAttribute('data-mid'); if(!s) return;
+    try{ m.innerHTML = richMd(s.text, s.urls); drawDiagrams(m); }catch(e){} });
+  mdSrc.clear();
+  document.querySelectorAll('#turns .a').forEach(a=>enhance(a));
+}
+if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', upgradeAnswers); else setTimeout(upgradeAnswers);
+// the answer being written: drawn at most every 100 ms (a phone does not flicker redrawing it on every word)
+function drawDraft(el, text){
+  el._draftText = text; if(el._draftT) return;
+  el._draftT = setTimeout(()=>flushDraft(el), Math.max(0, 100 - (Date.now() - (el._draftAt || 0))));
+}
+function flushDraft(el){
+  if(el._draftT){ clearTimeout(el._draftT); el._draftT = 0; } if(el._draftText == null) return;
+  const d = el.querySelector('.draft'), t = String(el._draftText); el._draftText = null; el._draftAt = Date.now(); if(!d) return;
+  d.hidden = !t.trim(); d.innerHTML = '<div class="dlabel">Writing…</div>' + answerMd(t, {}, true); enhance(d, true);
+}
 const srcCard = (s, i) => { const h = host(s.url) || s.title || ''; const web = !!webUrl(s.url);
   return `<li><a ${web ? `href="${esc(s.url)}" target="_blank" rel="noopener"` : ''} title="${esc(s.url || s.title)}"><span class="av" style="background:hsl(${hue(h)} 65% 55%)">${esc((h || '?')[0].toUpperCase())}</span><span class="tx"><b>${esc(s.title || h)}</b><small>${s.i || i + 1} · ${esc(h)}${s.trust && s.trust !== 'other' ? ` · <em class="tr ${esc(s.trust)}">${esc(s.trust)}</em>` : ''}</small></span></a></li>`; };
 /* the price chart of a market answer: closes, the 20/50/200 averages, support (mint) and resistance (coral) */
@@ -796,7 +921,7 @@ function render(out){
   if(cited.length) src += `<div class="srchead">Sources</div><ul class="src">${cited.map(srcCard).join('')}</ul>`;
   if(also.length) src += `<details class="also"><summary>Also read ${also.length} page${also.length === 1 ? '' : 's'}</summary><ul class="src">${also.map(srcCard).join('')}</ul></details>`;
   if(!cited.length && !also.length && usedModel) src += `<p class="memory">From the model's own knowledge — no web pages were read for this answer.</p>`;
-  return imagesHtml(out) + chartSvg(out.chart) + markdown(out.text, urls) + src;
+  return imagesHtml(out) + chartSvg(out.chart) + answerMd(out.text, urls) + src;
 }
 /* "How it got here": every step, each opening to what it did — searched (and the results), read (the passage),
    worked out, ran (the code and its output), and what the checks sent back. Built live while it works. */
@@ -839,6 +964,7 @@ function finish(el, q, out, steps, traces, pending){
   el.querySelector('.slot').innerHTML = `<div class="a"><div class="badges">${model ? `<span class="model" title="The AI model that wrote this answer">✦ ${esc(model)}</span>` : ''}${badge}</div>${render(out)}
     <div class="foot"><span class="by">${esc(out.by || '')}</span>${out.saved ? '<button class="ghost fresh" type="button">Ask fresh</button>' : ''}<button class="ghost cp" type="button" title="Copy the answer">Copy</button><button class="ghost rt" type="button" title="Ask again from scratch">Retry</button><button class="ghost up" type="button" title="Good answer — keep it">👍</button><button class="ghost down" type="button" title="Wrong — tell it what is right">👎</button>${mode === 'mac' && out.text ? '<button class="ghost pin" type="button" title="Pin as important — every chat can use it (What it learned → Pinned)">📌</button>' : ''}</div></div>`;
   drawDiagrams(el);                                          // a ```mermaid diagram in the answer, drawn
+  enhance(el);                                               // its maths drawn and its code coloured
   el.querySelector('.foot .down').onclick = () => teachBox(el, q);
   const pinB = el.querySelector('.foot .pin');
   if(pinB) pinB.onclick = async () => { const r = await post('/memory', {pin: {text: String(out.text || '').slice(0, 4000), q, chatId: sessionId, chatTitle: chatName || q}}).catch(()=>null); if(r && r.pin){ pinB.textContent = '📌 Pinned'; pinB.disabled = true; toast('Pinned — any chat can use it now'); } else toast('Could not pin it'); };
@@ -999,7 +1125,7 @@ async function ask(q, opt){
           const m = JSON.parse(line);
           if(m.step) step(m.step);
           if(m.trace) addTrace(m.trace);
-          if(m.draft != null){ const d = el.querySelector('.draft'); if(d){ d.hidden = !String(m.draft).trim(); d.innerHTML = '<div class="dlabel">Writing…</div>' + markdown(m.draft, {}); } }
+          if(m.draft != null) drawDraft(el, m.draft);
           if(m.error) throw new Error(m.error);
           if(m.answer){ out = m.answer; done(out); doneShown = true; }
           if(m.title){ requestChatName = String(m.title).slice(0, 80); if(sessionId === requestSessionId){ chatName = requestChatName; store.set('ai.chatName', chatName); setTitle(); } saveChat({id: requestSessionId, history: requestHistory, goal: requestGoal, chatName: requestChatName}).then(loadChats); }
@@ -1014,6 +1140,7 @@ async function ask(q, opt){
     if(doneShown){ activeRequests.delete(requestSessionId); syncRequestUI(); return; }    // only the suggestions were cut short
     if(request.controller.signal.aborted){
       // stopped: what was written so far stays, marked as stopped
+      flushDraft(el);
       const d = el.querySelector('.draft'), part = d && !d.hidden ? d.innerHTML.replace('<div class="dlabel">Writing…</div>', '') : '';
       el.querySelector('.slot').innerHTML = `<div class="a">${part}<p class="stopped">■ Stopped.</p></div>`;
       if(d) d.hidden = true;
@@ -1857,14 +1984,18 @@ async function loadSkills(){
   const box = $('#skillsList'); box.innerHTML = '<p class="sub">Loading…</p>';
   let d = null; try{ d = await fetch(HELPER + '/skills').then(r=>r.json()); }catch(e){}
   if(!d || !d.skills){ box.innerHTML = '<p class="sub">Your Mac\'s AI is not answering — is the helper running?</p>'; return; }
-  if(!d.skills.length){ box.innerHTML = '<p class="sub">No skills yet. Ask in the chat: <b>integrate https://github.com/owner/repo</b></p>'; return; }
   const when = t => t ? new Date(t).toLocaleString([], {day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit'}) : 'never';
-  box.innerHTML = d.skills.map(s=>{ const state = s.pending ? ['yellow', 'Planned — not installed yet (reply “install it” in its chat)'] : s.off ? ['grey', 'Switched off — kept installed, not used'] : s.tested && s.tested.ok ? ['green', 'Working — checked ' + when(s.tested.at)] : ['red', 'Not working — ' + ((s.tested && s.tested.why) || 'failed its check').replace(/\s+/g, ' ').slice(0, 140)];
-    return `<div class="krow skrow" data-k="${esc(s.slug)}"><div class="khead"><span class="kdot ${state[0]}"></span><b>${esc(s.name)}</b>${s.pending ? '' : `<label title="Use this skill"><input type="checkbox" data-act="on" ${s.off ? '' : 'checked'}></label>`}</div><small>${esc(s.description)}</small><small>${esc(state[1])}</small><div class="kedit">${s.pending ? '' : '<button class="ghost" data-act="test" type="button">Test</button>'}<button class="ghost" data-act="remove" type="button">Remove</button></div><small><a href="${esc(s.source)}" target="_blank" rel="noopener">${esc(String(s.source).replace('https://github.com/', ''))}</a></small></div>`; }).join('');
-  box.querySelectorAll('[data-act]').forEach(b=>{ const k = b.closest('.skrow').dataset.k;
-    if(b.dataset.act === 'on') b.onchange = async () => { await post('/skills', {slug: k, on: b.checked}); toast(b.checked ? 'Switched on' : 'Switched off'); loadSkills(); };
-    else b.onclick = async () => { b.disabled = true; b.textContent = b.dataset.act === 'test' ? 'Testing…' : 'Removing…';
-      try{ const j = await post('/skills', b.dataset.act === 'test' ? {slug: k, test: true} : {slug: k, remove: true}); toast(b.dataset.act === 'test' ? (j.ok ? 'It works ✓' : 'Not working: ' + String(j.why || '').slice(0, 90)) : 'Removed'); }catch(e){ toast('That did not work: ' + e.message); }
+  const repo = s => /^https?:/.test(s.source) ? `<a href="${esc(s.source)}" target="_blank" rel="noopener">${esc(String(s.source).replace('https://github.com/', ''))}</a>` : esc(s.source);
+  // installed tools, then the built-in ones (rules and ways of working taken from GitHub repos into the AI's own code)
+  const row = s => { const state = s.pending ? ['yellow', 'Planned — not installed yet (reply “install it” in its chat)'] : s.off ? ['grey', 'Switched off — ' + (s.builtin ? 'not used until you switch it on' : 'kept installed, not used')] : s.tested && s.tested.ok ? ['green', 'Working — checked ' + when(s.tested.at)] : s.tested ? ['red', 'Not working — ' + (s.tested.why || 'failed its check').replace(/\s+/g, ' ').slice(0, 140)] : ['green', s.core ? 'Always on — part of how answers are kept honest' : 'On — press Test to check it'];
+    return `<div class="krow skrow" data-k="${esc(s.slug)}" data-b="${s.builtin ? 1 : ''}"><div class="khead"><span class="kdot ${state[0]}"></span><b>${esc(s.name)}</b>${s.pending || s.core ? '' : `<label title="Use this skill"><input type="checkbox" data-act="on" ${s.off ? '' : 'checked'}></label>`}</div><small>${esc(s.description)}</small><small>${esc(state[1])}</small><div class="kedit">${s.pending ? '' : '<button class="ghost" data-act="test" type="button">Test</button>'}${s.builtin ? '' : '<button class="ghost" data-act="remove" type="button">Remove</button>'}</div><small>${s.builtin ? 'From ' : ''}${repo(s)}</small></div>`; };
+  const b = d.builtin || [];
+  box.innerHTML = `<h3 class="skh">Installed · ${d.skills.length}</h3>` + (d.skills.length ? d.skills.map(row).join('') : '<p class="sub">None yet. Ask in the chat: <b>integrate https://github.com/owner/repo</b></p>')
+    + (b.length ? `<h3 class="skh">Built in · ${b.length}</h3><p class="sub">Ideas and rules taken from GitHub repos into your AI's own code.</p>` + b.map(row).join('') : '');
+  box.querySelectorAll('[data-act]').forEach(btn=>{ const r = btn.closest('.skrow'), k = r.dataset.k, builtin = !!r.dataset.b;
+    if(btn.dataset.act === 'on') btn.onchange = async () => { await post('/skills', {slug: k, on: btn.checked, builtin}); toast(btn.checked ? 'Switched on' : 'Switched off'); loadSkills(); };
+    else btn.onclick = async () => { btn.disabled = true; btn.textContent = btn.dataset.act === 'test' ? 'Testing…' : 'Removing…';
+      try{ const j = await post('/skills', btn.dataset.act === 'test' ? {slug: k, test: true, builtin} : {slug: k, remove: true}); toast(btn.dataset.act === 'test' ? (j.ok ? 'It works ✓' : 'Not working: ' + String(j.why || '').slice(0, 90)) : 'Removed'); }catch(e){ toast('That did not work: ' + e.message); }
       loadSkills(); }; });
 }
 const openSkills = on => { $('#skillsPanel').classList.toggle('open', on); $('#scrim').classList.toggle('open', on); if(on) loadSkills(); };
