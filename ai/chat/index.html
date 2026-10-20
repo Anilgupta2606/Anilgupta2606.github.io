@@ -336,6 +336,7 @@ code{font-family:var(--mono); font-size:.85em; background:var(--page2); padding:
 .kdot.grey{background:#9aa0aa; color:#9aa0aa}
 .skrow .khead input[type=checkbox]{width:18px; height:18px; accent-color:var(--think)}
 .skfrom a{word-break:break-word}
+.skillused{display:inline-flex; align-items:center; gap:4px; font-size:11.5px; padding:2px 8px; border-radius:999px; border:1px solid var(--line, rgba(127,127,127,.25)); opacity:.85; margin-left:6px; white-space:nowrap}
 .memsw{font-size:12px; font-weight:400; margin-left:8px}
 .setrow .khead{justify-content:space-between; gap:10px}
 .skh{font-size:13px; margin:16px 0 6px; color:var(--muted, inherit); text-transform:uppercase; letter-spacing:.04em}
@@ -967,7 +968,7 @@ function finish(el, q, out, steps, traces, pending){
   el.querySelector('.work').outerHTML = n ? `<details class="how"><summary><span class="dots">${dots.join('')}</span>How it got here · ${n} step${n === 1 ? '' : 's'}${out.secs ? ' · ' + out.secs + ' s' : ''}</summary>${traces.length ? timeline(traces) : `<div class="steps">${steps.map(s=>stepHtml(s)).join('')}</div>`}</details>` : '';
   const model = out.model || (/no AI/.test(out.by || '') ? 'Worked out exactly (no AI)' : '');
   const badge = out.verify ? trustBadge(out.verify) : out.trust && !out.saved && pending ? `<span class="conf pending" title="A second model is checking each claim against the sources">Checking claims…</span>` : '';
-  el.querySelector('.slot').innerHTML = `<div class="a"><div class="badges">${model ? `<span class="model" title="The AI model that wrote this answer">✦ ${esc(model)}</span>` : ''}${badge}</div>${render(out)}
+  el.querySelector('.slot').innerHTML = `<div class="a"><div class="badges">${model ? `<span class="model" title="The AI model that wrote this answer">✦ ${esc(model)}</span>` : ''}${badge}${(out.skillsUsed || []).map(n=>`<span class="skillused" title="A skill this answer used">🧰 ${esc(n)}</span>`).join('')}</div>${render(out)}
     <div class="foot"><span class="by">${esc(out.by || '')}</span>${out.saved ? '<button class="ghost fresh" type="button">Ask fresh</button>' : ''}<button class="ghost cp" type="button" title="Copy the answer">Copy</button><button class="ghost say" type="button" title="Read this answer out loud" aria-label="Read aloud">🔊</button><button class="ghost rt" type="button" title="Ask again from scratch">Retry</button><button class="ghost up" type="button" title="Good answer — keep it">👍</button><button class="ghost down" type="button" title="Wrong — tell it what is right">👎</button>${mode === 'mac' && out.text ? '<button class="ghost pin" type="button" title="Pin as important — every chat can use it (What it learned → Pinned)">📌</button>' : ''}</div></div>`;
   drawDiagrams(el);                                          // a ```mermaid diagram in the answer, drawn
   enhance(el);                                               // its maths drawn and its code coloured
