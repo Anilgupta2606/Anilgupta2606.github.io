@@ -336,6 +336,7 @@ code{font-family:var(--mono); font-size:.85em; background:var(--page2); padding:
 .kdot.grey{background:#9aa0aa; color:#9aa0aa}
 .skrow .khead input[type=checkbox]{width:18px; height:18px; accent-color:var(--think)}
 .skfrom a{word-break:break-word}
+.approve{border:1px solid var(--line, rgba(127,127,127,.3)); border-radius:12px; padding:10px 12px; margin:10px 0} .approve.danger{border-color:#d33} .approve pre{margin:6px 0; white-space:pre-wrap; word-break:break-word} .apb{display:flex; gap:8px; flex-wrap:wrap} .apb button{min-height:40px; padding:0 16px; border-radius:999px; font-weight:600; cursor:pointer} .apb .primary{background:var(--think, #3b6); color:#fff; border:0}
 .skillused{display:inline-flex; align-items:center; gap:4px; font-size:11.5px; padding:2px 8px; border-radius:999px; border:1px solid var(--line, rgba(127,127,127,.25)); opacity:.85; margin-left:6px; white-space:nowrap}
 .memsw{font-size:12px; font-weight:400; margin-left:8px}
 .setrow .khead{justify-content:space-between; gap:10px}
@@ -978,6 +979,9 @@ function finish(el, q, out, steps, traces, pending){
   el.querySelector('.foot .cp').onclick = e => { const b = e.currentTarget; (navigator.clipboard ? navigator.clipboard.writeText(out.text || '') : Promise.reject()).then(()=>{ b.textContent = 'Copied'; setTimeout(()=>{ b.textContent = 'Copy'; }, 1500); }).catch(()=>toast('Select the text to copy it')); };
   el.querySelector('.foot .rt').onclick = () => ask(q, {fresh: true});
   const sayB = el.querySelector('.foot .say'); if(sayB) sayB.onclick = () => window.readAloud ? window.readAloud(out, sayB) : toast('This browser cannot read aloud');
+  // a command waiting for your OK: Run / Don't run, right under the answer (the same as replying "run it" or "no")
+  if(out.pending && out.pending.cmd){ const a = el.querySelector('.a'); a.querySelector('.foot').insertAdjacentHTML('beforebegin', `<div class="approve${out.pending.danger ? ' danger' : ''}"><div class="apq">${out.pending.danger ? '✋ This cannot easily be undone. ' : ''}Run this on your Mac?</div><pre><code>${esc(out.pending.cmd)}</code></pre><div class="apb"><button type="button" class="primary" data-ap="run it">▶ Run</button><button type="button" class="ghost" data-ap="don't run">Don't run</button></div></div>`);
+    a.querySelectorAll('[data-ap]').forEach(b=>b.onclick = () => { a.querySelectorAll('[data-ap]').forEach(x=>x.disabled = true); b.textContent = b.dataset.ap === 'run it' ? 'Running…' : 'Not run'; ask(b.dataset.ap); }); }
   if(out.kind === 'clarify'){ const a = el.querySelector('.a'); a.classList.add('ask'); a.querySelector('.foot').insertAdjacentHTML('beforebegin', '<p class="asknote">Tap an answer, or type your own below.</p>'); }
   if(out.followups && out.followups.length) setTimeout(()=>showFollow(el, out.followups));
   el.querySelector('.foot .up').onclick = async e => {
