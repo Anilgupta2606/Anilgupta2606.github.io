@@ -56,19 +56,19 @@ const MoneyAI = (function(){
     // Words only: an app's request never becomes a picture or a video.
     {id:'mac', name:'Your own AI (on your Mac)', signupUrl:'https://anilgupta2606.github.io/ai/chat/', placeholder:'http://127.0.0.1:8899', models:['auto', 'chatgpt'], keyless:true},
     // NVIDIA's own API (build.nvidia.com): Nemotron straight from NVIDIA, with its own limits — not OpenRouter's shared 50 a day
-    {id:'nvidia', name:'NVIDIA (Nemotron)', signupUrl:'https://build.nvidia.com', placeholder:'nvapi-…', models:['nvidia/nemotron-3-ultra-550b-a55b','nvidia/nemotron-3-super-120b-a12b','openai/gpt-oss-120b']},
+    {id:'nvidia', name:'NVIDIA (Nemotron)', signupUrl:'https://build.nvidia.com', placeholder:'nvapi-…', models:['nvidia/nemotron-3-ultra-550b-a55b','nvidia/nemotron-3-super-120b-a12b','nvidia/nemotron-3.5-lightning-30b-a3b']},
     // OLLAMA CLOUD through the Mac's own Ollama (signed in to ollama.com): Beam (Reflection, 501B MoE, 1M context, strong
     // at coding and tools) — used on the Mac only; no key travels (Ollama holds the sign-in)
     {id:'ollamacloud', name:'Ollama Cloud (Beam)', signupUrl:'https://ollama.com/library/beam', placeholder:'on', models:['beam:cloud']},
     {id:'gemini', name:'Google Gemini', signupUrl:'https://aistudio.google.com/apikey', placeholder:'AIza…', models:['gemini-flash-latest','gemini-flash-lite-latest'], vision:true, search:true},
-    {id:'groq', name:'Groq', signupUrl:'https://console.groq.com/keys', placeholder:'gsk_…', models:['openai/gpt-oss-120b','llama-3.3-70b-versatile','openai/gpt-oss-20b']},
+    {id:'groq', name:'Groq', signupUrl:'https://console.groq.com/keys', placeholder:'gsk_…', models:['openai/gpt-oss-120b','qwen/qwen3.8-27b','openai/gpt-oss-20b']},
     // Z.ai (GLM's maker): GLM-4.7-Flash and GLM-4.5-Flash free, with no daily cap (their API speaks the OpenAI form)
     {id:'zai', name:'Z.ai (GLM)', signupUrl:'https://z.ai/manage-apikey/apikey-list', placeholder:'key', models:['glm-4.7-flash','glm-4.5-flash','glm-4.6v-flash']},
     // Cohere (trial key: 1,000 calls a month, 20 a minute): Command A+ and North Mini Code, through its OpenAI-style API
     {id:'cohere', name:'Cohere (Command)', signupUrl:'https://dashboard.cohere.com/api-keys', placeholder:'key', models:['command-a-plus-05-2026','command-a-03-2025','north-mini-code']},
     {id:'cerebras', name:'Cerebras', signupUrl:'https://cloud.cerebras.ai', placeholder:'csk-…', models:['gpt-oss-120b','llama-3.3-70b','llama3.1-8b']},
     {id:'mistral', name:'Mistral', signupUrl:'https://console.mistral.ai/api-keys', placeholder:'key', models:['mistral-small-latest','mistral-medium-latest']},
-    {id:'openrouter', name:'OpenRouter', signupUrl:'https://openrouter.ai/keys', placeholder:'sk-or-…', models:['openrouter/free','meta-llama/llama-3.3-70b-instruct:free']},
+    {id:'openrouter', name:'OpenRouter', signupUrl:'https://openrouter.ai/keys', placeholder:'sk-or-…', models:['openrouter/free']},
     // Private AI (in this browser) is gone: Your own AI (on your Mac) is the private one — a key saved for it is not used
     // Local (Ollama) is gone from here: the models on the Mac are reached through Your own AI (local:…), one way for every app
     {id:'anthropic', name:'Anthropic Claude (paid)', signupUrl:'https://console.anthropic.com/settings/keys', placeholder:'sk-ant-…', models:['claude-haiku-4-5-20251001'], vision:true},
@@ -203,6 +203,8 @@ const MoneyAI = (function(){
       throw e;
     }
     if(res.status === 402){ const e = Unavailable(name + ': no credit left on this account.', 402, true); e.until = Date.now() + toMidnight('UTC'); throw e; }
+    // taken off for good (NVIDIA's gpt-oss-120b: "410 Gone ... reached its end of life"; Groq: "does not exist"): skipped a month
+    if(res.status === 410 || res.status === 404 && /end of life|no longer available|decommissioned|does not exist|unavailable for free/i.test(body)){ const e = Unavailable(name + ': model retired.', 404); e.retired = true; throw e; }
     if(res.status === 404) throw Unavailable(name + ': model not available to this key.', 404);
     if(res.status === 400 && /image|vision|multimodal|content type/i.test(body)) throw Unavailable(name + ' cannot read images with this model.', 400);
     if(res.status >= 500) throw Unavailable(name + ' is busy right now.', res.status);
@@ -601,18 +603,71 @@ const MoneyAI = (function(){
     return (d.data || []).map(m=>m.id);
   }
   /* What a key can use (asked once a day), ranked for the task. */
-  async function bestModels(id, key, tier){
-    if(id === 'webllm') return [key];
-    // NVIDIA lists a hundred models of every maker: its own short list (Nemotron first) is the one used
-    if(id === 'nvidia' || id === 'zai' || id === 'cohere' || id === 'ollamacloud') return PROVIDERS.find(p=>p.id === id).models;
+  /* NEW MODELS OF NVIDIA AND COHERE: only their own chat families are taken in when they appear — Nemotron ultra / super /
+     lightning / nano ("nvidia/nemotron-4-ultra-…"), Command A and A+ ("command-a-plus-11-2026") and North code models;
+     never a vision (-vl), omni, embedding, safety, reward, parse, reasoning or translation one */
+  const FAMILY = {
+    nvidia: /^nvidia\/nemotron-\d+(\.\d+)?-(ultra|super|lightning|nano)-(?!.*\b(vl|omni|embed|safety|guard|reward|parse)\b)/,
+    cohere: /^(command-a(-plus)?-\d{2}-\d{4}|north-[\w-]*code[\w-]*)$/,
+  };
+  // the strongest first, the newest first within it: Nemotron ultra, super, lightning, nano by version; Cohere's Command
+  // models by date (A+ before A on the same date), then the code models
+  function familyOrder(id, list){
+    const uniq = Array.from(new Set(list));
+    if(id === 'nvidia'){
+      const TIER = {ultra: 0, super: 1, lightning: 2, nano: 3}, t = m => { const x = /-(ultra|super|lightning|nano)-/.exec(m); return x ? TIER[x[1]] : 4; };
+      const v = m => +((/nemotron-(\d+(?:\.\d+)?)-/.exec(m) || [])[1] || 0);
+      return uniq.sort((a, b)=>t(a) - t(b) || v(b) - v(a));
+    }
+    const date = m => { const x = /-(\d{2})-(\d{4})$/.exec(m); return x ? +x[2] * 12 + +x[1] : 0; }, code = m => /^north/.test(m) ? 1 : 0;
+    return uniq.sort((a, b)=>code(a) - code(b) || date(b) - date(a) || (/-plus-/.test(b) ? 1 : 0) - (/-plus-/.test(a) ? 1 : 0));
+  }
+  async function liveNames(id, key){
     const cache = lsGet(MODELS_KEY, {}), c = cache[id], tag = key.slice(-6);
     // a day's cache for the online services; the models on this computer are read fresh (a new one may just have been downloaded)
     let names = id !== 'ollama' && id !== 'mac' && c && c.key === tag && Date.now() - c.at < 86400000 && c.names && c.names.length ? c.names : null;
     if(!names){
       try{ names = await listModels(id, key); if(names.length){ cache[id] = {at: Date.now(), key: tag, names}; lsSet(MODELS_KEY, cache); } }catch(e){ names = null; }
     }
+    return names;
+  }
+  async function bestModels(id, key, tier){
+    if(id === 'webllm') return [key];
+    // NVIDIA and Cohere list a hundred models of every kind: their own short list (Nemotron first), less what the service no
+    // longer lists (NVIDIA's gpt-oss-120b was retired and kept being tried), plus new models of the same family when they come
+    // (FAMILY: chat models only — no embedding, safety, vision or translation ones). Z.ai's list leaves out its free -flash
+    // models, so its short list stays as it is
+    if(id === 'nvidia' || id === 'zai' || id === 'cohere' || id === 'ollamacloud'){
+      const mine = PROVIDERS.find(p=>p.id === id).models;
+      if(id !== 'nvidia' && id !== 'cohere') return mine;
+      const names = await liveNames(id, key);
+      if(!names) return mine;
+      const same = (m, n) => n === m || n.indexOf(m + '-') === 0;                 // Cohere: north-mini-code is north-mini-code-1-0
+      const kept = mine.filter(m=>names.some(n=>same(m, n))), fresh = names.filter(n=>FAMILY[id].test(n) && !mine.some(m=>same(m, n)));
+      const all = familyOrder(id, kept.concat(fresh));
+      return all.length ? all : mine;
+    }
+    const names = await liveNames(id, key);
     const ranked = names ? rankModels(id, names, tier) : [];
     return ranked.length ? ranked : PROVIDERS.find(p=>p.id === id).models;
+  }
+  /* THE MODEL LISTS ASKED AGAIN NOW (services retire and add models): the day's list and skip marks of a service dropped,
+     its list read afresh and the models it would use first each asked for one word. One that is retired or not open to
+     this key is skipped (a retired one for a month) -> [{model, ok, why}] */
+  async function refreshModels(id, key, n){
+    const cache = lsGet(MODELS_KEY, {}); delete cache[id]; lsSet(MODELS_KEY, cache);
+    const b = lsGet(BAD_KEY, {}); Object.keys(b).forEach(k=>{ if(k.indexOf(id + '|') === 0) delete b[k]; }); lsSet(BAD_KEY, b);
+    const out = [];
+    for(const model of (await bestModels(id, key, 'smart')).slice(0, n || 5)){     // as many as a chat would try
+      const ctl = new AbortController(), timer = setTimeout(()=>ctl.abort(), 45000);
+      try{ await callOne(id, key, model, 'Reply with the single word OK.', [{role: 'user', content: 'OK?'}], {}, ctl.signal); out.push({model, ok: true}); }
+      catch(e){
+        if(e.status === 404) markBad(id, model, e.retired ? 30 * 86400000 : 0);
+        out.push({model, ok: false, retired: !!e.retired, why: e.code === 'cancelled' ? 'no answer in 45 s' : String(e.message || e).slice(0, 140)});
+      }
+      finally{ clearTimeout(timer); }
+    }
+    return out;
   }
   /* Which model answered last, per service and kind of task (tried first next time), and models a key cannot use (skipped for a day). */
   const WORKING_KEY = 'money-ai-working', BAD_KEY = 'money-ai-bad';
@@ -622,7 +677,7 @@ const MoneyAI = (function(){
     const r = restMap(), until = Math.min.apply(null, models.map(m=>(r[id + '|' + m] || {}).until || Date.now() + 15 * 60000));
     rest(id, ((r[id + '|' + models[0]] || {}).why) || 'free limit reached', until);
   }
-  function markBad(id, model){ const b = lsGet(BAD_KEY, {}); b[id + '|' + model] = Date.now() + 86400000; lsSet(BAD_KEY, b); }
+  function markBad(id, model, ms){ const b = lsGet(BAD_KEY, {}); b[id + '|' + model] = Date.now() + (ms || 86400000); lsSet(BAD_KEY, b); }
   const isBad = (id, model) => (lsGet(BAD_KEY, {})[id + '|' + model] || 0) > Date.now();
   /* What answers now, for the settings: [{id, name, model, resting}] in the order they are tried. */
   function aiStatus(){
@@ -696,7 +751,7 @@ const MoneyAI = (function(){
           lastError = e;
           if(e.unavailable) tell(e.message + ' — trying the next');
           if(!e.unavailable){ skipped.push(e.message); tell(e.message + ' — trying the next'); break; }        // the key itself was refused
-          if(e.status === 404) markBad(id, model);                      // this key cannot use that model
+          if(e.status === 404) markBad(id, model, e.retired ? 30 * 86400000 : 0);       // this key cannot use that model (retired: a month)
           if(e.limit && e.perModel){ rest(id + '|' + model, e.message, e.until); if(free.every(m=>resting(id + '|' + m))){ restAll(id, free); break; } continue; }
           if(e.limit){ rest(id, e.message, e.until); break; }           // out of free quota: next service
         }
@@ -783,7 +838,7 @@ const MoneyAI = (function(){
   const setModel = (id, m) => { const h = aiLocal(); h.model = Object.assign({}, h.model, {[id]: m}); saveAiLocal(h); };
 
   return {keysToMac, macLights, macManaged, macMaybe, BACKUP_KEY, LIGHTS_KEY, macModels, macModelLabel, macRequest, MAC_URL, macUp, macFetch, macRemote, setMacRemote, macSignIn, macBase, PRIVATE_MODELS, trialPrivate, removePrivate, privateCached, PROVIDERS, loadAi, aiSettings, aiLocal, saveAiLocal, adoptAppKeys, aiStatus, rankModels, shareableAi, takeSyncedAi,
-          aiAvailable, aiNames, canSee, canSearch, resting, wake, backAt, chat, generate, json, test, setModel, listModels};
+          aiAvailable, aiNames, canSee, canSearch, resting, wake, backAt, chat, generate, json, test, setModel, listModels, refreshModels};
 })();
 
 /* =========================================================
