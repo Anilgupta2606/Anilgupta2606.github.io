@@ -1688,8 +1688,8 @@ const COMMANDS = [
   {c: '/memory', a: 'forget n · clear · off · on · add …', d: 'What it remembers about you — kept automatically, no pinning needed'},
   {c: '/tune', a: 'run · off n · remove n', d: 'Self-tune: the rules it learned from answers that went wrong'},
   {c: '/config', a: 'name value', d: 'Settings and limits (also in Skills → Limits)'},
-  {c: '/design', a: 'a product, e.g. expense tracker mobile web', d: 'A design system for it — style, colours, fonts, UX rules (ui-ux-pro-max, no AI)'},
-  {c: '/rea', a: 'an app, a .har or a database on your Mac', d: 'rea looks inside it with evidence — an app\'s windows, IPC and network calls, a capture\'s requests, a database\'s tables'},
+  {c: '/design', a: 'a product — or logo | banner | slides | brand <brief>', d: 'A design system for a product (ui-ux-pro-max, no AI); or make a logo (SVG + PNG), a banner at the platform\'s size (PNG), an HTML slide deck, brand guidelines with design tokens'},
+  {c: '/rea', a: 'an app, a web page (https://…), a .har or a database', d: 'rea looks inside it with evidence — an app\'s screens, IPC and network calls; a page\'s requests, APIs, scripts and structure in Chrome; "<program> explain <function>" decompiles one function (Ghidra); "<https URL> watch 60" records where you go'},
   {c: '/upskill', a: 'generate <task> · eval <skill> · list', d: 'A strong model writes a skill; measured with and without it on the models on your Mac'},
   {c: '/upstream', a: 'run · apply n · drop n', d: 'What changed in the repos our skills came from — suggestions to apply (SoGPT, with tests)'},
   {c: '/blueprint', a: 'a site or an app', d: 'Reverse-engineer it: how it is built and what it does, then a plan to build your own (say “build it” after)'},
@@ -1789,8 +1789,8 @@ async function runCommand(line){
     toast('Rewound ' + gone + ' question' + (gone === 1 ? '' : 's'));
   }
   else if(c === '/context') showContext();
-  else if(c === '/design'){ if(!arg) return toast('/design expense tracker, mobile web'); ask('/design ' + arg); }
-  else if(c === '/rea'){ if(!arg) return toast('/rea /Applications/Slack.app — or a .har or .sqlite file'); ask('/rea ' + arg); }
+  else if(c === '/design'){ if(!arg) return toast('/design expense tracker, mobile web · /design logo for "Ledgerly" fintech · /design banner twitter header … · /design slides seed pitch deck … · /design brand …'); ask('/design ' + arg); }
+  else if(c === '/rea'){ if(!arg) return toast('/rea /Applications/Slack.app · /rea https://zerodha.com · /rea ~/bin/tool explain main — or a .har or .sqlite file'); ask('/rea ' + arg); }
   else if(c === '/upstream') ask('/upstream' + (arg ? ' ' + arg : ''));
   else if(c === '/upskill') ask('/upskill' + (arg ? ' ' + arg : ''));
   else if(c === '/blueprint'){ if(!arg) return toast('/blueprint notion.so — or an app on your Mac'); ask('/blueprint ' + arg); }
