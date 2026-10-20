@@ -585,12 +585,12 @@ button, a, summary, label{touch-action:manipulation}
   <div class="slash" id="slash" role="listbox" hidden></div>
   <form class="box" id="form">
     <button class="clip" type="button" id="clip" aria-label="Attach a file" title="Attach files: PDF, text, CSV, JSON, code"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5l-8.6 8.6a5 5 0 01-7.1-7.1l8.6-8.6a3.3 3.3 0 014.7 4.7l-8.6 8.6a1.7 1.7 0 01-2.4-2.4l7.9-7.9"/></svg></button>
-    <input type="file" id="fileIn" multiple hidden accept=".pdf,.xlsx,.xls,.xlsm,.ods,.csv,.tsv,.docx,.pptx,.txt,.md,.markdown,.json,.html,.htm,.xml,.log,.yaml,.yml,.ini,.js,.mjs,.ts,.py,.java,.c,.cpp,.h,.sql,.sh,.css">
+    <input type="file" id="fileIn" multiple hidden accept=".pdf,.xlsx,.xls,.xlsm,.ods,.csv,.tsv,.docx,.pptx,.zip,.msg,.epub,audio/*,video/*,.m4a,.mp3,.wav,.mp4,.mov,.txt,.md,.markdown,.json,.html,.htm,.xml,.log,.yaml,.yml,.ini,.js,.mjs,.ts,.py,.java,.c,.cpp,.h,.sql,.sh,.css">
     <input type="file" id="folderIn" hidden webkitdirectory multiple>
     <input type="file" id="imageIn" hidden multiple accept="image/*">
     <input type="file" id="cameraIn" hidden accept="image/*" capture="environment">
     <div class="attachMenu" id="attachMenu" hidden role="menu">
-      <button type="button" data-in="fileIn" role="menuitem"><i>📄</i><span><b>Files</b><small>PDF, Excel, Word, PowerPoint, CSV, code</small></span></button>
+      <button type="button" data-in="fileIn" role="menuitem"><i>📄</i><span><b>Files</b><small>PDF, Excel, Word, PowerPoint, zip, CSV, code, recordings</small></span></button>
       <button type="button" data-in="folderIn" role="menuitem"><i>🗂</i><span><b>Folder</b><small>Its text and code files (up to 40)</small></span></button>
       <button type="button" data-in="imageIn" role="menuitem"><i>🖼</i><span><b>Images</b><small>Photos, screenshots, receipts, charts</small></span></button>
       <button type="button" data-in="cameraIn" role="menuitem" class="phoneOnly"><i>📷</i><span><b>Take a photo</b><small>With the camera</small></span></button>
@@ -1461,6 +1461,16 @@ async function pptxText(file){
   for(const n of slides){ const x = await zip.files[n].async('string'); out.push('[slide ' + n.match(/\d+/)[0] + '] ' + Array.from(x.matchAll(/<a:t>([^<]*)<\/a:t>/g)).map(m=>m[1]).join(' ')); }
   return out.join('\n');
 }
+// Excel, PowerPoint, a .zip, Outlook mail, EPUB and recordings go to this Mac's helper: MarkItDown reads them (an Excel's
+// sheets come back as CSV for run_code; a PowerPoint's pictures are described), Whisper hears a recording. Without the
+// helper (the site on a phone with the Mac off) Excel and PowerPoint are still read here, the others cannot be.
+const VIA_MAC = /\.(xlsx|xlsm|xls|pptx|zip|msg|epub|mp3|m4a|wav|aac|flac|ogg|opus|aiff?|amr|mp4|mov|m4v|webm|mkv|avi|3gp)$/i;
+async function viaMac(f){
+  const r = await fetch(HELPER + '/convert?name=' + encodeURIComponent(f.name), {method: 'POST', headers: {'content-type': 'application/octet-stream'}, body: f});
+  const j = await r.json().catch(()=>({}));
+  if(!r.ok || !Array.isArray(j.files) || !j.files.length) throw new Error(j.error || 'the Mac could not read it');
+  return j.files;
+}
 function showFiles(){
   const box = $('#files'); box.hidden = !attachments.length;
   box.innerHTML = attachments.map((a, i)=>`<span class="fchip${a.busy ? ' busy' : ''}">${a.thumb ? `<img src="${a.thumb}" alt="">` : a.image !== undefined ? '🖼' : '📄'} ${esc(a.name.length > 40 ? '…' + a.name.slice(-38) : a.name)} <small>${a.busy ? 'reading…' : a.err ? esc(a.err) : a.image ? 'picture' : Math.max(1, Math.round(a.text.length / 1000)) + 'k chars'}</small><button type="button" data-i="${i}" aria-label="Remove">×</button></span>`).join('');
@@ -1506,6 +1516,11 @@ $('#folderIn').onchange = async () => {
 $('#fileIn').onchange = async () => {
   for(const f of Array.from($('#fileIn').files).slice(0, 10 - attachments.length)){
     if(/^image\//.test(f.type)){ await addImages([f]); continue; }
+    if(VIA_MAC.test(f.name) || /^(audio|video)\//.test(f.type)){
+      const a = {name: f.name, text: '', busy: true}; attachments.push(a); showFiles();
+      try{ if(mode !== 'mac') throw new Error('needs the Mac'); if(f.size > 200e6) throw new Error('too big'); const list = await viaMac(f); attachments.splice(attachments.indexOf(a), 1, ...list.map(x=>({name: x.name, text: x.text}))); showFiles(); continue; }
+      catch(e){ attachments.splice(attachments.indexOf(a), 1); if(!/\.(xlsx|xls|xlsm|pptx)$/i.test(f.name)){ attachments.push({name: f.name, text: '', err: String(e.message || e).slice(0, 40)}); showFiles(); continue; } }
+    }
     if(/\.(xlsx|xls|xlsm|ods)$/i.test(f.name)){
       const a = {name: f.name, text: '', busy: true}; attachments.push(a); showFiles();
       try{ const list = await sheets(f); attachments.splice(attachments.indexOf(a), 1, ...list.map(x=>({name: x.name, text: x.text}))); if(!list.length) throw new Error('empty'); }catch(e){ a.err = String(e.message || e).slice(0, 40); a.busy = false; }
@@ -1678,7 +1693,7 @@ const COMMANDS = [
   {c: '/upskill', a: 'generate <task> · eval <skill> · list', d: 'A strong model writes a skill; measured with and without it on the models on your Mac'},
   {c: '/upstream', a: 'run · apply n · drop n', d: 'What changed in the repos our skills came from — suggestions to apply (SoGPT, with tests)'},
   {c: '/blueprint', a: 'a site or an app', d: 'Reverse-engineer it: how it is built and what it does, then a plan to build your own (say “build it” after)'},
-  {c: '/review', a: '', d: 'Review the coding project\'s uncommitted changes for bugs (nothing is changed)'},
+  {c: '/review', a: '[security | performance | tests]', d: 'Review the coding project\'s uncommitted changes for bugs — or as a security, performance or test reviewer (nothing is changed)'},
   {c: '/init', a: '', d: 'Make the coding project\'s notes, so SoGPT knows it'},
   {c: '/model', a: '', d: 'Choose the model that answers (the ✦ menu)'},
   {c: '/project', a: '', d: 'Choose the coding project (SoGPT 1.1 works on it)'},
@@ -1782,7 +1797,7 @@ async function runCommand(line){
   else if(c === '/memory' || c === '/tune' || c === '/config'){ if(mode !== 'mac') return toast('That is kept on your Mac — open this page there (or over Tailscale)');
     const j = await post(c === '/memory' ? '/memory' : c === '/tune' ? '/tune' : '/settings', c === '/memory' ? {memory: arg} : {cmd: arg}).catch(e=>({text: 'Could not reach your Mac: ' + e.message}));
     note(c + (arg ? ' ' + arg : ''), j.text || j.error || 'Done.', c === '/memory' ? 'Memory' : c === '/tune' ? 'Self-tune' : 'Settings'); }
-  else if(c === '/review' || c === '/init'){ if(mode !== 'mac') return toast('Coding projects are on your Mac — open this page there (or over Tailscale)'); if(!store.get('ai.project', '')) return toast('Choose a coding project first (/project)'); ask(c); }
+  else if(c === '/review' || c === '/init'){ if(mode !== 'mac') return toast('Coding projects are on your Mac — open this page there (or over Tailscale)'); if(!store.get('ai.project', '')) return toast('Choose a coding project first (/project)'); ask(c + (c === '/review' && arg ? ' ' + arg : '')); }
   else if(c === '/data-usage' || c === '/usage') openUsage(true);
   else if(c === '/model') $('#stModel').click();
   else if(c === '/project' || c === '/projects') $('#openProjects').click();
