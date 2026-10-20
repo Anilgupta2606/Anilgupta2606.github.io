@@ -72,14 +72,22 @@ const MoneyWeb = (function(){
       return {kind: 'calculator', text: `${m[1]} ${m[2]} = ${v.toLocaleString('en-IN')} (${(v / 1e6).toLocaleString('en-IN')} million).`, sources: []};
     }
     // units
-    const U = [[/(\d+\.?\d*)\s*(?:km|kilomet(?:er|re)s?)\s*(?:in|to)\s*miles?/, x=>x * 0.621371, 'miles'], [/(\d+\.?\d*)\s*miles?\s*(?:in|to)\s*(?:km|kilomet(?:er|re)s?)/, x=>x * 1.609344, 'km'],
-      [/(\d+\.?\d*)\s*(?:kg|kilos?|kilograms?)\s*(?:in|to)\s*(?:lbs?|pounds?)/, x=>x * 2.20462, 'lb'], [/(\d+\.?\d*)\s*(?:lbs?|pounds?)\s*(?:in|to)\s*(?:kg|kilos?|kilograms?)/, x=>x / 2.20462, 'kg'],
-      [/(-?\d+\.?\d*)\s*(?:°\s*)?(?:c|celsius)\s*(?:in|to)\s*(?:°\s*)?(?:f|fahrenheit)/, x=>x * 9 / 5 + 32, '°F'], [/(-?\d+\.?\d*)\s*(?:°\s*)?(?:f|fahrenheit)\s*(?:in|to)\s*(?:°\s*)?(?:c|celsius)/, x=>(x - 32) * 5 / 9, '°C'],
-      [/(\d+\.?\d*)\s*(?:feet|foot|ft)\s*(?:in|to)\s*(?:m|met(?:er|re)s?)/, x=>x * 0.3048, 'm'], [/(\d+\.?\d*)\s*(?:m|met(?:er|re)s?)\s*(?:in|to)\s*(?:feet|ft)/, x=>x / 0.3048, 'ft'],
-      [/(\d+\.?\d*)\s*(?:inch(?:es)?|in)\s*(?:in|to)\s*(?:cm|centimet(?:er|re)s?)/, x=>x * 2.54, 'cm'], [/(\d+\.?\d*)\s*(?:sq\.?\s*ft|square feet)\s*(?:in|to)\s*(?:sq\.?\s*m|square met(?:er|re)s?)/, x=>x * 0.092903, 'sq m']];
-    for(const [re, f, unit] of U){ if((m = re.exec(q))) return {kind: 'calculator', text: `${m[1]} → ${(Math.round(f(+m[1]) * 100) / 100).toLocaleString('en-IN')} ${unit}.`, sources: []}; }
-    // plain arithmetic: "what is 23*47+12", "1250/7"
-    const ex = /(?:what is|calculate|compute|=)?\s*([\d\s+\-*/().^%,]{3,})\s*\??$/.exec(q.trim());
+    const U = [[/(\d+\.?\d*)\s*(?:km|kilomet(?:er|re)s?)\s*(?:in|into|to)\s*miles?/, x=>x * 0.621371, 'miles'], [/(\d+\.?\d*)\s*miles?\s*(?:in|into|to)\s*(?:km|kilomet(?:er|re)s?)/, x=>x * 1.609344, 'km'],
+      [/(\d+\.?\d*)\s*(?:kg|kilos?|kilograms?)\s*(?:in|into|to)\s*(?:lbs?|pounds?)/, x=>x * 2.20462, 'lb'], [/(\d+\.?\d*)\s*(?:lbs?|pounds?)\s*(?:in|into|to)\s*(?:kg|kilos?|kilograms?)/, x=>x / 2.20462, 'kg'],
+      [/(-?\d+\.?\d*)\s*(?:°\s*)?(?:c|celsius)\s*(?:in|into|to)\s*(?:°\s*)?(?:f|fahrenheit)/, x=>x * 9 / 5 + 32, '°F'], [/(-?\d+\.?\d*)\s*(?:°\s*)?(?:f|fahrenheit)\s*(?:in|into|to)\s*(?:°\s*)?(?:c|celsius)/, x=>(x - 32) * 5 / 9, '°C'],
+      [/(\d+\.?\d*)\s*(?:feet|foot|ft)\s*(?:in|into|to)\s*(?:m|met(?:er|re)s?)/, x=>x * 0.3048, 'm'], [/(\d+\.?\d*)\s*(?:m|met(?:er|re)s?)\s*(?:in|into|to)\s*(?:feet|ft)/, x=>x / 0.3048, 'ft'],
+      [/(\d+\.?\d*)\s*(?:inch(?:es)?|in)\s*(?:in|into|to)\s*(?:cm|centimet(?:er|re)s?)/, x=>x * 2.54, 'cm'], [/(\d+\.?\d*)\s*(?:sq\.?\s*ft|square feet)\s*(?:in|into|to)\s*(?:sq\.?\s*m|square met(?:er|re)s?)/, x=>x * 0.092903, 'sq m']];
+    // "how many miles is 5 km" is "5 km to miles"
+    const uq = q.replace(/how many\s+([a-z°]+)\s+(?:is|are|in|make|makes)\s+(-?\d+\.?\d*)\s*([a-z°]+)/i, '$2 $3 to $1');
+    for(const [re, f, unit] of U){ if((m = re.exec(uq))) return {kind: 'calculator', text: `${m[1]} → ${(Math.round(f(+m[1]) * 100) / 100).toLocaleString('en-IN')} ${unit}.`, sources: []}; }
+    // plain arithmetic: "what is 23*47+12", "1250/7" — and in words: "17 multiplied by 23", "17 times 23", "17 x 23", "17 into 23"
+    // (Indian English), "100 divided by 8", "45 plus 12", "2 to the power of 10", "12 squared" (those went to a Wikipedia
+    // lookup: "What is 17 times 23?" was answered with the New York Times), with "… Reply with the number." left off
+    const sum = q.trim().replace(/(?<=[\d?])\s*[.!?]?\s*(?:please\s+)?(?:reply|answer|respond|give(?: me)?|just give|only)\b[^?]*[.!]?\s*$/i, '')
+      .replace(/(\d)\s*(?:multiplied by|times|into|x|×)\s*(?=[\d(])/gi, '$1*').replace(/(\d)\s*(?:divided by|÷)\s*(?=[\d(])/gi, '$1/')
+      .replace(/(\d)\s*(?:plus|added to)\s*(?=[\d(])/gi, '$1+').replace(/(\d)\s*minus\s*(?=[\d(])/gi, '$1-')
+      .replace(/(\d)\s*(?:to the power of|raised to(?: the power of)?)\s*(?=\d)/gi, '$1^').replace(/(\d)\s*squared\b/gi, '$1^2').replace(/(\d)\s*cubed\b/gi, '$1^3');
+    const ex = /(?:what is|what's|calculate|compute|=)?\s*([\d\s+\-*/().^%,]{3,})\s*\??$/i.exec(sum);
     if(ex && /\d\s*[+\-*/^]\s*\(?\d/.test(ex[1]) && !/\d{4}-\d{2}/.test(ex[1])){
       try{ const v = arith(ex[1].replace(/,/g, '')); if(isFinite(v)) return {kind: 'calculator', text: `${ex[1].trim()} = ${(Math.round(v * 1e6) / 1e6).toLocaleString('en-IN')}`, sources: []}; }catch(e){}
     }
