@@ -247,13 +247,13 @@ code{font-family:var(--mono); font-size:.85em; background:var(--page2); padding:
 .box:focus-within{background-image:linear-gradient(var(--card), var(--card)), var(--orb)}
 .box textarea{flex:1; border:0; outline:0; background:none; resize:none; max-height:180px; padding:8px 0; line-height:1.5}
 .box textarea::placeholder{white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
-.send{width:42px; height:42px; border-radius:50%; border:0; background:var(--ink); color:var(--page); display:grid; place-items:center; cursor:pointer; flex:none; transition:transform .15s ease}
+.send{width:42px; height:42px; border-radius:50%; border:0; background:var(--accent, var(--ink)); color:var(--page); display:grid; place-items:center; cursor:pointer; flex:none; transition:transform .15s ease}
 .send.stop{background:var(--check)}
 .mic.on{color:var(--check); background:var(--check-bg); animation:pulse 1.2s ease-in-out infinite}
 @keyframes pulse{50%{box-shadow:0 0 0 6px color-mix(in srgb, var(--check) 18%, transparent)}}
 .stopped{color:var(--mut); font-size:13.5px; margin:8px 0 0}
 .send:hover{transform:scale(1.06)} .send:disabled{opacity:.4; cursor:default; transform:none}
-.btn{background:var(--ink); color:var(--page); border:0; border-radius:12px; padding:9px 16px; font-weight:600; cursor:pointer}
+.btn{background:var(--accent, var(--ink)); color:var(--page); border:0; border-radius:12px; padding:9px 16px; font-weight:600; cursor:pointer}
 .clip{width:38px; height:38px; border:0; background:none; color:var(--mut); border-radius:12px; cursor:pointer; display:grid; place-items:center; flex:none; align-self:flex-end}
 .clip:hover{background:var(--page); color:var(--ink)}
 .box{position:relative}
@@ -516,7 +516,7 @@ button, a, summary, label{touch-action:manipulation}
   <input class="sbsearch" id="chatSearch" type="search" placeholder="Search chats" aria-label="Search chats">
   <nav class="chatlist" id="chats" aria-label="Your chats"></nav>
   <div class="sbnav">
-    <button class="navbtn" id="openTasks" type="button"><i>⏰</i>Scheduled</button>
+    <button class="navbtn" id="openTasks" type="button"><i>⏰</i>Tasks</button>
     <button class="navbtn" id="openProjects" type="button"><i>⌘</i>Projects</button>
     <button class="navbtn" id="openConn" type="button"><i>🔌</i>Connectors</button>
     <button class="navbtn" id="openSkills" type="button" hidden><i>🧰</i>Skills</button>
@@ -627,9 +627,9 @@ button, a, summary, label{touch-action:manipulation}
 
 <div class="scrim" id="scrim"></div>
 
-<aside class="panel" id="taskPanel" aria-label="Scheduled tasks">
+<aside class="panel" id="taskPanel" aria-label="Tasks">
   <button class="ghost close" id="closeTasks">Close</button>
-  <h2>Scheduled</h2>
+  <h2>Tasks</h2>
   <p class="sub">A question asked for you at a time — "every weekday at 9:15, a Nifty summary". Each result lands in its own chat (⏰) with a notification on your Mac. Runs while the Mac is awake; a time it slept through runs when it wakes. Loops (🔁, <code>/loop 15m …</code>) ask every few minutes and stop by themselves after 24 h.</p>
   <div id="tasks"></div>
 </aside>
@@ -1672,7 +1672,15 @@ const COMMANDS = [
   {c: '/file', a: '', d: 'Attach a file (PDF, text, CSV, code)'},
   {c: '/cloud', a: 'on | off', d: 'Let a bigger cloud model write the hard answers'},
   {c: '/theme', a: 'auto | light | dark', d: 'Change the look'},
-  {c: '/schedule', a: '09:00 weekdays a question', d: 'A question asked for you each day at a time (list · remove n; alone: the Scheduled panel)'},
+  {c: '/color', a: 'blue | green | orange | red | pink | purple | teal | gray | #hex | reset', d: 'The accent colour (the send button, buttons)'},
+  {c: '/rename', a: 'new name', d: 'Rename this chat'},
+  {c: '/verify', a: '', d: 'Does the selected project really work? Its tests run, then its app is started and opened (PASS / FAIL, with what was seen)'},
+  {c: '/doctor', a: '', d: 'Health of your AI (also /status) — the Usage panel'},
+  {c: '/pins', a: '', d: 'What you pinned and what it remembers (also /profile, /rules)'},
+  {c: '/projects', a: '', d: 'Your coding projects'},
+  {c: '/export', a: '', d: 'Save this chat as Markdown'},
+  {c: '/security', a: '', d: 'Check this AI\'s skills, connectors, file permissions and password for risks (nothing is changed)'},
+  {c: '/schedule', a: '09:00 weekdays a question', d: 'A question asked for you each day at a time (list · remove n; alone: the Tasks panel)'},
   {c: '/loop', a: '15m a question', d: 'Ask it every 15 minutes (1m at least; x10: at most 10 runs; --market: 09:15–15:30 IST) into its own 🔁 chat, stops after 24 h · list · stop [n|all]'},
   {c: '/image', a: 'a description', d: 'Make a picture from a description (the model: ✦ menu → Pictures)'},
   {c: '/video', a: 'a description', d: 'A video with real motion, free — "/video a 8 second …", or longer in scenes: "/video a 1 minute … with narration" ("continue the video" adds what the free allowance did not); "/gif …" for a GIF (the model: ✦ menu → Videos)'},
@@ -1774,6 +1782,15 @@ async function runCommand(line){
   else if(c === '/cloud'){ const on = !/^off$/i.test(arg); store.set('ai.cloud', on); $('#cloudTog').checked = on; toast('Cloud AI for hard questions: ' + (on ? 'on' : 'off')); }
   else if(c === '/theme'){ const t = /^(light|dark)$/i.test(arg) ? arg.toLowerCase() : 'auto'; store.set('ai.theme', t); applyTheme(t); toast('Theme: ' + t); }
   else if(c === '/new' || c === '/clear') newChat();
+  // the chat's own name (the sidebar and the title), kept on the Mac like every chat
+  else if(c === '/rename'){ if(!arg) return toast('Write the new name: /rename Trip to Goa'); if(!history.length) return toast('Ask something first — then name the chat'); chatName = arg.slice(0, 80); store.set('ai.chatName', chatName); setTitle(); await saveChat(); loadChats(); toast('Renamed: ' + chatName); }
+  else if(c === '/color'){ const v = colorOf(arg); if(v === null) return toast('A colour: blue, green, orange, red, pink, purple, teal, gray, a #hex — or reset'); store.set('ai.color', v); applyColor(v); toast(v ? 'Accent: ' + arg : 'Accent: as it was'); }
+  else if(c === '/doctor' || c === '/status') openUsage(true);
+  else if(c === '/security'){ if(mode !== 'mac') return toast('That checks your Mac — open this page there (or over Tailscale)'); ask('/security'); }
+  else if(c === '/pins' || c === '/profile' || c === '/rules') openPanel(true);
+  else if(c === '/projects') openProjects(true);
+  else if(c === '/export'){ if(!history.length) return toast('Nothing to export yet'); $('#exportChat').click(); }
+  else if(c === '/verify'){ if(mode !== 'mac') return toast('Coding projects are on your Mac — open this page there (or over Tailscale)'); if(!store.get('ai.project', '')) return toast('Choose a coding project first (/project)'); ask('/verify'); }
   else if(c === '/chats' || c === '/resume') openChats(true);
   // /loop and /schedule: kept and asked by the helper on the Mac (with the page closed too); the panel lists them
   else if(c === '/schedule' && !arg) openTasks(true);
@@ -2173,6 +2190,11 @@ $('#openConn').onclick = () => openConn(true);
 $('#closeConn').onclick = () => openConn(false);
 
 /* ---------------------------------------------------------------- theme, sign-in and the account menu */
+// /color: the accent (the send button and buttons), remembered in this browser; "reset" goes back to the theme's own
+const COLORS = {blue: '#3b6cf6', green: '#1f9d55', orange: '#e8710a', red: '#d93636', pink: '#d6337a', purple: '#7c4ddb', teal: '#0f9488', gray: '#5f6b7a', grey: '#5f6b7a', black: '#111', yellow: '#c99a00'};
+const colorOf = a => { a = String(a || '').trim().toLowerCase(); if(!a || a === 'reset' || a === 'default' || a === 'auto') return ''; if(COLORS[a]) return COLORS[a]; return /^#[0-9a-f]{3}([0-9a-f]{3})?$/.test(a) ? a : null; };
+const applyColor = v => { if(v) document.documentElement.style.setProperty('--accent', v); else document.documentElement.style.removeProperty('--accent'); };
+applyColor(store.get('ai.color', ''));
 const applyTheme = t => { if(t === 'light' || t === 'dark') document.documentElement.dataset.theme = t; else delete document.documentElement.dataset.theme;
   document.querySelectorAll('#themeSeg button').forEach(b=>b.setAttribute('aria-checked', String(b.dataset.t === (t || 'auto')))); };
 applyTheme(store.get('ai.theme', 'auto'));
