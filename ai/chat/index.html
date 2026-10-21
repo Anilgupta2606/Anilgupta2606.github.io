@@ -602,6 +602,7 @@ button, a, summary, label{touch-action:manipulation}
       <button type="button" data-mode="video" role="menuitem"><i>🎞</i><span><b>Make a video</b><small>A short video, made free on your Mac</small></span></button>
       <button type="button" data-mode="deep" role="menuitem"><i>🧠</i><span><b>Deep think</b><small>Deeper research; ChatGPT and Private Cloud write it, merged</small></span></button>
       <button type="button" data-mode="research" role="menuitem"><i>🔎</i><span><b>Research</b><small>More searches and pages read, with sources — for current topics</small></span></button>
+      <button type="button" data-mode="notebook" role="menuitem"><i>📒</i><span><b>Notebook</b><small>Answers from your notebook's sources only, with [n] — a link you send is added to it</small></span></button>
       <button type="button" data-mode="council" role="menuitem"><i>💭</i><span><b>Thinking</b><small>Two cloud models write it, an editor merges</small></span></button>
     </div>
     <span class="modechip" id="modeChip" hidden><span id="modeName"></span><button type="button" id="modeOff" aria-label="Turn this mode off">×</button></span>
@@ -617,6 +618,7 @@ button, a, summary, label{touch-action:manipulation}
     <button type="button" class="mchip" data-m="council" title="Two models write it, an editor merges them">💭 Think</button>
     <button type="button" class="mchip" data-m="deep" title="Deeper research; ChatGPT and Private Cloud write it, merged">🧠 Deep</button>
     <button type="button" class="mchip" data-m="research" title="More searches and pages read, with sources">🔎 Research</button>
+    <button type="button" class="mchip" data-m="notebook" id="mNotebook" title="Answer from your open notebook — its sources only, with [n]. A message that is only a link adds it to the notebook">📒 <span id="mNotebookName">Notebook</span></button>
     <button type="button" class="mchip" data-m="agents" title="Several agents work on parts of the task at the same time, then their findings are merged">🤖 Agents</button>
     <button type="button" class="mchip" data-m="image" title="A picture from your words">🎨 Image</button>
     <button type="button" class="mchip" data-m="video" title="A short video, made on your Mac">🎞 Video</button>
@@ -1124,7 +1126,7 @@ async function ask(q, opt){
       out.secs = Math.round((Date.now() - t0) / 1000);
       done(out);
     } else {
-      const r = await fetch(HELPER + '/ask', {method: 'POST', headers: {'content-type': 'application/json'}, signal: request.controller.signal, body: JSON.stringify({question: q, voice: !!opt.voice, agents: !!opt.agents, deep: !!opt.deep || pick.kind === 'deep' || pick.kind === 'deeplocal', research: !!opt.research, sogpt: pick.kind === 'sogpt', imageModel: opt.imageModel || store.get('ai.imageModel', 'auto'), videoModel: store.get('ai.videoModel', 'auto') !== 'auto' ? store.get('ai.videoModel') : undefined, model: pick.kind === 'local' ? pick.model : undefined, provider: opt.provider || (pick.kind === 'cloud' ? pick.provider : pick.kind === 'council' ? 'council' : undefined), history: turns, cloud: cloudKeys(), fresh: !!opt.fresh, attachments: files.map(f=>f.image ? {name: f.name, image: f.image} : f), goal: requestGoal, session: requestSessionId, disabled, project: store.get('ai.project', '') || null, forceVideo: !!opt.forceVideo, lastKind: (requestHistory.length && requestHistory[requestHistory.length - 1].answer.kind) || ''})});
+      const r = await fetch(HELPER + '/ask', {method: 'POST', headers: {'content-type': 'application/json'}, signal: request.controller.signal, body: JSON.stringify({question: q, voice: !!opt.voice, agents: !!opt.agents, notebook: !!opt.notebook, deep: !!opt.deep || pick.kind === 'deep' || pick.kind === 'deeplocal', research: !!opt.research, sogpt: pick.kind === 'sogpt', imageModel: opt.imageModel || store.get('ai.imageModel', 'auto'), videoModel: store.get('ai.videoModel', 'auto') !== 'auto' ? store.get('ai.videoModel') : undefined, model: pick.kind === 'local' ? pick.model : undefined, provider: opt.provider || (pick.kind === 'cloud' ? pick.provider : pick.kind === 'council' ? 'council' : undefined), history: turns, cloud: cloudKeys(), fresh: !!opt.fresh, attachments: files.map(f=>f.image ? {name: f.name, image: f.image} : f), goal: requestGoal, session: requestSessionId, disabled, project: store.get('ai.project', '') || null, forceVideo: !!opt.forceVideo, lastKind: (requestHistory.length && requestHistory[requestHistory.length - 1].answer.kind) || ''})});
       if(!r.ok) throw new Error((await r.json().catch(()=>({}))).error || 'It answered ' + r.status);
       const reader = r.body.getReader(), dec = new TextDecoder();
       let buf = '', out = null;
@@ -1399,8 +1401,18 @@ document.addEventListener('click', e=>{ const b = e.target.closest && e.target.c
   (navigator.clipboard ? navigator.clipboard.writeText(code) : Promise.reject()).then(()=>{ b.textContent = 'Copied'; setTimeout(()=>{ b.textContent = 'Copy'; }, 1500); }).catch(()=>{ b.textContent = 'Select and copy'; }); });
 /* TOOLS: a mode for your next questions (it stays until you take it off): picture, video, deep think, research, best answer */
 let toolMode = null;
-const MODES = {image: '🎨 Create image', video: '🎞 Make a video', deep: '🧠 Deep think', research: '🔎 Research', council: '💭 Thinking', agents: '🤖 Agents'};
-const setMode = m => { toolMode = MODES[m] ? m : null; $('#modeChip').hidden = true;
+const MODES = {image: '🎨 Create image', video: '🎞 Make a video', deep: '🧠 Deep think', research: '🔎 Research', council: '💭 Thinking', agents: '🤖 Agents', notebook: '📒 Notebook'};
+// 📒 Notebook: the open notebook (else the newest) is the one asked; none yet — how to make one. Its name is on the chip
+async function notebookOn(){
+  if(mode !== 'mac'){ toast('Notebooks are kept on your Mac — open this page there (or over Tailscale)'); return null; }
+  const d = await fetch(HELPER + '/notebooks').then(r=>r.json()).catch(()=>null);
+  if(!d || !(d.list || []).length){ toast('No notebook yet — type /notebook new Trip to Goa, then send it links or /notebook add a file'); return null; }
+  const nb = d.selected || d.list[0]; if(!d.selected) await post('/notebooks', {select: nb.id}).catch(()=>{});
+  $('#mNotebookName').textContent = nb.name.length > 18 ? nb.name.slice(0, 17) + '…' : nb.name; MODES.notebook = '📒 ' + nb.name;
+  return nb;
+}
+const setMode = async m => { if(m === 'notebook' && toolMode !== 'notebook' && !(await notebookOn())) m = null; if(m !== 'notebook') $('#mNotebookName').textContent = 'Notebook';
+  toolMode = MODES[m] ? m : null; $('#modeChip').hidden = true;
   document.querySelectorAll('#modes [data-m]').forEach(b=>{ b.classList.toggle('on', b.dataset.m === toolMode); b.setAttribute('aria-pressed', b.dataset.m === toolMode ? 'true' : 'false'); }); $('#modeName').textContent = toolMode ? MODES[toolMode] : ''; $('#toolsBtn').classList.toggle('on', !!toolMode);
   $('#q').placeholder = toolMode === 'image' ? 'Describe the picture…' : toolMode === 'video' ? 'Describe the video…' : matchMedia('(max-width: 600px)').matches ? 'Ask anything…' : 'Ask anything… ( / for commands)'; $('#q').focus(); };
 const toolsMenu = on => { $('#toolsMenu').hidden = !on; if(on) attachMenu(false); };
@@ -1424,6 +1436,7 @@ const send = v => {
   if(toolMode === 'research') return ask(v, {research: true});
   if(toolMode === 'agents') return ask(v, {agents: true});
   if(toolMode === 'council') return ask(v, {provider: 'council'});
+  if(toolMode === 'notebook') return ask(v, {notebook: true});
   return ask(v);
 };
 $('#q').addEventListener('keydown', e=>{ if(e.key === 'Enter' && !e.shiftKey && !e.isComposing){ e.preventDefault(); send($('#q').value); } });
