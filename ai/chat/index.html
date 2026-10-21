@@ -1193,7 +1193,7 @@ const pill = (id, text, cls) => { const p = $(id); p.hidden = false; p.className
 /* ---------------------------------------------------------------- which AI answers (the picker) */
 // {kind: 'auto'} · {kind: 'local', model} · {kind: 'private'} · {kind: 'cloud', provider} · {kind: 'council'}
 let pick = store.get('ai.pick', {kind: 'auto'});
-const CLOUD_NAMES = {apple: 'Apple Intelligence (on this Mac)', chatgpt: 'ChatGPT (through Siri)', pcc: 'Apple Private Cloud', gemini: 'Google Gemini', groq: 'Groq — gpt-oss-120b (OpenAI\'s open model)', cerebras: 'Cerebras — gpt-oss-120b', mistral: 'Mistral', openrouter: 'OpenRouter (free models)', anthropic: 'Anthropic Claude'};
+const CLOUD_NAMES = {omniroute: 'OmniRoute (your gateway on this Mac)', apple: 'Apple Intelligence (on this Mac)', chatgpt: 'ChatGPT (through Siri)', pcc: 'Apple Private Cloud', gemini: 'Google Gemini', groq: 'Groq — gpt-oss-120b (OpenAI\'s open model)', cerebras: 'Cerebras — gpt-oss-120b', mistral: 'Mistral', openrouter: 'OpenRouter (free models)', anthropic: 'Anthropic Claude'};
 let autoLabel = 'Auto';
 // the picture models (the relay's Cloudflare models, Pollinations, Image Playground) and Compare
 const IMG_PICK = [['auto', 'Auto pictures', 'Best first: FLUX.2 klein 9B (first 5 a day), then FLUX.1 schnell; a style (cartoon, sketch…) by Image Playground; then Gemini, Pollinations, Draw Things, DiffusionBee as backups'], ['compare', 'Compare 4 models', 'FLUX.1 schnell, FLUX.2 klein 4B, SDXL Lightning, Pollinations — side by side'], ['compare-best', 'Compare the 4 best', 'FLUX.2 klein 9B, FLUX.2 dev, Phoenix, Lucid Origin — most of a day\'s free allowance'],
@@ -1679,6 +1679,8 @@ const COMMANDS = [
   {c: '/pins', a: '', d: 'What you pinned and what it remembers (also /profile, /rules)'},
   {c: '/projects', a: '', d: 'Your coding projects'},
   {c: '/export', a: '', d: 'Save this chat as Markdown'},
+  {c: '/notebook', a: 'new · use · add · ask · podcast', d: 'Notebooks: sources you collect (pages, files, text); questions answered only from them, with [n]; a two-voice podcast of them'},
+  {c: '/nb', a: 'question', d: 'Ask the open notebook'},
   {c: '/security', a: '', d: 'Check this AI\'s skills, connectors, file permissions and password for risks (nothing is changed)'},
   {c: '/schedule', a: '09:00 weekdays a question', d: 'A question asked for you each day at a time (list · remove n; alone: the Tasks panel)'},
   {c: '/loop', a: '15m a question', d: 'Ask it every 15 minutes (1m at least; x10: at most 10 runs; --market: 09:15–15:30 IST) into its own 🔁 chat, stops after 24 h · list · stop [n|all]'},
@@ -1786,6 +1788,7 @@ async function runCommand(line){
   else if(c === '/rename'){ if(!arg) return toast('Write the new name: /rename Trip to Goa'); if(!history.length) return toast('Ask something first — then name the chat'); chatName = arg.slice(0, 80); store.set('ai.chatName', chatName); setTitle(); await saveChat(); loadChats(); toast('Renamed: ' + chatName); }
   else if(c === '/color'){ const v = colorOf(arg); if(v === null) return toast('A colour: blue, green, orange, red, pink, purple, teal, gray, a #hex — or reset'); store.set('ai.color', v); applyColor(v); toast(v ? 'Accent: ' + arg : 'Accent: as it was'); }
   else if(c === '/doctor' || c === '/status') openUsage(true);
+  else if(c === '/notebook' || c === '/nb'){ if(mode !== 'mac') return toast('Notebooks are kept on your Mac — open this page there (or over Tailscale)'); ask(c + (arg ? ' ' + arg : '')); }
   else if(c === '/security'){ if(mode !== 'mac') return toast('That checks your Mac — open this page there (or over Tailscale)'); ask('/security'); }
   else if(c === '/pins' || c === '/profile' || c === '/rules') openPanel(true);
   else if(c === '/projects') openProjects(true);
