@@ -80,6 +80,27 @@ const MoneyWeb = (function(){
     // "how many miles is 5 km" is "5 km to miles"
     const uq = q.replace(/how many\s+([a-z°]+)\s+(?:is|are|in|make|makes)\s+(-?\d+\.?\d*)\s*([a-z°]+)/i, '$2 $3 to $1');
     for(const [re, f, unit] of U){ if((m = re.exec(uq))) return {kind: 'calculator', text: `${m[1]} → ${(Math.round(f(+m[1]) * 100) / 100).toLocaleString('en-IN')} ${unit}.`, sources: []}; }
+    // the day of the week of a date: "What day of the week was 15 August 1947?" (worked out, not looked up or guessed)
+    const MONTHS = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'];
+    const mo = w => MONTHS.findIndex(x=>x.startsWith(String(w || '').toLowerCase().slice(0, 3)));
+    const wd = /\bwhat\s+day(?:\s+of\s+the\s+week)?\s+(?:was|is|will\s+be|falls\s+on|did)\s+(?:it\s+on\s+)?(?:the\s+)?(.+?)(?:\s+(?:fall|be|fall on))?\s*\??$/i.exec(q.trim());
+    if(wd){
+      const t = wd[1].replace(/(\d)(st|nd|rd|th)\b/gi, '$1').replace(/,/g, ' ').replace(/\s+/g, ' ').trim();
+      let y, mIdx, d, x;
+      if((x = /^(\d{1,2}) ([a-z]+)(?: of)? (\d{3,4})$/i.exec(t)) && mo(x[2]) >= 0){ d = +x[1]; mIdx = mo(x[2]); y = +x[3]; }
+      else if((x = /^([a-z]+) (\d{1,2}) (\d{3,4})$/i.exec(t)) && mo(x[1]) >= 0){ mIdx = mo(x[1]); d = +x[2]; y = +x[3]; }
+      else if((x = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(t))){ y = +x[1]; mIdx = +x[2] - 1; d = +x[3]; }
+      else if((x = /^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{4})$/.exec(t))){ d = +x[1]; mIdx = +x[2] - 1; y = +x[3]; }      // day first (India)
+      if(y && mIdx >= 0 && mIdx < 12 && d >= 1){
+        const dt = new Date(Date.UTC(y, mIdx, d));
+        if(dt.getUTCMonth() === mIdx && dt.getUTCDate() === d){
+          const day = dt.toLocaleDateString('en-GB', {weekday: 'long', timeZone: 'UTC'}), nice = d + ' ' + MONTHS[mIdx][0].toUpperCase() + MONTHS[mIdx].slice(1) + ' ' + y;
+          const now = new Date(), past = dt < new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+          return {kind: 'calculator', text: `${nice} ${past ? 'was' : 'is'} a **${day}**.`, sources: []};
+        }
+        return {kind: 'calculator', text: `There is no ${d} ${MONTHS[mIdx][0].toUpperCase() + MONTHS[mIdx].slice(1)} ${y} — ${MONTHS[mIdx][0].toUpperCase() + MONTHS[mIdx].slice(1)} ${y} has ${new Date(Date.UTC(y, mIdx + 1, 0)).getUTCDate()} days.`, sources: []};
+      }
+    }
     // plain arithmetic: "what is 23*47+12", "1250/7" — and in words: "17 multiplied by 23", "17 times 23", "17 x 23", "17 into 23"
     // (Indian English), "100 divided by 8", "45 plus 12", "2 to the power of 10", "12 squared" (those went to a Wikipedia
     // lookup: "What is 17 times 23?" was answered with the New York Times), with "… Reply with the number." left off

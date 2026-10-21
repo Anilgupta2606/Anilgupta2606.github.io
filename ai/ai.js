@@ -552,6 +552,14 @@ const MoneyAI = (function(){
     const d = await res.json();
     const text = ((((d.choices || [])[0] || {}).message) || {}).content || '';
     if(!text) throw Unavailable(name + ' returned an empty answer.', 502);
+    // a safety checker is not an answer: OpenRouter's free router sent a question to one and "User Safety: safe" came back
+    // as the answer — the next model is asked
+    if(NOT_CHAT.test(String(d.model || '')) || /^\s*(?:(?:user|assistant|agent|response)\s+)?safety\s*:\s*(?:safe|unsafe)\b[\s\S]{0,80}$|^\s*(?:safe|unsafe)(?:\s*\n\s*S\d+(?:,\s*S\d+)*)?\s*$/i.test(text))
+      throw Unavailable(name + ' answered with a safety label (' + String(d.model || 'a checker') + '), not an answer.', 502);
+    // nor is a tool call written out as text instead of an answer ("<dots_function_call> … webfetch …</parameter>"): what is left
+    // without the markup is no answer
+    if(/<\/?[\w|]*(?:function_call|tool_call|tool_use)\b|<\|tool_call|<\/parameter>/i.test(text) && text.replace(/<[^>]*>|\{[^{}]*\}|^\s*\w+">\s*$/gm, '').replace(/\s+/g, ' ').trim().length < 160)
+      throw Unavailable(name + ' wrote out a tool call instead of an answer (' + String(d.model || model) + ').', 502);
     return {text: text.replace(/<think>[\s\S]*?<\/think>/g, ''), sources: []};     // reasoning models think out loud first
   }
 
