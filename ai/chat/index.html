@@ -1969,6 +1969,36 @@ async function loadTasks(){
   box.querySelectorAll('[data-del]').forEach(b=>b.onclick = async () => { await post('/task', {id: b.dataset.del, delete: true}); loadTasks(); toast(b.textContent === 'Stop' ? 'Loop stopped — its answers stay in its 🔁 chat' : 'Task deleted'); });
   box.querySelectorAll('[data-run]').forEach(b=>b.onclick = async () => { await post('/task', {id: b.dataset.run, run: true}); toast('Running — the result will appear in its ⏰ chat'); setTimeout(loadChats, 60000); });
   $('#tform').onsubmit = async e => { e.preventDefault(); const r = await post('/task', {prompt: $('#tp').value, time: $('#tt').value, days: $('#td').value, cloud: $('#tc').checked}).catch(()=>null); toast(r && r.id ? 'Scheduled' : 'Could not schedule that'); loadTasks(); };
+  loadReach(box);
+}
+/* YOUR IPHONE AND YOUR INBOX (cli/phone.mjs, cli/email.mjs), above the tasks: results to your own iMessage thread, and a
+   morning summary of your email — read without changing it, summed up on this Mac */
+async function loadReach(box){
+  const [im, em] = await Promise.all([fetch(HELPER + '/imessage').then(r=>r.json()).catch(()=>null), fetch(HELPER + '/email').then(r=>r.json()).catch(()=>null)]);
+  if(!im && !em) return;
+  const old = box.querySelector('#reach'); if(old) old.remove();
+  const imHtml = !im ? '' : im.on ? `<div class="trow2"><span class="tt"><b>${im.running ? 'On' : 'Installed, not running'} · your thread with ${esc(im.handle)}</b><small>${im.alerts ? 'Loop and schedule results are sent here' : 'Alerts are off — only your questions are answered'}${im.waiting ? ' · ' + im.waiting + ' waiting to send' : ''}</small></span>
+      <span class="acts"><label class="sub" style="display:flex;gap:5px;align-items:center"><input type="checkbox" id="imAlerts" ${im.alerts ? 'checked' : ''}> Alerts</label><button class="ghost" type="button" id="imTest">Send a test</button><button class="ghost" type="button" id="imOff">Turn off</button></span></div>
+      ${im.fullDiskAccess ? `<p class="sub">To ask from your iPhone too (text yourself <b>ai what is Nifty at?</b>), give this helper Full Disk Access: System Settings → Privacy &amp; Security → Full Disk Access → + → Cmd+Shift+G → paste <code id="imPath">${esc(im.fullDiskAccess)}</code> <button class="ghost" type="button" id="imCopy">Copy</button>. Only this helper gets it — not node, not Terminal. Alerts work without it.</p>` : im.canRead ? '<p class="sub">Questions work too: text yourself <b>ai …</b> from your iPhone.</p>' : ''}`
+    : `<form class="cform" id="imForm"><input id="imHandle" placeholder="Your number with the country code (+919812345678) or Apple ID email" required autocomplete="off"><button class="btn" type="submit">Turn on</button></form>`;
+  const emHtml = !em ? '' : em.set ? `<div class="trow2"><input type="checkbox" id="emOn" ${em.on ? 'checked' : ''} aria-label="On"><span class="tt"><b>${esc(em.user)}</b><small>Every day at ${esc(em.time)}${em.lastSent ? ' · last ' + esc(em.lastSent.replace(/^(\d{4})(\d\d)(\d\d)$/, '$3-$2-$1')) : ''} · ${esc(em.host)}</small></span>
+      <span class="acts"><button class="ghost" type="button" id="emRun">Run now</button><button class="ghost" type="button" id="emTest">Test</button><button class="ghost" type="button" id="emOff">Turn off</button></span></div><pre class="sub" id="emOut" style="white-space:pre-wrap;margin:8px 0 0" hidden></pre>`
+    : `<form class="cform" id="emForm"><input id="emUser" type="email" placeholder="you@gmail.com" required autocomplete="off"><input id="emPass" type="password" placeholder="App password (not your usual one)" required autocomplete="new-password">
+      <div class="two"><input id="emTime" type="time" value="08:00" required><button class="btn" type="submit">Save and test</button></div><p class="sub" style="margin:0">Gmail: make one at myaccount.google.com/apppasswords (2-step verification must be on). iCloud, Yahoo and Outlook have the same in their security settings.</p></form>`;
+  box.insertAdjacentHTML('afterbegin', `<div id="reach"><h3>📱 Results on your iPhone</h3><p class="sub">Your loops' and schedules' results — and the morning email — also go to your own iMessage thread.</p>${imHtml}
+    <h3>📧 Morning email</h3><p class="sub">A short summary of the last day's inbox each morning. Read-only: nothing is marked read, moved, deleted or sent. Summed up by the model on this Mac — no email text leaves it.</p>${emHtml}</div>`);
+  const again = () => loadReach(box), say = (r, ok) => toast(r && r.error ? r.error : ok);
+  const f = $('#imForm'); if(f) f.onsubmit = async e => { e.preventDefault(); const r = await post('/imessage', {on: $('#imHandle').value.trim()}).catch(e=>({error: e.message})); say(r, 'iMessage is on — the first message asks to let it control Messages: allow it'); again(); };
+  const t = $('#imTest'); if(t) t.onclick = async () => { const r = await post('/imessage', {test: true}).catch(e=>({error: e.message})); say(r, 'A test is on its way to your iPhone'); again(); };
+  const o = $('#imOff'); if(o) o.onclick = async () => { await post('/imessage', {off: true}); toast('iMessage is off'); again(); };
+  const a = $('#imAlerts'); if(a) a.onchange = async () => { await post('/imessage', {alerts: a.checked}); toast(a.checked ? 'Alerts on' : 'Alerts off'); };
+  const c = $('#imCopy'); if(c) c.onclick = async () => { try{ await navigator.clipboard.writeText($('#imPath').textContent); toast('Copied'); }catch(e){ const r = document.createRange(); r.selectNodeContents($('#imPath')); getSelection().removeAllRanges(); getSelection().addRange(r); toast('Selected — press Cmd+C'); } };
+  const ef = $('#emForm'); if(ef) ef.onsubmit = async e => { e.preventDefault(); toast('Signing in…'); const r = await post('/email', {save: {user: $('#emUser').value.trim(), pass: $('#emPass').value, time: $('#emTime').value}}).catch(e=>({error: e.message}));
+    $('#emPass').value = ''; say(r, r && r.test ? (r.test.ok ? r.test.text : 'Saved, but signing in failed: ' + r.test.text) : 'Saved'); again(); };
+  const er = $('#emRun'); if(er) er.onclick = async () => { er.disabled = true; er.textContent = 'Reading…'; const r = await post('/email', {run: true}).catch(e=>({error: e.message})); const out = $('#emOut'); if(out){ out.hidden = false; out.textContent = r.error || r.text; } er.disabled = false; er.textContent = 'Run now'; };
+  const et = $('#emTest'); if(et) et.onclick = async () => { const r = await post('/email', {test: true}).catch(e=>({error: e.message})); say(r, r.text); };
+  const eo = $('#emOff'); if(eo) eo.onclick = async () => { await post('/email', {off: true}); toast('The morning email is off — its app password is deleted from this Mac'); again(); };
+  const en = $('#emOn'); if(en) en.onchange = async () => { await post('/email', {on: en.checked}); toast(en.checked ? 'The morning email is on' : 'The morning email is paused'); };
 }
 async function loadUsage(){
   const box = $('#usage');
