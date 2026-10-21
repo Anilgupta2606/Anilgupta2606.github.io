@@ -563,6 +563,10 @@ const MoneyAI = (function(){
     // without the markup is no answer
     if(/<\/?[\w|]*(?:function_call|tool_call|tool_use)\b|<\|tool_call|<\/parameter>/i.test(text) && text.replace(/<[^>]*>|\{[^{}]*\}|^\s*\w+">\s*$/gm, '').replace(/\s+/g, ' ').trim().length < 160)
       throw Unavailable(name + ' wrote out a tool call instead of an answer (' + String(d.model || model) + ').', 502);
+    // …in JSON too: {"tool": "search", "query": "hotels near Burj Khalifa…"} came back as NVIDIA's whole answer, twice
+    { const j = (()=>{ try{ return JSON.parse(text.trim().replace(/^```(?:json)?\s*|\s*```$/g, '')); }catch(e){ return null; } })();
+      if(j && typeof j === 'object' && !Array.isArray(j) && ('tool' in j || 'function' in j || 'name' in j && ('arguments' in j || 'parameters' in j)) && Object.keys(j).length <= 6 && /query|arguments|parameters|args|input|url/.test(Object.keys(j).join(' ')))
+        throw Unavailable(name + ' wrote out a tool call instead of an answer (' + String(d.model || model) + ').', 502); }
     return {text: text.replace(/<think>[\s\S]*?<\/think>/g, ''), sources: []};     // reasoning models think out loud first
   }
 
