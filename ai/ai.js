@@ -66,9 +66,7 @@ const MoneyAI = (function(){
     {id:'zai', name:'Z.ai (GLM)', signupUrl:'https://z.ai/manage-apikey/apikey-list', placeholder:'key', models:['glm-4.7-flash','glm-4.5-flash','glm-4.6v-flash']},
     // Cohere (trial key: 1,000 calls a month, 20 a minute): Command A+ and North Mini Code, through its OpenAI-style API
     {id:'cohere', name:'Cohere (Command)', signupUrl:'https://dashboard.cohere.com/api-keys', placeholder:'key', models:['command-a-plus-05-2026','command-a-03-2025','north-mini-code']},
-    // OMNIROUTE on this Mac (github.com/diegosouzapw/OmniRoute): one gateway to many providers you connect in its dashboard
-    // (http://localhost:20128), with its own fallback between them — its API key goes here
-    {id:'omniroute', name:'OmniRoute (your gateway on this Mac)', signupUrl:'http://localhost:20128', placeholder:'an API key from its dashboard', models:['auto']},
+    // (OmniRoute, a gateway on this Mac, was taken off: it had no providers connected and only repeated this order)
     {id:'cerebras', name:'Cerebras', signupUrl:'https://cloud.cerebras.ai', placeholder:'csk-…', models:['gpt-oss-120b','llama-3.3-70b','llama3.1-8b']},
     {id:'mistral', name:'Mistral', signupUrl:'https://console.mistral.ai/api-keys', placeholder:'key', models:['mistral-small-latest','mistral-medium-latest']},
     {id:'openrouter', name:'OpenRouter', signupUrl:'https://openrouter.ai/keys', placeholder:'sk-or-…', models:['openrouter/free']},
@@ -76,8 +74,8 @@ const MoneyAI = (function(){
     // Local (Ollama) is gone from here: the models on the Mac are reached through Your own AI (local:…), one way for every app
     {id:'anthropic', name:'Anthropic Claude (paid)', signupUrl:'https://console.anthropic.com/settings/keys', placeholder:'sk-ant-…', models:['claude-haiku-4-5-20251001'], vision:true},
   ];
-  const OPENAI_BASE = {omniroute:'http://127.0.0.1:20128/v1', ollamacloud:'http://127.0.0.1:11434/v1', groq:'https://api.groq.com/openai/v1', nvidia:'https://integrate.api.nvidia.com/v1', zai:'https://api.z.ai/api/paas/v4', cohere:'https://api.cohere.ai/compatibility/v1', cerebras:'https://api.cerebras.ai/v1', mistral:'https://api.mistral.ai/v1', openrouter:'https://openrouter.ai/api/v1'};
-  const DEVICE_ONLY = {ollama: true, webllm: true, mac: true, omniroute: true};         // this computer's own: not shared with your other devices
+  const OPENAI_BASE = {ollamacloud:'http://127.0.0.1:11434/v1', groq:'https://api.groq.com/openai/v1', nvidia:'https://integrate.api.nvidia.com/v1', zai:'https://api.z.ai/api/paas/v4', cohere:'https://api.cohere.ai/compatibility/v1', cerebras:'https://api.cerebras.ai/v1', mistral:'https://api.mistral.ai/v1', openrouter:'https://openrouter.ai/api/v1'};
+  const DEVICE_ONLY = {ollama: true, webllm: true, mac: true};         // this computer's own: not shared with your other devices
   const SYNCED_AI = 'tripvault-ai-synced';          // keys that came from another device through Trip Vault's encrypted sync
   /* The keys this device uses, to carry to your other devices inside the encrypted sync (not Ollama: it is this computer's). */
   function shareableAi(){

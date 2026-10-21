@@ -260,7 +260,7 @@ code{font-family:var(--mono); font-size:.85em; background:var(--page2); padding:
 .attachMenu{position:absolute; left:8px; bottom:calc(100% + 8px); background:var(--card); border:1px solid var(--line); border-radius:16px; box-shadow:var(--shadow); padding:6px; width:270px; z-index:8}
 .attachMenu button{display:flex; gap:12px; align-items:center; width:100%; border:0; background:none; padding:9px 10px; border-radius:11px; cursor:pointer; text-align:left}
 .attachMenu button:hover{background:var(--page)}
-.attachMenu i{font-style:normal; font-size:18px; width:34px; height:34px; display:grid; place-items:center; background:var(--page); border-radius:10px}
+.attachMenu i{flex:none; font-style:normal; font-size:18px; width:34px; height:34px; display:grid; place-items:center; background:var(--page); border-radius:10px}
 .attachMenu b{display:block; font-size:14px} .attachMenu small{color:var(--mut); font-size:12px}
 @media (hover:hover) and (pointer:fine){ .phoneOnly{display:none!important} }
 .fchip img{width:24px; height:24px; object-fit:cover; border-radius:6px}
@@ -414,6 +414,11 @@ main{max-width:800px; padding:22px 20px 170px}
 .mchip.on{background:var(--think-bg); color:var(--think); border-color:transparent; font-weight:600}
 .mchip.voice{margin-left:auto}
 .mchip.model{font-weight:600}
+.mchip.run{border-color:var(--think); color:var(--think)} .mchip.run::before{content:''; display:inline-block; width:7px; height:7px; border-radius:50%; background:var(--think); margin-right:6px; vertical-align:1px; animation:vpulse 1.2s infinite}
+.popMenu{position:fixed; bottom:auto; max-height:min(60vh, 460px); overflow-y:auto; width:300px; z-index:30}
+.runMenu{width:360px} .runMenu .ritem{padding:8px 10px; border-radius:11px} .runMenu .ritem + .ritem{border-top:1px solid var(--line)}
+.runMenu .ritem b{font-size:13.5px} .runMenu .ritem small{display:block; color:var(--mut); font-size:12px; overflow-wrap:anywhere} .runMenu .sub{margin-left:18px}
+@media (max-width:600px){ .popMenu{width:calc(100vw - 32px)!important; left:16px!important} }
 @media (max-width:600px){ .modes{margin-top:6px} .mchip{padding:6px 10px; font-size:12.5px} .mchip.voice{margin-left:0} }
 .modechip{display:inline-flex; align-items:center; gap:4px; flex:none; background:var(--think-bg); color:var(--think); border-radius:999px; padding:3px 4px 3px 10px; font-size:12.5px; font-weight:600; white-space:nowrap; align-self:center}
 .modechip button{border:0; background:none; color:inherit; cursor:pointer; font-size:15px; line-height:1; width:20px; height:20px; border-radius:50%} .modechip button:hover{background:rgb(0 0 0 / .08)}
@@ -619,14 +624,19 @@ button, a, summary, label{touch-action:manipulation}
     <button type="button" class="mchip" data-m="deep" title="Deeper research; ChatGPT and Private Cloud write it, merged">🧠 Deep</button>
     <button type="button" class="mchip" data-m="research" title="More searches and pages read, with sources">🔎 Research</button>
     <button type="button" class="mchip" data-m="notebook" id="mNotebook" title="Answer from your open notebook — its sources only, with [n]. A message that is only a link adds it to the notebook">📒 <span id="mNotebookName">Notebook</span></button>
+    <button type="button" class="mchip" id="mSkills" aria-haspopup="menu" title="Skills you use with a / command — pick one instead of remembering it">🧰 <span id="mSkillsName">Skills</span> ▾</button>
     <button type="button" class="mchip" data-m="agents" title="Several agents work on parts of the task at the same time, then their findings are merged">🤖 Agents</button>
     <button type="button" class="mchip" data-m="image" title="A picture from your words">🎨 Image</button>
     <button type="button" class="mchip" data-m="video" title="A short video, made on your Mac">🎞 Video</button>
+    <button type="button" class="mchip run" id="mRun" hidden title="What is running now — answers, each agent and its step, background jobs">⚙ <span id="mRunN">0</span> running</button>
     <button type="button" class="mchip voice" id="mVoice" title="Voice mode — talk, and hear the answer" hidden>〰 Voice</button>
   </div>
   <div class="hint"><span>Enter to ask · Shift+Enter new line · ⌘K new chat · 🎤 dictate · ▮▮ voice mode</span><button class="link" id="clear" type="button">New chat</button></div>
 </div>
 
+<!-- 🧰 the / skills in one list; ⚙ what is running (answers, agents, background jobs) — placed over their chip -->
+<div class="attachMenu popMenu" id="skillsMenu" hidden role="menu"></div>
+<div class="attachMenu popMenu runMenu" id="runMenu" hidden role="dialog" aria-label="What is running"></div>
 <div class="scrim" id="scrim"></div>
 
 <aside class="panel" id="taskPanel" aria-label="Tasks">
@@ -705,13 +715,13 @@ if(LOCAL_PAGE){ const _fetch = window.fetch.bind(window); let out = false;
 let mode = null;                                            // 'mac' | 'browser'
 // an answer sent back with the next question: 1500 characters, and the line naming its picture (so "edit it" finds it)
 const keepText = (t, n) => { t = String(t || ''); const s = (/Saved on this Mac: `[^`]+`/.exec(t) || [''])[0]; const c = t.slice(0, n); return s && !c.includes(s) ? c + '\n\n' + s : c; };
-// Every saved turn matters to a conversation, but a long chat cannot be sent to
-// an 8k-context local model verbatim. Keep all questions and a concise answer
+// Every saved turn matters to a conversation. The cloud models take far more than the 8k local model this was made
+// for (the one loop fits it to each model's own limit), so the last 6 turns go in full and older ones much less squeezed. Keep all questions and a concise answer
 // from every older turn, while retaining much more detail for the latest turns.
 // (/compact: turns taken into a summary are not sent; the summary turn is, whole, in their place)
 const conversationTurns = saved => {
-  const all = (saved || []).filter(t=>!(t.answer || {}).compacted).slice(-60), recent = 3, older = Math.max(0, all.length - recent);
-  const oldPair = older ? Math.max(180, Math.min(900, Math.floor(9000 / older))) : 0;
+  const all = (saved || []).filter(t=>!(t.answer || {}).compacted).slice(-80), recent = 6, older = Math.max(0, all.length - recent);
+  const oldPair = older ? Math.max(400, Math.min(2500, Math.floor(60000 / older))) : 0;
   // older turns: squeezed onto one line; the latest ones keep their line breaks (code in them stays readable)
   const compact = (text, limit, lines) => {
     const raw = (lines ? String(text || '').replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n') : String(text || '').replace(/\s+/g, ' ')).trim(), saved = (/Saved on this Mac: `[^`]+`/.exec(raw) || [''])[0];
@@ -720,7 +730,7 @@ const conversationTurns = saved => {
     return s.length > limit && !saved ? s.slice(0, Math.max(0, limit - 1)) + '…' : s;
   };
   return all.flatMap((turn, i) => {
-    const detailed = i >= older || !!(turn.answer || {}).summary, pair = detailed ? 2400 : oldPair;
+    const detailed = i >= older || !!(turn.answer || {}).summary, pair = detailed ? 6000 : oldPair;
     if((turn.answer || {}).summary) return [{role: 'user', content: 'Summary of our conversation so far (made by /compact):\n' + compact(turn.answer.text, 2400, true)}, {role: 'assistant', content: 'Noted — I will keep that in mind.'}];
     const question = compact(turn.q, detailed ? 1000 : Math.max(70, Math.floor(pair * .45)), detailed);
     const answer = compact((turn.answer || {}).text, detailed ? 1400 : Math.max(100, pair - question.length), detailed);
@@ -1195,7 +1205,7 @@ const pill = (id, text, cls) => { const p = $(id); p.hidden = false; p.className
 /* ---------------------------------------------------------------- which AI answers (the picker) */
 // {kind: 'auto'} · {kind: 'local', model} · {kind: 'private'} · {kind: 'cloud', provider} · {kind: 'council'}
 let pick = store.get('ai.pick', {kind: 'auto'});
-const CLOUD_NAMES = {omniroute: 'OmniRoute (your gateway on this Mac)', apple: 'Apple Intelligence (on this Mac)', chatgpt: 'ChatGPT (through Siri)', pcc: 'Apple Private Cloud', gemini: 'Google Gemini', groq: 'Groq — gpt-oss-120b (OpenAI\'s open model)', cerebras: 'Cerebras — gpt-oss-120b', mistral: 'Mistral', openrouter: 'OpenRouter (free models)', anthropic: 'Anthropic Claude'};
+const CLOUD_NAMES = {apple: 'Apple Intelligence (on this Mac)', chatgpt: 'ChatGPT (through Siri)', pcc: 'Apple Private Cloud', gemini: 'Google Gemini', groq: 'Groq — gpt-oss-120b (OpenAI\'s open model)', cerebras: 'Cerebras — gpt-oss-120b', mistral: 'Mistral', openrouter: 'OpenRouter (free models)', anthropic: 'Anthropic Claude'};
 let autoLabel = 'Auto';
 // the picture models (the relay's Cloudflare models, Pollinations, Image Playground) and Compare
 const IMG_PICK = [['auto', 'Auto pictures', 'Best first: FLUX.2 klein 9B (first 5 a day), then FLUX.1 schnell; a style (cartoon, sketch…) by Image Playground; then Gemini, Pollinations, Draw Things, DiffusionBee as backups'], ['compare', 'Compare 4 models', 'FLUX.1 schnell, FLUX.2 klein 4B, SDXL Lightning, Pollinations — side by side'], ['compare-best', 'Compare the 4 best', 'FLUX.2 klein 9B, FLUX.2 dev, Phoenix, Lucid Origin — most of a day\'s free allowance'],
@@ -1401,7 +1411,47 @@ document.addEventListener('click', e=>{ const b = e.target.closest && e.target.c
   (navigator.clipboard ? navigator.clipboard.writeText(code) : Promise.reject()).then(()=>{ b.textContent = 'Copied'; setTimeout(()=>{ b.textContent = 'Copy'; }, 1500); }).catch(()=>{ b.textContent = 'Select and copy'; }); });
 /* TOOLS: a mode for your next questions (it stays until you take it off): picture, video, deep think, research, best answer */
 let toolMode = null;
-const MODES = {image: '🎨 Create image', video: '🎞 Make a video', deep: '🧠 Deep think', research: '🔎 Research', council: '💭 Thinking', agents: '🤖 Agents', notebook: '📒 Notebook'};
+const MODES = {image: '🎨 Create image', video: '🎞 Make a video', deep: '🧠 Deep think', research: '🔎 Research', council: '💭 Thinking', agents: '🤖 Agents', notebook: '📒 Notebook', skill: '🧰 Skill'};
+/* 🧰 THE / SKILLS in one list: one that needs words (REA, Blueprint, Design, Upskill) becomes the mode — your next message
+   goes to it, as 📒 Notebook does; one that needs none runs at once */
+const SKILLS = [
+  {c: '/rea', i: '🔬', n: 'REA — look inside software', d: 'An app, a file or an https link: what it is, how it works, with evidence', words: 'An app, a file path or an https link…'},
+  {c: '/blueprint', i: '🗺', n: 'Blueprint', d: 'Reverse-engineer a site or app into a plan to build your own', words: 'A site or app to reverse-engineer…'},
+  {c: '/design', i: '🎨', n: 'Design', d: 'A design system, logo, banner, slides or brand for a product', words: 'The product (or: logo / banner / slides / brand …)'},
+  {c: '/upskill generate', i: '🎓', n: 'Upskill', d: 'A strong model writes a new skill for a task and tests it', words: 'The task the new skill is for…'},
+  {c: '/review', i: '🔍', n: 'Review my changes', d: 'The selected project\'s uncommitted changes checked for bugs', now: true},
+  {c: '/verify', i: '✅', n: 'Verify the project', d: 'Its tests run, its app started and looked at — PASS / FAIL', now: true},
+  {c: '/init', i: '📝', n: 'Project notes', d: 'Notes on the selected project, so answers know it', now: true},
+  {c: '/mcp', i: '🔌', n: 'MCP servers', d: 'Tool servers plugged in (GitHub, Notion…): list, add, allow', now: true},
+  {c: '/security', i: '🛡', n: 'Security scan', d: 'Skills, connectors, permissions and password checked', now: true},
+  {c: '/ps', i: '⚙️', n: 'What is running', d: 'Answers, agents and background jobs, each with its step', now: true},
+];
+let skillPick = null;
+const placeMenu = (menu, chip) => { const r = chip.getBoundingClientRect(); menu.style.left = Math.max(16, Math.min(r.left, innerWidth - menu.offsetWidth - 16)) + 'px'; menu.style.top = Math.max(8, r.top - menu.offsetHeight - 8) + 'px'; };
+const skillsMenu = on => { const m = $('#skillsMenu'); m.hidden = !on; if(on){ $('#runMenu').hidden = true; placeMenu(m, $('#mSkills')); } };
+$('#skillsMenu').innerHTML = SKILLS.map((x, k)=>'<button type="button" role="menuitem" data-k="' + k + '"><i>' + x.i + '</i><span><b>' + esc(x.n) + ' <code>' + esc(x.c) + '</code></b><small>' + esc(x.d) + '</small></span></button>').join('');
+$('#skillsMenu').querySelectorAll('[data-k]').forEach(b=>b.onclick = () => { const x = SKILLS[+b.dataset.k]; skillsMenu(false);
+  if(x.now) return runCommand(x.c);
+  skillPick = x; MODES.skill = x.i + ' ' + x.n.split(' — ')[0]; $('#mSkillsName').textContent = x.n.split(' — ')[0]; setMode('skill'); $('#q').placeholder = x.words; });
+$('#mSkills').onclick = e => { e.stopPropagation(); if(toolMode === 'skill'){ setMode(null); return; } skillsMenu($('#skillsMenu').hidden); };
+/* ⚙ WHAT IS RUNNING: answers, each agent with its step, background jobs — from this Mac (the terminal's too) */
+const KIND_ICON = {chat: '💬', agent: '🤖', loop: '🔁', schedule: '⏰', email: '📧', selftune: '🧪', repowatch: '👀', podcast: '🎙', video: '🎬', code: '🧩', task: '⚙️'};
+const secs = ms => { const s = Math.max(0, Math.round(ms / 1000)); return s < 60 ? s + ' s' : Math.floor(s / 60) + ' min'; };
+let runList = [];
+async function pollRunning(){
+  if(mode !== 'mac' || document.hidden) return;
+  const d = await fetch(HELPER + '/activity').then(r=>r.ok ? r.json() : null).catch(()=>null); if(!d) return;
+  runList = d.list || []; $('#mRun').hidden = !runList.length; $('#mRunN').textContent = runList.length;
+  if(!$('#runMenu').hidden) drawRunning();
+}
+function drawRunning(){
+  const top = runList.filter(x=>!x.parent || !runList.some(y=>y.id === x.parent)), item = (x, sub) => '<div class="ritem' + (sub ? ' sub' : '') + '"><b>' + (KIND_ICON[x.kind] || '⚙️') + ' ' + esc(x.title || x.kind) + '</b><small>' + esc((x.from ? x.from + ' · ' : '') + secs(Date.now() - x.started)) + (x.step ? ' — ' + esc(x.step) : '') + '</small></div>';
+  $('#runMenu').innerHTML = runList.length ? top.map(x=>item(x) + runList.filter(y=>y.parent === x.id).map(y=>item(y, true)).join('')).join('') : '<div class="ritem"><small>Nothing is running.</small></div>';
+  placeMenu($('#runMenu'), $('#mRun'));
+}
+$('#mRun').onclick = e => { e.stopPropagation(); const m = $('#runMenu'); m.hidden = !m.hidden; if(!m.hidden){ $('#skillsMenu').hidden = true; drawRunning(); } };
+document.addEventListener('click', e=>{ if(!e.target.closest('#skillsMenu, #mSkills')) $('#skillsMenu').hidden = true; if(!e.target.closest('#runMenu, #mRun')) $('#runMenu').hidden = true; });
+setInterval(pollRunning, 3000); setTimeout(pollRunning, 800);
 // 📒 Notebook: the open notebook (else the newest) is the one asked; none yet — how to make one. Its name is on the chip
 async function notebookOn(){
   if(mode !== 'mac'){ toast('Notebooks are kept on your Mac — open this page there (or over Tailscale)'); return null; }
@@ -1412,6 +1462,7 @@ async function notebookOn(){
   return nb;
 }
 const setMode = async m => { if(m === 'notebook' && toolMode !== 'notebook' && !(await notebookOn())) m = null; if(m !== 'notebook') $('#mNotebookName').textContent = 'Notebook';
+  if(m !== 'skill'){ skillPick = null; $('#mSkillsName').textContent = 'Skills'; } $('#mSkills').classList.toggle('on', m === 'skill');
   toolMode = MODES[m] ? m : null; $('#modeChip').hidden = true;
   document.querySelectorAll('#modes [data-m]').forEach(b=>{ b.classList.toggle('on', b.dataset.m === toolMode); b.setAttribute('aria-pressed', b.dataset.m === toolMode ? 'true' : 'false'); }); $('#modeName').textContent = toolMode ? MODES[toolMode] : ''; $('#toolsBtn').classList.toggle('on', !!toolMode);
   $('#q').placeholder = toolMode === 'image' ? 'Describe the picture…' : toolMode === 'video' ? 'Describe the video…' : matchMedia('(max-width: 600px)').matches ? 'Ask anything…' : 'Ask anything… ( / for commands)'; $('#q').focus(); };
@@ -1437,6 +1488,7 @@ const send = v => {
   if(toolMode === 'agents') return ask(v, {agents: true});
   if(toolMode === 'council') return ask(v, {provider: 'council'});
   if(toolMode === 'notebook') return ask(v, {notebook: true});
+  if(toolMode === 'skill' && skillPick) return runCommand(skillPick.c + ' ' + v.trim());
   return ask(v);
 };
 $('#q').addEventListener('keydown', e=>{ if(e.key === 'Enter' && !e.shiftKey && !e.isComposing){ e.preventDefault(); send($('#q').value); } });
@@ -1694,6 +1746,9 @@ const COMMANDS = [
   {c: '/export', a: '', d: 'Save this chat as Markdown'},
   {c: '/notebook', a: 'new · use · add · ask · podcast', d: 'Notebooks: sources you collect (pages, files, text); questions answered only from them, with [n]; a two-voice podcast of them'},
   {c: '/nb', a: 'question', d: 'Ask the open notebook'},
+  {c: '/ps', a: '', d: 'What is running now: answers, each agent with its step, background jobs (also the ⚙ chip)'},
+  {c: '/mode', a: 'loop | classic', d: 'One model with the whole chat and every tool (loop, the default), or the old way (classic)'},
+  {c: '/mcp', a: 'add name command | https url', d: 'MCP tool servers (GitHub, Notion, Calendar…): list · add · remove · allow name read|all'},
   {c: '/security', a: '', d: 'Check this AI\'s skills, connectors, file permissions and password for risks (nothing is changed)'},
   {c: '/schedule', a: '09:00 weekdays a question', d: 'A question asked for you each day at a time (list · remove n; alone: the Tasks panel)'},
   {c: '/loop', a: '15m a question', d: 'Ask it every 15 minutes (1m at least; x10: at most 10 runs; --market: 09:15–15:30 IST) into its own 🔁 chat, stops after 24 h · list · stop [n|all]'},
@@ -1802,6 +1857,9 @@ async function runCommand(line){
   else if(c === '/color'){ const v = colorOf(arg); if(v === null) return toast('A colour: blue, green, orange, red, pink, purple, teal, gray, a #hex — or reset'); store.set('ai.color', v); applyColor(v); toast(v ? 'Accent: ' + arg : 'Accent: as it was'); }
   else if(c === '/doctor' || c === '/status') openUsage(true);
   else if(c === '/notebook' || c === '/nb'){ if(mode !== 'mac') return toast('Notebooks are kept on your Mac — open this page there (or over Tailscale)'); ask(c + (arg ? ' ' + arg : '')); }
+  else if(c === '/ps'){ if(mode !== 'mac') return toast('That shows your Mac — open this page there (or over Tailscale)'); ask('/ps'); }
+  else if(c === '/mode'){ if(mode !== 'mac') return toast('The mode is set on your Mac — open this page there (or over Tailscale)'); ask('/mode' + (arg ? ' ' + arg : '')); }
+  else if(c === '/mcp'){ if(mode !== 'mac') return toast('MCP servers run on your Mac — open this page there (or over Tailscale)'); ask('/mcp' + (arg ? ' ' + arg : '')); }
   else if(c === '/security'){ if(mode !== 'mac') return toast('That checks your Mac — open this page there (or over Tailscale)'); ask('/security'); }
   else if(c === '/pins' || c === '/profile' || c === '/rules') openPanel(true);
   else if(c === '/projects') openProjects(true);

@@ -394,7 +394,7 @@ Rules: ${Object.values(RULES).join('; ')}.${(m=>m.length ? '\nMistakes you made 
   async function deep(question, o){
     o = o || {};
     const step = t => { try{ o.onStep && o.onStep(t); }catch(e){} };
-    const today = new Date().toISOString().slice(0, 10);
+    const today = new Date().toLocaleDateString('en-CA');            // today where you are, not in UTC
     const timely = isTimely(question);
     const month = new Date().toLocaleString('en-US', {month: 'long', year: 'numeric'});
     const sources = [], seen = new Set(), links = [];
@@ -574,7 +574,7 @@ Rules: ${Object.values(RULES).join('; ')}.${(m=>m.length ? '\nMistakes you made 
     const counts = Array.from(bare.matchAll(/\b(\d+)\s+(days?|weeks?)\b/gi)).filter(m=>!new RegExp('\\b' + m[1] + '\\s+(days?|weeks?)', 'i').test(String(c.extra || ''))).map(m=>'"' + m[0] + '"');
     if(counts.length) out.push({rule: 'R6', text: Array.from(new Set(counts)).join(', ') + ' — not worked out with calculate; do not add days up yourself.'});
     // R10: told as done, but dated after today
-    const today = new Date((c.today || new Date().toISOString().slice(0, 10)) + 'T00:00:00Z');
+    const today = new Date((c.today || new Date().toLocaleDateString('en-CA')) + 'T00:00:00Z');
     // ("the meeting scheduled for 5 October" inside a sentence that says a decision was made is still a claim that it happened)
     const PAST = /\b(was|were|did|didn't|has been|had|kept|held|made|decided|announced|cut|raised|left|voted|confirmed|happened|took place|remained|stayed)\b/i;
     const FUTURE = /\b(will|upcoming|yet to|not yet|has not (yet )?(happened|taken place|been held|met)|hasn't|is (scheduled|due|set) to|are (scheduled|due|set) to|is scheduled for|are scheduled for|next (meeting|review|policy))\b/i;
