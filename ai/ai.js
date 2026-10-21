@@ -203,8 +203,8 @@ const MoneyAI = (function(){
     }
     if(res.status === 429 || /quota|rate.?limit|exhausted|too many/i.test(body)){
       const end = limitEnd(id, res, body), e = Unavailable(name + ': free ' + (end.daily ? 'daily ' : '') + 'limit reached' + (end.daily ? ' — back ' + backAt(end.until) : ' for now') + '.', 429, true);
-      // Gemini, Groq and Cerebras count each model on its own: the next model of the same service may still answer
-      e.until = end.until; e.perModel = ['gemini', 'groq', 'cerebras'].indexOf(id) >= 0;
+      // Gemini, Groq, Cerebras and OpenRouter count each model on its own: the next model of the same service may still answer
+      e.until = end.until; e.perModel = ['gemini', 'groq', 'cerebras', 'openrouter'].indexOf(id) >= 0;      // OpenRouter: each free model has its own (upstream) limit — one at its limit benched the whole service for 15 minutes
       throw e;
     }
     if(res.status === 402){ const e = Unavailable(name + ': no credit left on this account.', 402, true); e.until = Date.now() + toMidnight('UTC'); throw e; }
