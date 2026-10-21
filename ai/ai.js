@@ -768,9 +768,12 @@ const MoneyAI = (function(){
     // Groq's free tier (8,000 tokens a minute) failed every other question with "free limit reached for now"
     if(opts.only && opts.only.length === 1 && !opts.waited && !(signal && signal.aborted)){
       const id = opts.only[0], r = restMap(), until = Math.min.apply(null, Object.keys(r).filter(k=>k === id || k.indexOf(id + '|') === 0).map(k=>r[k].until || 0).filter(u=>u > Date.now()).concat([Infinity]));
-      if(until - Date.now() <= 65000){
-        tell(PROVIDERS.find(p=>p.id === id).name + ' is at its per-minute limit — waiting ' + Math.ceil((until - Date.now()) / 1000) + ' s, then asking again', id);
-        await new Promise(res=>{ const t = setTimeout(res, Math.max(0, until - Date.now()) + 1000); if(signal) signal.addEventListener('abort', ()=>{ clearTimeout(t); res(); }); });
+      // or it was busy / gave no answer in time once (Ollama Cloud): asked again after a few seconds
+      const blip = until === Infinity && lastError && lastError.unavailable && [502, 503, 504].includes(lastError.status);
+      if(until - Date.now() <= 65000 || blip){
+        const wait = blip ? 5000 : until - Date.now();
+        tell(PROVIDERS.find(p=>p.id === id).name + (blip ? ' did not answer — asking again in 5 s' : ' is at its per-minute limit — waiting ' + Math.ceil(wait / 1000) + ' s, then asking again'), id);
+        await new Promise(res=>{ const t = setTimeout(res, Math.max(0, wait) + 1000); if(signal) signal.addEventListener('abort', ()=>{ clearTimeout(t); res(); }); });
         if(!(signal && signal.aborted)){ wake(id); const b = restMap(); Object.keys(b).forEach(k=>{ if(k.indexOf(id + '|') === 0) delete b[k]; }); lsSet(REST_KEY, b); return chat(system, turns, Object.assign({}, opts, {waited: true}), signal); }
       }
     }
