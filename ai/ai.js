@@ -196,6 +196,11 @@ const MoneyAI = (function(){
   async function failure(name, res, id){
     const body = await res.text().catch(()=>'');
     if(res.status === 401 || res.status === 403 || (res.status === 400 && /api[ _-]?key|unauthori[sz]ed|invalid.*key/i.test(body))) throw new Error(name + ' rejected the API key.');
+    // busy, not out of quota: "The service may be temporarily overloaded" (Z.ai, code 1305), "high demand" — it rests a minute
+    // (a picked service is then asked again), not the 15 minutes of a free limit, and says so
+    if((res.status === 429 || res.status === 503) && /overloaded|high demand|temporarily unavailable|over capacity|\b1305\b/i.test(body) && !/quota|per.?day|daily|exhausted/i.test(body)){
+      const e = Unavailable(name + ' is busy right now (overloaded).', 503, true); e.until = Date.now() + 60000; e.perModel = true; throw e;
+    }
     if(res.status === 429 || /quota|rate.?limit|exhausted|too many/i.test(body)){
       const end = limitEnd(id, res, body), e = Unavailable(name + ': free ' + (end.daily ? 'daily ' : '') + 'limit reached' + (end.daily ? ' — back ' + backAt(end.until) : ' for now') + '.', 429, true);
       // Gemini, Groq and Cerebras count each model on its own: the next model of the same service may still answer
