@@ -67,14 +67,12 @@ const MoneyAI = (function(){
     // Cohere (trial key: 1,000 calls a month, 20 a minute): Command A+ and North Mini Code, through its OpenAI-style API
     {id:'cohere', name:'Cohere (Command)', signupUrl:'https://dashboard.cohere.com/api-keys', placeholder:'key', models:['command-a-plus-05-2026','command-a-03-2025','north-mini-code']},
     // (OmniRoute, a gateway on this Mac, was taken off: it had no providers connected and only repeated this order)
-    {id:'cerebras', name:'Cerebras', signupUrl:'https://cloud.cerebras.ai', placeholder:'csk-…', models:['gpt-oss-120b','llama-3.3-70b','llama3.1-8b']},
-    {id:'mistral', name:'Mistral', signupUrl:'https://console.mistral.ai/api-keys', placeholder:'key', models:['mistral-small-latest','mistral-medium-latest']},
+    // (Cerebras, Mistral and Anthropic were taken off, 22 Oct 2026: no key for them on this Mac or in the apps)
     {id:'openrouter', name:'OpenRouter', signupUrl:'https://openrouter.ai/keys', placeholder:'sk-or-…', models:['openrouter/free']},
     // Private AI (in this browser) is gone: Your own AI (on your Mac) is the private one — a key saved for it is not used
     // Local (Ollama) is gone from here: the models on the Mac are reached through Your own AI (local:…), one way for every app
-    {id:'anthropic', name:'Anthropic Claude (paid)', signupUrl:'https://console.anthropic.com/settings/keys', placeholder:'sk-ant-…', models:['claude-haiku-4-5-20251001'], vision:true},
   ];
-  const OPENAI_BASE = {ollamacloud:'http://127.0.0.1:11434/v1', groq:'https://api.groq.com/openai/v1', nvidia:'https://integrate.api.nvidia.com/v1', zai:'https://api.z.ai/api/paas/v4', cohere:'https://api.cohere.ai/compatibility/v1', cerebras:'https://api.cerebras.ai/v1', mistral:'https://api.mistral.ai/v1', openrouter:'https://openrouter.ai/api/v1'};
+  const OPENAI_BASE = {ollamacloud:'http://127.0.0.1:11434/v1', groq:'https://api.groq.com/openai/v1', nvidia:'https://integrate.api.nvidia.com/v1', zai:'https://api.z.ai/api/paas/v4', cohere:'https://api.cohere.ai/compatibility/v1', openrouter:'https://openrouter.ai/api/v1'};
   const DEVICE_ONLY = {ollama: true, webllm: true, mac: true};         // this computer's own: not shared with your other devices
   const SYNCED_AI = 'tripvault-ai-synced';          // keys that came from another device through Trip Vault's encrypted sync
   /* The keys this device uses, to carry to your other devices inside the encrypted sync (not Ollama: it is this computer's). */
@@ -204,8 +202,8 @@ const MoneyAI = (function(){
     }
     if(res.status === 429 || /quota|rate.?limit|exhausted|too many/i.test(body)){
       const end = limitEnd(id, res, body), e = Unavailable(name + ': free ' + (end.daily ? 'daily ' : '') + 'limit reached' + (end.daily ? ' — back ' + backAt(end.until) : ' for now') + '.', 429, true);
-      // Gemini, Groq, Cerebras and OpenRouter count each model on its own: the next model of the same service may still answer
-      e.until = end.until; e.perModel = ['gemini', 'groq', 'cerebras', 'openrouter'].indexOf(id) >= 0;      // OpenRouter: each free model has its own (upstream) limit — one at its limit benched the whole service for 15 minutes
+      // Gemini, Groq and OpenRouter count each model on its own: the next model of the same service may still answer
+      e.until = end.until; e.perModel = ['gemini', 'groq', 'openrouter'].indexOf(id) >= 0;      // OpenRouter: each free model has its own (upstream) limit — one at its limit benched the whole service for 15 minutes
       throw e;
     }
     if(res.status === 402){ const e = Unavailable(name + ': no credit left on this account.', 402, true); e.until = Date.now() + toMidnight('UTC'); throw e; }
@@ -417,7 +415,7 @@ const MoneyAI = (function(){
        auto · chatgpt · pcc · apple (through Siri / on the Mac) · council (Thinking) · deep
        cloud:<service> (a key on the Mac) · local:<model> (a model on the Mac)      -> [[id, label]]
      Picture and video models are not in it: an app asks your AI for words. */
-  const MAC_CLOUD = {ollamacloud: 'Beam (Ollama Cloud)', gemini: 'Google Gemini', groq: 'Groq — gpt-oss-120b', nvidia: 'NVIDIA — Nemotron', zai: 'Z.ai — GLM', cohere: 'Cohere — Command', cerebras: 'Cerebras — gpt-oss-120b', mistral: 'Mistral', openrouter: 'OpenRouter', anthropic: 'Anthropic Claude'};
+  const MAC_CLOUD = {ollamacloud: 'Beam (Ollama Cloud)', gemini: 'Google Gemini', groq: 'Groq — gpt-oss-120b', nvidia: 'NVIDIA — Nemotron', zai: 'Z.ai — GLM', cohere: 'Cohere — Command', openrouter: 'OpenRouter'};
   function macModels(info){
     const d = info || {}, a = d.apple || {}, cloud = d.cloud || [], local = (d.local || []).map(m=>m.name || m).filter(n=>n && !/embed|guard|vision|llava/i.test(n));
     const out = [['auto', 'Auto (recommended) — your AI picks the best available model for each request']];
@@ -514,16 +512,6 @@ const MoneyAI = (function(){
       const sources = (((cand.groundingMetadata || {}).groundingChunks) || []).map(c=>c.web).filter(Boolean).map(w=>({title: w.title, url: w.uri}));
       return {text, sources};
     }
-    if(id === 'anthropic'){
-      const messages = turns.map((t, i)=>({role: t.role, content: i === turns.length - 1 && images.length
-        ? images.map(im=>im.mime === 'application/pdf' ? {type:'document', source:{type:'base64', media_type:im.mime, data:im.b64}} : {type:'image', source:{type:'base64', media_type:im.mime, data:im.b64}}).concat([{type:'text', text:t.content}])
-        : t.content}));
-      const res = await post('https://api.anthropic.com/v1/messages', {'x-api-key':key, 'anthropic-version':'2023-06-01', 'anthropic-dangerous-direct-browser-access':'true'},
-        {model, max_tokens:8192, temperature: temp(opts), system, messages}, signal);
-      if(!res.ok) await failure(name, res, id);
-      const d = await res.json();
-      return {text: (d.content || []).map(c=>c.text || '').join(''), sources: []};
-    }
     if(id === 'ollama'){
       // Ollama's own API, with "thinking" off: reasoning models otherwise think for minutes on a laptop
       const res = await post(key.replace(/\/+$/, '') + '/api/chat', {},
@@ -594,7 +582,6 @@ const MoneyAI = (function(){
       const score = m => [RANK[kind(m)], -ver(m), alias(m) ? 1 : 0, preview(m)];
       return g.sort((a, b)=>{ const x = score(a), y = score(b); for(let i = 0; i < x.length; i++) if(x[i] !== y[i]) return x[i] - y[i]; return a.localeCompare(b); });
     }
-    if(id === 'anthropic'){ const t = m => /haiku/.test(m) ? (fast ? 0 : 1) : /sonnet/.test(m) ? (fast ? 1 : 0) : 2; return uniq.filter(m=>/^claude/.test(m) && !/opus/.test(m)).sort((a, b)=>t(a) - t(b) || b.localeCompare(a)); }
     // a model on this computer: the smallest good one first (a laptop runs a 4B model in seconds, an 8B one in minutes)
     if(id === 'ollama'){ const LOCAL = ['qwen3:4b-instruct', 'gemma3:4b', 'llama3.2:3b', 'qwen2.5:3b', 'phi4-mini', 'qwen3:4b', 'gemma3:1b'];     // measured on an 8 GB M1: qwen3 4B Instruct reads web pages best (4/4, 25 s)
       const li = m => { const i = LOCAL.findIndex(x=>m.toLowerCase().indexOf(x) === 0); return i < 0 ? LOCAL.length : i; };
@@ -611,7 +598,6 @@ const MoneyAI = (function(){
     if(id === 'mac'){ const d = await (await macFetch('/models')).json(); lsSet(MAC_KEY, Object.assign({}, lsGet(MAC_KEY, {}), {info: {apple: d.apple, cloud: d.cloud, local: (d.local || []).map(m=>({name: m.name}))}})); return macModels(d).map(x=>x[0]); }
     let res;
     if(id === 'gemini') res = await fetch('https://generativelanguage.googleapis.com/v1beta/models?pageSize=200&key=' + encodeURIComponent(key));
-    else if(id === 'anthropic') res = await fetch('https://api.anthropic.com/v1/models', {headers:{'x-api-key':key, 'anthropic-version':'2023-06-01', 'anthropic-dangerous-direct-browser-access':'true'}});
     else if(id === 'ollama') res = await fetch(key.replace(/\/+$/, '') + '/api/tags');
     else res = await fetch(OPENAI_BASE[id] + '/models', {headers:{Authorization:'Bearer ' + key}});
     if(!res.ok) throw new Error('HTTP ' + res.status);

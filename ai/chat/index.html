@@ -343,6 +343,7 @@ code{font-family:var(--mono); font-size:.85em; background:var(--page2); padding:
 .skh{font-size:13px; margin:16px 0 6px; color:var(--muted, inherit); text-transform:uppercase; letter-spacing:.04em}
 .kdot.green{background:#22c55e; color:#22c55e} .kdot.yellow{background:#f5b301; color:#f5b301} .kdot.red{background:#ef4444; color:#ef4444}
 .krow .kedit{display:flex; gap:8px; flex-wrap:wrap} .krow .kedit input{flex:1 1 180px; min-width:0; padding:9px 11px; border-radius:10px; border:1px solid var(--line); background:var(--page); color:var(--ink); font:inherit}
+.krow .kedit select{flex:1 1 180px; min-width:0; padding:9px 11px; border-radius:10px; border:1px solid var(--line); background:var(--page); color:var(--ink); font:inherit}
 .krow .kedit button{padding:8px 12px} .kmore{margin-top:6px}.kkey{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:2px 0}.kkey button{padding:4px 10px;font-size:12px}
 .kgroup{margin:16px 0 8px; font:600 12px/1 var(--display); letter-spacing:.06em; text-transform:uppercase; color:var(--ink2)}
 .panel h2{font:700 28px var(--display); letter-spacing:-.02em; margin:0 0 4px}
@@ -1205,7 +1206,7 @@ const pill = (id, text, cls) => { const p = $(id); p.hidden = false; p.className
 /* ---------------------------------------------------------------- which AI answers (the picker) */
 // {kind: 'auto'} · {kind: 'local', model} · {kind: 'private'} · {kind: 'cloud', provider} · {kind: 'council'}
 let pick = store.get('ai.pick', {kind: 'auto'});
-const CLOUD_NAMES = {apple: 'Apple Intelligence (on this Mac)', chatgpt: 'ChatGPT (through Siri)', pcc: 'Apple Private Cloud', gemini: 'Google Gemini', groq: 'Groq — gpt-oss-120b (OpenAI\'s open model)', cerebras: 'Cerebras — gpt-oss-120b', mistral: 'Mistral', openrouter: 'OpenRouter (free models)', anthropic: 'Anthropic Claude'};
+const CLOUD_NAMES = {apple: 'Apple Intelligence (on this Mac)', chatgpt: 'ChatGPT (through Siri)', pcc: 'Apple Private Cloud', gemini: 'Google Gemini', groq: 'Groq — gpt-oss-120b (OpenAI\'s open model)', openrouter: 'OpenRouter (free models)'};
 let autoLabel = 'Auto';
 // the picture models (the relay's Cloudflare models, Pollinations, Image Playground) and Compare
 const IMG_PICK = [['auto', 'Auto pictures', 'Best first: FLUX.2 klein 9B (first 5 a day), then FLUX.1 schnell; a style (cartoon, sketch…) by Image Playground; then Gemini, Pollinations, Draw Things, DiffusionBee as backups'], ['compare', 'Compare 4 models', 'FLUX.1 schnell, FLUX.2 klein 4B, SDXL Lightning, Pollinations — side by side'], ['compare-best', 'Compare the 4 best', 'FLUX.2 klein 9B, FLUX.2 dev, Phoenix, Lucid Origin — most of a day\'s free allowance'],
@@ -2236,6 +2237,29 @@ async function loadSkills(){
   const b = d.builtin || [];
   box.innerHTML = `<h3 class="skh">Installed · ${d.skills.length}</h3>` + (d.skills.length ? d.skills.map(row).join('') : '<p class="sub">None yet. Ask in the chat: <b>integrate https://github.com/owner/repo</b></p>')
     + (b.length ? `<h3 class="skh">Built in · ${b.length}</h3><p class="sub">Ideas and rules taken from GitHub repos into your AI's own code.</p>` + b.map(row).join('') : '');
+  // MCP SERVERS: tool servers plugged in — the same as /mcp in the chat: on/off, read-only or all tools, remove, add one
+  let mc = null; try{ mc = await fetch(HELPER + '/mcp').then(r=>r.json()); }catch(e){}
+  if(mc && mc.list) box.insertAdjacentHTML('beforeend', `<h3 class="skh">MCP servers · ${mc.list.length}</h3><p class="sub">Tool servers your AI can use (Model Context Protocol). Read-only tools run freely; with “All tools”, anything that changes something still waits for your yes. Never from iMessage.</p>`
+    + mc.list.map(m=>{ const dot = !m.on ? 'grey' : m.ok ? 'green' : 'red', state = !m.on ? 'Off' : m.ok ? m.tools + ' tools, ' + m.readOnly + ' of them read-only' : 'Not working — ' + (m.why || '');
+      return `<div class="krow skrow" data-mcp="${esc(m.name)}"><div class="khead"><span class="kdot ${dot}"></span><b>${esc(m.name)}</b><label title="Use this server"><input type="checkbox" data-mcp-on ${m.on ? 'checked' : ''}></label></div><small>${esc(state)}<br>${esc(m.where)}</small>`
+        + `<div class="kedit"><select data-mcp-allow aria-label="Which of its tools"><option value="read"${m.allow === 'read' ? ' selected' : ''}>Read-only tools</option><option value="all"${m.allow === 'all' ? ' selected' : ''}>All tools (changes ask first)</option></select><button class="ghost" type="button" data-mcp-rm>Remove</button></div></div>`; }).join('')
+    + `<div class="krow"><div class="khead"><b>Add a server</b></div><small>A program on this Mac (npx -y @scope/server, uvx mcp-server-…) or an https:// address. A token: for an address, paste it; for a program, NAME=value.</small>`
+    + `<div class="kedit"><input id="mcpName" placeholder="name (github)" autocomplete="off" aria-label="Name"><input id="mcpTarget" placeholder="npx -y … or https://…" autocomplete="off" aria-label="Program or address"><input id="mcpToken" type="password" placeholder="token (optional)" autocomplete="off" aria-label="Token"><button class="btn" type="button" id="mcpAddBtn">Add</button></div></div>`);
+  const mcpDo = async (cmd, done) => { try{ const j = await post('/mcp', {cmd}); toast(String(j.error || j.text || done).replace(/\*/g, '').split('\n')[0].slice(0, 140)); }catch(e){ toast('That did not work: ' + e.message); } loadSkills(); };
+  box.querySelectorAll('[data-mcp]').forEach(r=>{ const n = r.dataset.mcp;
+    r.querySelector('[data-mcp-on]').onchange = e => mcpDo((e.target.checked ? 'on ' : 'off ') + n);
+    r.querySelector('[data-mcp-allow]').onchange = e => mcpDo('allow ' + n + ' ' + e.target.value);
+    r.querySelector('[data-mcp-rm]').onclick = e => { e.target.disabled = true; mcpDo('remove ' + n); }; });
+  const ma = $('#mcpAddBtn'); if(ma) ma.onclick = () => {
+    const name = $('#mcpName').value.trim(), target = $('#mcpTarget').value.trim(), tok = $('#mcpToken').value.trim();
+    if(!/^[a-z0-9][a-z0-9_-]{0,30}$/i.test(name)) return toast('A short name: letters, numbers, - or _');
+    if(!target) return toast('What runs it? npx -y … or an https:// address');
+    if(/["\\]/.test(tok)) return toast('That token has a character it cannot carry (" or \\)');
+    const https = /^https:\/\//i.test(target), env = /^[A-Z_][A-Z0-9_]*=/.test(tok);
+    if(tok && !https && !env) return toast('For a program, give the token as NAME=value (for GitHub: GITHUB_PERSONAL_ACCESS_TOKEN=…)');
+    ma.disabled = true; ma.textContent = 'Starting it…';
+    mcpDo('add ' + name + ' ' + target + (!tok ? '' : env ? ' --env ' + tok : ' --header "Authorization: Bearer ' + tok + '"'), 'Added');
+  };
   // SELF-TUNE's learned tweaks, and the limits (settings) — changed here without changing code
   let tu = null, st = null; try{ [tu, st] = await Promise.all([fetch(HELPER + '/tune').then(r=>r.json()), fetch(HELPER + '/settings').then(r=>r.json())]); }catch(e){}
   if(tu) box.insertAdjacentHTML('beforeend', `<h3 class="skh">Learned tweaks · ${tu.tweaks.length}</h3><p class="sub">Self-tune learns these at night from answers that went wrong (👎, corrections, claims its sources did not hold) — a rule is kept only when it clearly wins. Waiting to learn from: ${tu.waiting}.${tu.last && tu.last.day ? ' Last run ' + esc(tu.last.day) + ': kept ' + tu.last.kept + '.' : ''}</p>`
@@ -2276,7 +2300,7 @@ document.querySelectorAll('#themeSeg button').forEach(b=>b.onclick = () => { sto
 $('#cloudTog').checked = !!store.get('ai.cloud', false);
 $('#cloudTog').onchange = () => store.set('ai.cloud', $('#cloudTog').checked);
 // with the switch on, the AI keys this browser holds go with the question to the helper on this Mac (used for that answer only)
-const browserKeys = () => { try{ const k = MoneyAI.aiSettings().keys || {}; return Object.fromEntries(Object.entries(k).filter(([n, v])=>v && /^(gemini|groq|cerebras|mistral|openrouter|anthropic)$/.test(n))); }catch(e){ return {}; } };
+const browserKeys = () => { try{ const k = MoneyAI.aiSettings().keys || {}; return Object.fromEntries(Object.entries(k).filter(([n, v])=>v && /^(gemini|groq|openrouter)$/.test(n))); }catch(e){ return {}; } };
 const cloudKeys = () => !store.get('ai.cloud', false) ? null : {keys: typeof MoneyAI === 'undefined' ? {} : browserKeys()};
 const menuOpen = on => { $('#acctMenu').hidden = !on; $('#acctBtn').setAttribute('aria-expanded', String(on)); };
 $('#acctBtn').onclick = e => { e.stopPropagation(); menuOpen($('#acctMenu').hidden); };
