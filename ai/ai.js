@@ -720,7 +720,8 @@ const MoneyAI = (function(){
     if(opts.webQuestion) opts = Object.assign({}, opts, {webQuestion: null});        // from here on: the app's own request
     if(opts.images && opts.images.length) order = order.filter(id=>PROVIDERS.find(p=>p.id === id).vision);
     if(opts.search) order = order.filter(id=>PROVIDERS.find(p=>p.id === id).search);
-    if(opts.only) order = order.filter(id=>opts.only.indexOf(id) >= 0);              // e.g. only the AI on this device
+    // only these (e.g. only the AI on this device); ordered: in the order given — your sequence for that use (Setup → Configure sequence)
+    if(opts.only) order = opts.ordered ? opts.only.filter(id=>order.indexOf(id) >= 0) : order.filter(id=>opts.only.indexOf(id) >= 0);
     if(opts.skip) order = order.filter(id=>opts.skip.indexOf(id) < 0);
     // a web search that is only nice to have: when no AI that can search is free, the next AI answers without it
     if(opts.search && opts.searchOptional){

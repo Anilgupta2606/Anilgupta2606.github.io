@@ -84,6 +84,7 @@ body{padding-left:var(--sb)}
 .chat{display:flex; align-items:center; gap:6px; padding:7px 8px 7px 10px; border-radius:10px; cursor:pointer; font-size:13.8px; color:var(--ink2)}
 .chat:hover{background:var(--page)} .chat.cur{background:var(--think-bg); color:var(--ink); font-weight:600}
 .chat .ct{flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.chat .ccode{font-size:12px; margin-right:2px}
 .chat .csrc{font-size:11px; color:var(--mut); flex:none}
 .clearall{display:block; margin:16px 8px 6px; font-size:12.5px; color:var(--mut)} .clearall.danger{color:var(--err); font-weight:600}
 .chat.hit{align-items:flex-start} .chat.hit .ct{white-space:normal} .chat.hit b{display:block; font-weight:600; font-size:13px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap} .chat.hit small{display:block; font-size:12px; color:var(--mut); line-height:1.35; max-height:2.7em; overflow:hidden}
@@ -343,6 +344,10 @@ code{font-family:var(--mono); font-size:.85em; background:var(--page2); padding:
 .skh{font-size:13px; margin:16px 0 6px; color:var(--muted, inherit); text-transform:uppercase; letter-spacing:.04em}
 .kdot.green{background:#22c55e; color:#22c55e} .kdot.yellow{background:#f5b301; color:#f5b301} .kdot.red{background:#ef4444; color:#ef4444}
 .krow .kedit{display:flex; gap:8px; flex-wrap:wrap} .krow .kedit input{flex:1 1 180px; min-width:0; padding:9px 11px; border-radius:10px; border:1px solid var(--line); background:var(--page); color:var(--ink); font:inherit}
+.seqchips{display:flex; flex-wrap:wrap; gap:6px}
+.seqchip{display:inline-flex; align-items:center; gap:2px; border:1px solid var(--line); border-radius:999px; padding:3px 4px 3px 10px; font-size:13px; background:var(--page)}
+.seqchip b{color:var(--ink2); margin-right:4px} .seqchip.off{opacity:.55}
+.seqchip button{border:0; background:none; padding:2px 5px; cursor:pointer; color:var(--ink2); font:inherit; border-radius:8px} .seqchip button:disabled{opacity:.25; cursor:default}
 .krow .kedit select{flex:1 1 180px; min-width:0; padding:9px 11px; border-radius:10px; border:1px solid var(--line); background:var(--page); color:var(--ink); font:inherit}
 .krow .kedit button{padding:8px 12px} .kmore{margin-top:6px}.kkey{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:2px 0}.kkey button{padding:4px 10px;font-size:12px}
 .kgroup{margin:16px 0 8px; font:600 12px/1 var(--display); letter-spacing:.06em; text-transform:uppercase; color:var(--ink2)}
@@ -419,6 +424,7 @@ main{max-width:800px; padding:22px 20px 170px}
 .popMenu{position:fixed; bottom:auto; max-height:min(60vh, 460px); overflow-y:auto; width:300px; z-index:30}
 .runMenu{width:360px} .runMenu .ritem{padding:8px 10px; border-radius:11px} .runMenu .ritem + .ritem{border-top:1px solid var(--line)}
 .runMenu .ritem b{font-size:13.5px} .runMenu .ritem small{display:block; color:var(--mut); font-size:12px; overflow-wrap:anywhere} .runMenu .sub{margin-left:18px}
+.runMenu .rstop{float:right; margin:0 0 4px 8px; padding:3px 9px; border-radius:8px; border:1px solid var(--line); background:transparent; color:inherit; font-size:12px; cursor:pointer; min-height:28px} .runMenu .rstop:hover{border-color:#d9534f; color:#d9534f} .runMenu .rall{text-align:right} .runMenu .rall .rstop{float:none}
 @media (max-width:600px){ .popMenu{width:calc(100vw - 32px)!important; left:16px!important} }
 @media (max-width:600px){ .modes{margin-top:6px} .mchip{padding:6px 10px; font-size:12.5px} .mchip.voice{margin-left:0} }
 .modechip{display:inline-flex; align-items:center; gap:4px; flex:none; background:var(--think-bg); color:var(--think); border-radius:999px; padding:3px 4px 3px 10px; font-size:12.5px; font-weight:600; white-space:nowrap; align-self:center}
@@ -1051,6 +1057,9 @@ async function ask(q, opt){
   q = q.trim();
   // A request belongs to the chat that started it.  Do not use the selected chat's
   // global state after an await: the user may have switched to another chat meanwhile.
+  // /cas password …: kept on this Mac straight away — never a chat message (its history goes to the models with the next question)
+  const casPw = /^\/cas\s+password\s+(\S+)$/i.exec(q);
+  if(casPw){ const r = await post('/cas', {password: casPw[1]}).catch(()=>null); toast(r && r.ok ? '🔐 CAS password kept on this Mac only — attach the CAS PDF and ask' : 'Could not keep it: ' + (r && r.error || 'the helper did not answer')); return; }
   const requestSessionId = sessionId;
   if(!q || activeRequests.has(requestSessionId)) return;
   const requestHistory = history;
@@ -1081,6 +1090,7 @@ async function ask(q, opt){
   const done = out => {
     if(deletedSessions.has(requestSessionId)) return;
     lastAnswer = out;
+    if(opt && opt.onAnswer) try{ opt.onAnswer(out); }catch(e){}
     // asked by speaking (the 🎤): the answer is spoken back too (voice mode speaks its own)
     if(window.spokenAsk && !(opt && opt.voice)){ window.spokenAsk = false; if(window.readAloud) setTimeout(()=>window.readAloud(out), 50); }
     if(steps[0] && steps[0].t === 'Starting') steps.shift();
@@ -1137,7 +1147,7 @@ async function ask(q, opt){
       out.secs = Math.round((Date.now() - t0) / 1000);
       done(out);
     } else {
-      const r = await fetch(HELPER + '/ask', {method: 'POST', headers: {'content-type': 'application/json'}, signal: request.controller.signal, body: JSON.stringify({question: q, voice: !!opt.voice, agents: !!opt.agents, notebook: !!opt.notebook, deep: !!opt.deep || pick.kind === 'deep' || pick.kind === 'deeplocal', research: !!opt.research, sogpt: pick.kind === 'sogpt', imageModel: opt.imageModel || store.get('ai.imageModel', 'auto'), videoModel: store.get('ai.videoModel', 'auto') !== 'auto' ? store.get('ai.videoModel') : undefined, model: pick.kind === 'local' ? pick.model : undefined, provider: opt.provider || (pick.kind === 'cloud' ? pick.provider : pick.kind === 'council' ? 'council' : undefined), history: turns, cloud: cloudKeys(), fresh: !!opt.fresh, attachments: files.map(f=>f.image ? {name: f.name, image: f.image} : f), goal: requestGoal, session: requestSessionId, disabled, project: store.get('ai.project', '') || null, forceVideo: !!opt.forceVideo, lastKind: (requestHistory.length && requestHistory[requestHistory.length - 1].answer.kind) || ''})});
+      const r = await fetch(HELPER + '/ask', {method: 'POST', headers: {'content-type': 'application/json'}, signal: request.controller.signal, body: JSON.stringify({question: q, voice: !!opt.voice, agents: !!opt.agents, notebook: !!opt.notebook, deep: !!opt.deep || pick.kind === 'deep' || pick.kind === 'deeplocal', research: !!opt.research, sogpt: pick.kind === 'sogpt', imageModel: opt.imageModel || store.get('ai.imageModel', 'auto'), videoModel: store.get('ai.videoModel', 'auto') !== 'auto' ? store.get('ai.videoModel') : undefined, model: pick.kind === 'local' ? pick.model : undefined, provider: opt.provider || (pick.kind === 'cloud' ? pick.provider : pick.kind === 'council' ? 'council' : undefined), history: turns, cloud: cloudKeys(), fresh: !!opt.fresh, attachments: files.map(f=>f.image ? {name: f.name, image: f.image} : f), goal: requestGoal, session: requestSessionId, disabled, project: projectOf(requestSessionId) || null, forceVideo: !!opt.forceVideo, lastKind: (requestHistory.length && requestHistory[requestHistory.length - 1].answer.kind) || ''})});
       if(!r.ok) throw new Error((await r.json().catch(()=>({}))).error || 'It answered ' + r.status);
       const reader = r.body.getReader(), dec = new TextDecoder();
       let buf = '', out = null;
@@ -1224,7 +1234,7 @@ async function openPicker(){
   const cloud = info.cloud && info.cloud.length ? info.cloud : (typeof MoneyAI !== 'undefined' ? Object.keys(browserKeys()) : []);
   const privateOk = false;                                         // Private AI (in this browser) was removed from Setup
   const item = (p, icon, title, sub) => `<button type="button" role="menuitem" data-p='${esc(JSON.stringify(p))}' class="${JSON.stringify(p) === JSON.stringify(pick) ? 'on' : ''}"><i>${icon}</i><span><b>${esc(title)}</b><small>${esc(sub)}</small></span></button>`;
-  box.innerHTML = item({kind: 'auto'}, '✦', 'Auto (recommended)', info.apple && info.apple.chatgpt ? 'The right model for each question, with backups: ChatGPT (through Siri) for most answers, Apple Private Cloud for personal ones, NVIDIA Nemotron first for code; your cloud keys when those are busy' : 'The right model for each question: general, code, pictures, hard questions')
+  box.innerHTML = item({kind: 'auto'}, '✦', 'Auto (recommended)', info.apple && info.apple.chatgpt ? 'One cloud model with the whole chat and every tool, in your order (Setup → Configure sequence: Groq → Beam → NVIDIA → Gemini → ChatGPT → Cohere by default); your private data: Apple Private Cloud, then this Mac; code: SoGPT (Beam first)' : 'The right model for each question: general, code, pictures, hard questions')
     + (mode === 'mac' ? item({kind: 'sogpt'}, '🧩', 'SoGPT 1.1', 'Coding: questions go to the selected project — it reads it, edits, runs the tests, and a second model rechecks') : '')
     // (Thinking and Deep think are chips under the box now — 💭 Think, 🧠 Deep — not models)
     + ''                                                               // (Deep on this Mac was removed: qwen3:8b, used 3 times)
@@ -1341,13 +1351,39 @@ let mermaidReady = null;
 async function drawDiagrams(root){
   const boxes = [...(root || document).querySelectorAll('.diagram:not([data-drawn])')]; if(!boxes.length) return;
   try{
-    if(!mermaidReady) mermaidReady = loadScript('https://cdnjs.cloudflare.com/ajax/libs/mermaid/11.15.0/mermaid.min.js').then(()=>{ const dark = matchMedia('(prefers-color-scheme: dark)').matches && document.documentElement.dataset.theme !== 'light' || document.documentElement.dataset.theme === 'dark'; window.mermaid.initialize({startOnLoad: false, securityLevel: 'strict', theme: dark ? 'dark' : 'default'}); });
+    if(!mermaidReady) mermaidReady = loadScript('https://cdnjs.cloudflare.com/ajax/libs/mermaid/11.15.0/mermaid.min.js').then(()=>{ const dark = matchMedia('(prefers-color-scheme: dark)').matches && document.documentElement.dataset.theme !== 'light' || document.documentElement.dataset.theme === 'dark'; window.mermaid.initialize({startOnLoad: false, securityLevel: 'strict', suppressErrorRendering: true, theme: dark ? 'dark' : 'default'}); });
     await mermaidReady;
     for(const b of boxes){ b.dataset.drawn = '1'; const src = b.querySelector('code').textContent;
-      try{ const {svg} = await window.mermaid.render('dg' + Math.random().toString(36).slice(2), src); b.querySelector('.dgraph').innerHTML = svg; }
-      catch(e){ b.querySelector('.dgraph').textContent = 'This diagram could not be drawn — its source is below.'; b.querySelector('.dsrc').open = true; } }
+      // a label with ( ) < > : ; or quotes in it breaks mermaid ("A[Start (i = 0)]"): such labels are put in quotes and it is
+      // tried again; what still will not draw shows its source — and never mermaid's "Syntax error" bomb in the page
+      const tries = [src, fixMermaid(src)].filter((x, i, a)=>a.indexOf(x) === i); let drawn = false;
+      for(const t of tries){ const id = 'dg' + Math.random().toString(36).slice(2);
+        try{ if(window.mermaid.parse && !(await window.mermaid.parse(t, {suppressErrors: true}))) continue;
+          const {svg} = await window.mermaid.render(id, t); b.querySelector('.dgraph').innerHTML = svg; drawn = true; break; }
+        catch(e){} finally{ document.querySelectorAll('#' + id + ', #d' + id).forEach(n=>{ if(!b.contains(n)) n.remove(); }); } }
+      if(!drawn){ b.querySelector('.dgraph').textContent = 'This diagram could not be drawn — its source is below.'; b.querySelector('.dsrc').open = true; } }
   }catch(e){ boxes.forEach(b=>{ b.querySelector('.dgraph').textContent = 'Diagrams need the internet the first time — the source is below.'; }); }
 }
+// a mermaid label with characters it cannot take, put in quotes: A[Start (i = 0)] -> A["Start (i = 0)"], {x > 0?} -> {"x > 0?"}
+const fixMermaid = t => String(t).split('\n').map(line=>{
+  const CLOSE = {'[[': ']]', '[(': ')]', '((': '))', '{{': '}}', '[': ']', '(': ')', '{': '}'};
+  let out = '', i = 0;
+  while(i < line.length){
+    const m = /^([A-Za-z_][\w-]*)(\[\[|\[\(|\(\(|\{\{|\[|\(|\{)/.exec(line.slice(i));
+    if(m && (i === 0 || /[\s;>|&-]/.test(line[i - 1]))){
+      const open = m[2], close = CLOSE[open], oc = open[open.length - 1], cc = close[0];
+      let j = i + m[0].length, depth = 1;
+      for(; j < line.length; j++){ if(line[j] === oc) depth++; else if(line[j] === cc && --depth === 0) break; }
+      if(j < line.length && line.slice(j, j + close.length) === close){
+        const label = line.slice(i + m[0].length, j);
+        out += m[1] + open + (/^\s*".*"\s*$/.test(label) || !/[()\[\]{}<>:;#&|']/.test(label) ? label : '"' + label.replace(/"/g, "'") + '"') + close;
+        i = j + close.length; continue;
+      }
+    }
+    out += line[i]; i++;
+  }
+  return out;
+}).join('\n');
 const loadScript = src => new Promise((res, rej)=>{ const s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = rej; document.head.appendChild(s); });
 async function detect(){
   let d = null;
@@ -1426,6 +1462,7 @@ const SKILLS = [
   {c: '/mcp', i: '🔌', n: 'MCP servers', d: 'Tool servers plugged in (GitHub, Notion…): list, add, allow', now: true},
   {c: '/security', i: '🛡', n: 'Security scan', d: 'Skills, connectors, permissions and password checked', now: true},
   {c: '/ps', i: '⚙️', n: 'What is running', d: 'Answers, agents and background jobs, each with its step', now: true},
+  {c: '/stop', i: '■', n: 'Stop a task', d: 'Lists what is running; /stop 1 stops the newest, /stop all every one', now: true},
 ];
 let skillPick = null;
 const placeMenu = (menu, chip) => { const r = chip.getBoundingClientRect(); menu.style.left = Math.max(16, Math.min(r.left, innerWidth - menu.offsetWidth - 16)) + 'px'; menu.style.top = Math.max(8, r.top - menu.offsetHeight - 8) + 'px'; };
@@ -1446,8 +1483,12 @@ async function pollRunning(){
   if(!$('#runMenu').hidden) drawRunning();
 }
 function drawRunning(){
-  const top = runList.filter(x=>!x.parent || !runList.some(y=>y.id === x.parent)), item = (x, sub) => '<div class="ritem' + (sub ? ' sub' : '') + '"><b>' + (KIND_ICON[x.kind] || '⚙️') + ' ' + esc(x.title || x.kind) + '</b><small>' + esc((x.from ? x.from + ' · ' : '') + secs(Date.now() - x.started)) + (x.step ? ' — ' + esc(x.step) : '') + '</small></div>';
-  $('#runMenu').innerHTML = runList.length ? top.map(x=>item(x) + runList.filter(y=>y.parent === x.id).map(y=>item(y, true)).join('')).join('') : '<div class="ritem"><small>Nothing is running.</small></div>';
+  const top = runList.filter(x=>!x.parent || !runList.some(y=>y.id === x.parent)), item = (x, sub) => '<div class="ritem' + (sub ? ' sub' : '') + '">' + (x.stoppable ? '<button class="rstop" data-stop="' + esc(x.id) + '" title="Stop this' + (sub ? ' agent' : ' (its agents too)') + '">■ Stop</button>' : '') + '<b>' + (KIND_ICON[x.kind] || '⚙️') + ' ' + esc(x.title || x.kind) + '</b><small>' + esc((x.from ? x.from + ' · ' : '') + secs(Date.now() - x.started)) + (x.step ? ' — ' + esc(x.step) : '') + '</small></div>';
+  const many = top.filter(x=>x.stoppable).length > 1;
+  $('#runMenu').innerHTML = runList.length ? top.map(x=>item(x) + runList.filter(y=>y.parent === x.id).map(y=>item(y, true)).join('')).join('') + (many ? '<div class="ritem rall"><button class="rstop" data-stop="all">■ Stop all</button></div>' : '') : '<div class="ritem"><small>Nothing is running.</small></div>';
+  $('#runMenu').querySelectorAll('[data-stop]').forEach(b=>b.onclick = async e => { e.stopPropagation(); b.disabled = true; b.textContent = 'Stopping…';
+    const r = await post('/activity', {stop: b.dataset.stop}).catch(()=>null);
+    toast(r && r.stopped && r.stopped.length ? '■ Stopped' + (r.stopped.length > 1 ? ' ' + r.stopped.length + ' tasks' : '') : 'Could not stop it — it may have just finished'); setTimeout(pollRunning, 600); });
   placeMenu($('#runMenu'), $('#mRun'));
 }
 $('#mRun').onclick = e => { e.stopPropagation(); const m = $('#runMenu'); m.hidden = !m.hidden; if(!m.hidden){ $('#skillsMenu').hidden = true; drawRunning(); } };
@@ -1702,11 +1743,13 @@ if(SR && 'speechSynthesis' in window){
     rec.onend = async () => { rec = null; if(!on) return;
       if(!heard.trim()){ if(++quiet >= 2){ state('', 'Paused', 'Tap the orb to talk'); return; } return listen(); }
       quiet = 0; state('thinking', 'Thinking…', heard);
-      lastAnswer = null; await ask(heard, {voice: true});
+      // spoken as soon as the answer is here — not after the title, the checks and the follow-ups that come after it
+      // (up to a minute: voice mode spoke late, 24 Oct)
+      lastAnswer = null; await new Promise(res=>{ ask(heard, {voice: true, onAnswer: res}).then(res, res); });
       if(!on) return;
       state('speaking', 'Speaking…', 'Tap the orb to interrupt'); await sayAnswer(spokenText(lastAnswer)); listen(); };
     rec.start(); };
-  const start = () => { on = true; quiet = 0; if(mode === 'mac') unlock(); bar.hidden = false; $('#talk').classList.add('on'); $('#mVoice').classList.add('on'); listen(); };
+  const start = () => { on = true; quiet = 0; if(mode === 'mac'){ unlock(); post('/speak', {warm: true}).catch(()=>{}); } bar.hidden = false; $('#talk').classList.add('on'); $('#mVoice').classList.add('on'); listen(); };
   const stop = () => { on = false; try{ rec && rec.abort(); }catch(e){} rec = null; hush(); bar.hidden = true; $('#talk').classList.remove('on'); $('#mVoice').classList.remove('on'); };
   // 🔊 under any answer (and the answer to a question asked with the 🎤): read out with the same voice, outside voice mode
   window.unlockAudio = () => { if(mode === 'mac') unlock(); };
@@ -1748,7 +1791,10 @@ const COMMANDS = [
   {c: '/notebook', a: 'new · use · add · ask · podcast', d: 'Notebooks: sources you collect (pages, files, text); questions answered only from them, with [n]; a two-voice podcast of them'},
   {c: '/nb', a: 'question', d: 'Ask the open notebook'},
   {c: '/ps', a: '', d: 'What is running now: answers, each agent with its step, background jobs (also the ⚙ chip)'},
+  {c: '/cas', a: 'password YOURPAN | forget', d: 'The password of your mutual-fund CAS PDFs (usually your PAN) — kept on this Mac only; then attach the PDF'},
+  {c: '/stop', a: 'number | all', d: 'Stop an answer or an agent that is running (its agents stop with it); also ■ in the ⚙ chip'},
   {c: '/mode', a: 'loop | classic', d: 'One model with the whole chat and every tool (loop, the default), or the old way (classic)'},
+  {c: '/sequence', a: 'use model model …', d: 'Which models answer, in which order, for each use (or Setup → Configure sequence): /sequence · /sequence code ollamacloud nvidia · /sequence reset code'},
   {c: '/mcp', a: 'add name command | https url', d: 'MCP tool servers (GitHub, Notion, Calendar…): list · add · remove · allow name read|all'},
   {c: '/security', a: '', d: 'Check this AI\'s skills, connectors, file permissions and password for risks (nothing is changed)'},
   {c: '/schedule', a: '09:00 weekdays a question', d: 'A question asked for you each day at a time (list · remove n; alone: the Tasks panel)'},
@@ -1832,7 +1878,7 @@ async function showContext(){
   if(mode === 'mac'){
     try{ rules = ((await api.learned()).yours || []).length; }catch(e){}
     try{ pins = String(((await fetch(HELPER + '/memory').then(r=>r.json())).pins || []).length); }catch(e){}
-    try{ const P = await fetch(HELPER + '/projects').then(r=>r.json()), id = store.get('ai.project', '') || P.selected, x = (P.list || []).find(p=>p.id === id); if(x) project = x.name; }catch(e){}
+    try{ const P = await fetch(HELPER + '/projects').then(r=>r.json()), id = projectOf(), x = (P.list || []).find(p=>p.id === id); if(x) project = x.name; }catch(e){}
   }
   const rows = [['Turns sent with the next question', Math.floor(turns.length / 2) - (sum ? 1 : 0) + (sum ? ' + the /compact summary' : '') + ' · about ' + Math.ceil(chars / 3.2).toLocaleString('en-IN') + ' tokens (' + history.length + ' in the chat)'],
     ['Goal', goal || 'none (/goal)'], ['Your rules', rules + ' (/rule)'], ['Pinned', pins + ' — given when a question is about them'], ['Attached files', attachments.length ? attachments.map(a=>a.name).join(', ') : 'none'],
@@ -1858,14 +1904,21 @@ async function runCommand(line){
   else if(c === '/color'){ const v = colorOf(arg); if(v === null) return toast('A colour: blue, green, orange, red, pink, purple, teal, gray, a #hex — or reset'); store.set('ai.color', v); applyColor(v); toast(v ? 'Accent: ' + arg : 'Accent: as it was'); }
   else if(c === '/doctor' || c === '/status') openUsage(true);
   else if(c === '/notebook' || c === '/nb'){ if(mode !== 'mac') return toast('Notebooks are kept on your Mac — open this page there (or over Tailscale)'); ask(c + (arg ? ' ' + arg : '')); }
+  // /cas password …: kept on this Mac at once — never a chat message, never in the history the models read
+  else if(c === '/cas'){ if(mode !== 'mac') return toast('That is kept on your Mac — open this page there (or over Tailscale)'); const pw = /^password\s+(\S+)$/i.exec(arg);
+    if(pw){ const r = await post('/cas', {password: pw[1]}).catch(()=>null); toast(r && r.ok ? '🔐 CAS password kept on this Mac only — attach the CAS PDF and ask' : 'Could not keep it: ' + (r && r.error || 'the helper did not answer')); }
+    else if(/^(forget|clear|off)$/i.test(arg)){ await post('/cas', {forget: true}).catch(()=>null); toast('CAS password forgotten'); }
+    else ask('/cas'); }
+  else if(c === '/stop'){ if(mode !== 'mac') return toast('That stops work on your Mac — open this page there (or over Tailscale)'); ask('/stop' + (arg ? ' ' + arg : '')); }
   else if(c === '/ps'){ if(mode !== 'mac') return toast('That shows your Mac — open this page there (or over Tailscale)'); ask('/ps'); }
   else if(c === '/mode'){ if(mode !== 'mac') return toast('The mode is set on your Mac — open this page there (or over Tailscale)'); ask('/mode' + (arg ? ' ' + arg : '')); }
+  else if(c === '/sequence' || c === '/sequences'){ if(mode !== 'mac') return toast('Sequences are kept on your Mac — open this page there (or over Tailscale)'); ask('/sequence' + (arg ? ' ' + arg : '')); }
   else if(c === '/mcp'){ if(mode !== 'mac') return toast('MCP servers run on your Mac — open this page there (or over Tailscale)'); ask('/mcp' + (arg ? ' ' + arg : '')); }
   else if(c === '/security'){ if(mode !== 'mac') return toast('That checks your Mac — open this page there (or over Tailscale)'); ask('/security'); }
   else if(c === '/pins' || c === '/profile' || c === '/rules') openPanel(true);
   else if(c === '/projects') openProjects(true);
   else if(c === '/export'){ if(!history.length) return toast('Nothing to export yet'); $('#exportChat').click(); }
-  else if(c === '/verify'){ if(mode !== 'mac') return toast('Coding projects are on your Mac — open this page there (or over Tailscale)'); if(!store.get('ai.project', '')) return toast('Choose a coding project first (/project)'); ask('/verify'); }
+  else if(c === '/verify'){ if(mode !== 'mac') return toast('Coding projects are on your Mac — open this page there (or over Tailscale)'); if(!projectOf()) return toast('Choose a coding project first (/project)'); ask('/verify'); }
   else if(c === '/chats' || c === '/resume') openChats(true);
   // /loop and /schedule: kept and asked by the helper on the Mac (with the page closed too); the panel lists them
   else if(c === '/schedule' && !arg) openTasks(true);
@@ -1893,7 +1946,7 @@ async function runCommand(line){
   else if(c === '/memory' || c === '/tune' || c === '/config'){ if(mode !== 'mac') return toast('That is kept on your Mac — open this page there (or over Tailscale)');
     const j = await post(c === '/memory' ? '/memory' : c === '/tune' ? '/tune' : '/settings', c === '/memory' ? {memory: arg} : {cmd: arg}).catch(e=>({text: 'Could not reach your Mac: ' + e.message}));
     note(c + (arg ? ' ' + arg : ''), j.text || j.error || 'Done.', c === '/memory' ? 'Memory' : c === '/tune' ? 'Self-tune' : 'Settings'); }
-  else if(c === '/review' || c === '/init'){ if(mode !== 'mac') return toast('Coding projects are on your Mac — open this page there (or over Tailscale)'); if(!store.get('ai.project', '')) return toast('Choose a coding project first (/project)'); ask(c + (c === '/review' && arg ? ' ' + arg : '')); }
+  else if(c === '/review' || c === '/init'){ if(mode !== 'mac') return toast('Coding projects are on your Mac — open this page there (or over Tailscale)'); if(!projectOf()) return toast('Choose a coding project first (/project)'); ask(c + (c === '/review' && arg ? ' ' + arg : '')); }
   else if(c === '/data-usage' || c === '/usage') openUsage(true);
   else if(c === '/model') $('#stModel').click();
   else if(c === '/project' || c === '/projects') $('#openProjects').click();
@@ -1925,6 +1978,19 @@ const newId = () => new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14) 
 let sessionId = store.get('ai.session', '') || newId(); store.set('ai.session', sessionId);
 const localChats = () => store.get('ai.sessions', {});
 let chatOpenSeq = 0; // Ignore a slower earlier click after the user selected another chat.
+/* CODING CHATS: a chat is bound to its own project (chosen in ⌘ Projects); a chat without one never touches a project —
+   "extract the text of ~/Downloads/x.pdf" in a plain chat went to the coding loop of the project selected elsewhere (22 Oct).
+   Two coding chats can work on two projects. Kept here per chat, and with the chat on the Mac. */
+const chatProjects = () => store.get('ai.chatProjects', {});
+const projectOf = id => chatProjects()[id || sessionId] || '';
+function setChatProject(id, pid){ const m = chatProjects(); if(pid) m[id] = pid; else delete m[id]; store.set('ai.chatProjects', m); }
+// a project picked: the chat open now takes it when it is empty or already this project's; otherwise a new coding chat
+function bindProject(pid, list){
+  if(history.length && projectOf() !== (pid || '')) newChat(true);
+  setChatProject(sessionId, pid); showProject((list || []).find(p=>p.id === pid)); drawChats(); setTitle();
+  if(pid) post('/projects', {select: pid}).catch(()=>null);          // the terminal starts its next conversation with it
+  return pid;
+}
 async function saveChat(state){
   state = state || {};
   const blockedId = state.id || sessionId;
@@ -1933,7 +1999,7 @@ async function saveChat(state){
   const savedName = state.chatName == null ? chatName : state.chatName;
   const savedGoal = state.goal == null ? goal : state.goal;
   if(!savedHistory.length) return;
-  const x = {id: savedId, title: savedName || savedHistory[0].q, goal: savedGoal, source: 'page', turns: savedHistory};
+  const x = {id: savedId, title: savedName || savedHistory[0].q, goal: savedGoal, source: 'page', project: projectOf(savedId), turns: savedHistory};
   if(mode === 'mac'){ try{ await post('/session', x); return; }catch(e){} }
   const all = localChats(); all[savedId] = Object.assign({}, x, {updated: new Date().toISOString(), created: (all[savedId] || {}).created || new Date().toISOString(),
     turns: savedHistory.map((h, i, a)=>i < a.length - 8 ? Object.assign({}, h, {traces: []}) : h)});
@@ -1942,7 +2008,7 @@ async function saveChat(state){
 }
 async function listChats(){
   if(mode === 'mac'){ try{ return (await fetch(HELPER + '/sessions').then(r=>r.json())).list || []; }catch(e){} }
-  return Object.values(localChats()).map(c=>({id: c.id, title: c.title, source: 'page', updated: c.updated, turns: (c.turns || []).length})).sort((a, b)=>String(b.updated).localeCompare(String(a.updated)));
+  return Object.values(localChats()).map(c=>({id: c.id, title: c.title, source: 'page', updated: c.updated, turns: (c.turns || []).length, project: c.project})).sort((a, b)=>String(b.updated).localeCompare(String(a.updated)));
 }
 async function openChat(id){
   const openSeq = ++chatOpenSeq;
@@ -1954,6 +2020,7 @@ async function openChat(id){
   sessionId = x.id; store.set('ai.session', sessionId); chatName = x.title || ''; store.set('ai.chatName', chatName);
   history = (x.turns || []).filter(t=>t && t.answer && !t.answer.pending); store.set('moneyai.history', history);
   goal = x.goal || ''; store.set('ai.goal', goal); showGoal();
+  if(x.project) setChatProject(x.id, x.project); showChatProject();
   drawHistory();
   // a question still being answered (in another tab, or before a reload): shown for 10 minutes, not forever when it failed
   if(x.pending && x.pending.q && !activeRequests.has(x.id) && Date.now() - Date.parse(x.pending.at || 0) < 600000) turnEl(x.pending.q);
@@ -1984,7 +2051,7 @@ function drawChats(){
   for(const c of list){
     const g = dayGroup(c.updated);
     if(g !== last){ html += `<h6>${g}</h6>`; last = g; }
-    html += `<div class="chat${c.id === sessionId ? ' cur' : ''}" data-id="${esc(c.id)}" title="${esc(c.title || '')}${c.source === 'terminal' ? ' (from the terminal)' : ''}"><span class="ct">${esc(c.title || 'Untitled')}</span>${c.source === 'terminal' ? '<span class="csrc" title="From the terminal">⌘</span>' : c.source === 'task' ? '<span class="csrc" title="A scheduled task">⏰</span>' : ''}<button class="cpin${pinnedChatIds.has(c.id) ? ' on' : ''}" type="button" aria-label="Pin this chat as important" title="${pinnedChatIds.has(c.id) ? 'Pinned — every chat can use it (click to unpin)' : 'Pin this whole chat as important — every chat can use it'}" data-cpin="${esc(c.id)}">📌</button><button class="del" type="button" aria-label="Delete this chat" data-del="${esc(c.id)}">×</button></div>`;
+    html += `<div class="chat${c.id === sessionId ? ' cur' : ''}" data-id="${esc(c.id)}" title="${esc(c.title || '')}${c.source === 'terminal' ? ' (from the terminal)' : ''}"><span class="ct">${c.project || projectOf(c.id) ? '<span class="ccode" title="A coding chat — bound to its project">🧩</span> ' : ''}${esc(c.title || 'Untitled')}</span>${c.source === 'terminal' ? '<span class="csrc" title="From the terminal">⌘</span>' : c.source === 'task' ? '<span class="csrc" title="A scheduled task">⏰</span>' : ''}<button class="cpin${pinnedChatIds.has(c.id) ? ' on' : ''}" type="button" aria-label="Pin this chat as important" title="${pinnedChatIds.has(c.id) ? 'Pinned — every chat can use it (click to unpin)' : 'Pin this whole chat as important — every chat can use it'}" data-cpin="${esc(c.id)}">📌</button><button class="del" type="button" aria-label="Delete this chat" data-del="${esc(c.id)}">×</button></div>`;
   }
   box.innerHTML = html + (f ? '' : `<button class="link clearall" id="clearAll" type="button">Delete all chats</button>`);
   const ca = box.querySelector('#clearAll');
@@ -2030,7 +2097,7 @@ $('#chatSearch').oninput = () => { clearTimeout(searchT); searchT = setTimeout(s
 function newChat(quiet){
   chatOpenSeq++;
   sessionId = newId(); store.set('ai.session', sessionId); chatName = ''; store.set('ai.chatName', '');
-  history = []; store.set('moneyai.history', []); goal = ''; store.set('ai.goal', ''); showGoal();
+  history = []; store.set('moneyai.history', []); goal = ''; store.set('ai.goal', ''); showGoal(); showProject(null);
   $('#turns').innerHTML = ''; $('#hello').hidden = false; syncRequestUI(); openChats(false); setTitle();
   drawChats(); $('#q').focus();
   if(!quiet) toast('New chat — the last one is in the list');
@@ -2098,13 +2165,15 @@ async function loadUsage(){
   let u = null; try{ u = await fetch(HELPER + '/usage?days=' + $('#usageDays').value).then(r=>r.json()); }catch(e){}
   if(!u || !u.models || !u.models.length){ box.innerHTML = '<p class="sub">No model has answered in this period yet.</p>'; return; }
   const n = x => x >= 1e6 ? (x / 1e6).toFixed(1) + 'M' : x >= 1e3 ? (x / 1e3).toFixed(1) + 'k' : String(x);
-  const max = Math.max(...u.models.map(m=>m.calls));
+  // a bar is the model's share of all calls in the period — it was its calls against the busiest model's, so the busiest
+  // always looked full, as if its limit was used up ("the usage looks full", 24 Oct)
+  const total = u.models.reduce((a, m)=>a + m.calls, 0) || 1, pct = m => Math.round(m.calls / total * 100);
   // HEALTH first: what needs a look (a program asking in a loop, a model failing, an Apple bridge at its limit), then who asked
   const health = '<h3>Health</h3>' + ((u.warnings || []).length ? (u.warnings || []).map(w=>`<div class="urow" style="border-left:3px solid #d29922;padding-left:8px"><small>⚠ ${esc(w)}</small></div>`).join('')
       : '<div class="urow"><small>✓ Healthy — no loops, no model failing often, no Apple bridge at its limit</small></div>')
     + ((u.callers || []).length ? '<div class="urow"><small><b>Who asked:</b> ' + u.callers.map(c=>esc(c.from) + ': ' + (c.asks || 0) + ' question' + (c.asks === 1 ? '' : 's') + ' (' + (c.asksLastHour || 0) + ' in the last hour), ' + c.calls + ' model calls' + (c.failed ? ', ' + c.failed + ' failed' : '')).join(' · ') + '</small></div>' : '')
     + '<div class="urow"><small><b>Shortcuts runs in the last 24 hours:</b> ' + (u.shortcutsToday || 0) + '</small></div>';
-  box.innerHTML = health + '<h3>Models</h3>' + u.models.map(m=>`<div class="urow"><div class="uhead"><b>${esc(m.model)}</b><small>${esc(m.by)}</small></div><div class="ubar"><i style="width:${Math.max(3, m.calls / max * 100)}%"></i></div><small>${m.calls} call${m.calls === 1 ? '' : 's'} · ${m.today} today · ${m.images ? m.images + ' picture' + (m.images === 1 ? '' : 's') : n(m.in) + ' in / ' + n(m.out) + ' out tokens'}${m.ms ? ' · ' + (m.ms / m.calls / 1000).toFixed(1) + 's a call' : ''}<br>${esc(Object.entries(m.roles).map(([r, c])=>r + ' ' + c).join(' · '))}</small></div>`).join('')
+  box.innerHTML = health + '<h3>Models</h3><p class="sub">Bars: each model\'s share of the ' + total + ' calls in this period — not a limit.</p>' + u.models.map(m=>`<div class="urow"><div class="uhead"><b>${esc(m.model)}</b><small>${esc(m.by)}</small></div><div class="ubar"><i style="width:${Math.max(2, pct(m))}%"></i></div><small>${m.calls} call${m.calls === 1 ? '' : 's'} (${pct(m)}%) · ${m.today} today · ${m.images ? m.images + ' picture' + (m.images === 1 ? '' : 's') : n(m.in) + ' in / ' + n(m.out) + ' out tokens'}${m.ms ? ' · ' + (m.ms / m.calls / 1000).toFixed(1) + 's a call' : ''}<br>${esc(Object.entries(m.roles).map(([r, c])=>r + ' ' + c).join(' · '))}</small></div>`).join('')
     + '<h3>Who wrote the answers</h3>' + u.writers.map(w=>`<div class="urow"><div class="uhead"><b>${esc(w.writer)}</b><small>${w.answers} answer${w.answers === 1 ? '' : 's'} · ${Math.round(w.secs / w.answers)}s on average</small></div><small>${esc(Object.entries(w.kinds).map(([k, c])=>k + ' ' + c).join(' · '))}</small></div>`).join('');
 }
 const openUsage = on => { $('#usagePanel').classList.toggle('open', on); $('#scrim').classList.toggle('open', on); if(on){ openChats(false); loadUsage(); } };
@@ -2130,18 +2199,23 @@ $('#closeTasks').onclick = () => openTasks(false);
 
 // the selected project, named on the Projects button (it is kept on the Mac: the terminal and the phone share it)
 function showProject(p){ const b = $('#openProjects'); if(b) b.innerHTML = '<i>⌘</i>' + (p ? 'Project: ' + esc(p.name.length > 22 ? p.name.slice(0, 21) + '…' : p.name) : 'Projects'); }
-async function syncProject(){ if(mode !== 'mac') return; try{ const j = await fetch(HELPER + '/projects').then(r=>r.json()); store.set('ai.project', j.selected || ''); showProject((j.list || []).find(p=>p.id === j.selected)); }catch(e){} }
+async function syncProject(){ showChatProject(); }
+var projectList = [];          // (var: syncProject runs at start-up, before this line)
+async function showChatProject(){ if(mode !== 'mac'){ showProject(null); return; } const pid = projectOf(); if(!pid){ showProject(null); return; }
+  try{ if(!projectList.some(p=>p.id === pid)) projectList = (await fetch(HELPER + '/projects').then(r=>r.json())).list || []; }catch(e){}
+  showProject(projectList.find(p=>p.id === pid) || {name: 'a project no longer on this Mac'}); }
 async function loadProjects(){
   const box = $('#projects');
   if(mode !== 'mac'){ box.innerHTML = '<p class="sub">Coding projects run on your Mac. Open this page through your Mac or Tailscale.</p>'; return; }
-  let list = [], active = ''; try{ const j = await fetch(HELPER + '/projects').then(r=>r.json()); list = j.list || []; active = j.selected || ''; }catch(e){ active = store.get('ai.project', ''); }
-  store.set('ai.project', active); showProject(list.find(p=>p.id === active));
-  box.innerHTML = (list.length ? `<label class="trow2"><input type="radio" name="project" data-use="" ${active ? '' : 'checked'}><span class="tt"><b>No project</b><small>Questions are answered as usual</small></span></label>` + list.map(p=>`<label class="trow2"><input type="radio" name="project" data-use="${esc(p.id)}" ${p.id === active ? 'checked' : ''}><span class="tt"><b>${esc(p.name)}</b><small>${esc(p.path)}${p.test ? ' · test: ' + esc(p.test) : ' · no test command detected'}</small><span class="popts"><label title="Let the AI run npm install for this project when packages are missing"><input type="checkbox" data-popt="allowInstall" data-pid="${esc(p.id)}" ${p.allowInstall ? 'checked' : ''}> Allow installs</label> <label title="Its code never leaves this Mac: the model here answers (slower)"><input type="checkbox" data-popt="private" data-pid="${esc(p.id)}" ${p.private ? 'checked' : ''}> Private</label></span></span><button class="ghost" type="button" data-project-del="${esc(p.id)}">Remove</button></label>`).join('') : '<p class="sub">No project selected. Upload a ZIP or import an existing folder.</p>') +
+  let list = [], active = projectOf(); try{ const j = await fetch(HELPER + '/projects').then(r=>r.json()); list = j.list || []; projectList = list; }catch(e){}
+  showProject(list.find(p=>p.id === active));
+  box.innerHTML = (list.length ? `<label class="trow2"><input type="radio" name="project" data-use="" ${active ? '' : 'checked'}><span class="tt"><b>No project</b><small>A normal chat: never touches a project</small></span></label>` + list.map(p=>`<label class="trow2"><input type="radio" name="project" data-use="${esc(p.id)}" ${p.id === active ? 'checked' : ''}><span class="tt"><b>${esc(p.name)}</b><small>${esc(p.path)}${p.test ? ' · test: ' + esc(p.test) : ' · no test command detected'}</small><span class="popts"><label title="Let the AI run npm install for this project when packages are missing"><input type="checkbox" data-popt="allowInstall" data-pid="${esc(p.id)}" ${p.allowInstall ? 'checked' : ''}> Allow installs</label> <label title="Its code never leaves this Mac: the model here answers (slower)"><input type="checkbox" data-popt="private" data-pid="${esc(p.id)}" ${p.private ? 'checked' : ''}> Private</label></span></span><button class="ghost" type="button" data-project-del="${esc(p.id)}">Remove</button></label>`).join('') : '<p class="sub">No project selected. Upload a ZIP or import an existing folder.</p>') +
     `<h3>Start a new project</h3><p class="sub">An empty folder in ~/Developer for a new app — then ask for it: “create a todo app in node with tests”.</p><form class="cform" id="newProjectForm"><input id="newProjectName" placeholder="Name, e.g. todo-app" maxlength="60" required><button class="btn">Create</button></form><h3>Upload a project</h3><p class="sub">ZIP files are extracted on this Mac. The AI then reads the extracted project through its project tools — the ZIP itself is not sent blindly to the model.</p><input id="projectZip" type="file" accept=".zip,application/zip" hidden><button class="btn" type="button" id="uploadProject">Upload ZIP</button><span id="projectUploadStatus" class="sub" style="margin-left:8px"></span><h3>Import an existing project</h3><button class="btn" type="button" id="findProjects">Find local projects</button><div id="projectImports"></div><h3>Add manually</h3><form class="cform" id="projectForm"><input id="projectName" placeholder="Name, e.g. My website" maxlength="60" required><input id="projectPath" placeholder="Local folder, e.g. /Users/anilgupta/AI" required><input id="projectTest" placeholder="Test command, e.g. npm test" maxlength="300"><button class="btn">Add project</button></form>`;
   box.querySelectorAll('[data-popt]').forEach(c=>{ c.onclick = e => e.stopPropagation(); c.onchange = async () => { const r = await post('/projects', {id: c.dataset.pid, option: c.dataset.popt, value: c.checked}).catch(()=>null); toast(r && r.project ? (c.dataset.popt === 'private' ? (c.checked ? 'Private: its code stays on this Mac' : 'Not private: Auto may use ChatGPT for it') : (c.checked ? 'Installs allowed for this project' : 'Installs not allowed')) : 'Could not save that'); }; });
-  box.querySelectorAll('[data-use]').forEach(i=>i.onchange = async () => { await post('/projects', {select: i.dataset.use || null}).catch(()=>null); store.set('ai.project', i.dataset.use); showProject(list.find(p=>p.id === i.dataset.use)); toast(i.dataset.use ? 'Project selected — the terminal uses it too' : 'No project selected'); });
-  box.querySelectorAll('[data-project-del]').forEach(b=>b.onclick = async () => { await post('/projects', {id: b.dataset.projectDel, delete: true}); if(store.get('ai.project', '') === b.dataset.projectDel){ store.set('ai.project', ''); showProject(null); } loadProjects(); });
-  $('#newProjectForm').onsubmit = async e => { e.preventDefault(); const r = await post('/projects', {create: $('#newProjectName').value}).catch(()=>null); if(r && r.project){ store.set('ai.project', r.project.id); toast('New project ' + r.project.name + ' — selected; now ask for the app'); loadProjects(); } else toast((r && r.error) || 'Could not create it'); };
+  box.querySelectorAll('[data-use]').forEach(i=>i.onchange = () => { const was = history.length; bindProject(i.dataset.use || '', list); const p = list.find(x=>x.id === i.dataset.use);
+    toast(p ? (was && !history.length ? '🧩 New coding chat for ' + p.name : '🧩 This chat works on ' + p.name) + ' — other chats are not affected' : was && !history.length ? 'New chat, with no project' : 'This chat has no project'); });
+  box.querySelectorAll('[data-project-del]').forEach(b=>b.onclick = async () => { await post('/projects', {id: b.dataset.projectDel, delete: true}); if(projectOf() === b.dataset.projectDel){ setChatProject(sessionId, ''); showProject(null); } loadProjects(); });
+  $('#newProjectForm').onsubmit = async e => { e.preventDefault(); const r = await post('/projects', {create: $('#newProjectName').value}).catch(()=>null); if(r && r.project){ bindProject(r.project.id, [r.project]); toast('New project ' + r.project.name + ' — selected; now ask for the app'); loadProjects(); } else toast((r && r.error) || 'Could not create it'); };
   $('#uploadProject').onclick = () => $('#projectZip').click();
   $('#projectZip').onchange = async () => {
     const f = $('#projectZip').files && $('#projectZip').files[0]; if(!f) return;
@@ -2150,7 +2224,7 @@ async function loadProjects(){
       if(f.size > 90 * 1024 * 1024) throw new Error('The ZIP is ' + Math.round(f.size / 1048576) + ' MB — at most 90 MB (leave out node_modules, build folders and videos)');
       const r = await fetch(HELPER + '/projects/upload?name=' + encodeURIComponent(f.name), {method:'POST', headers:{'content-type':'application/zip'}, body:f});
       const j = await r.json(); if(!r.ok || !j.project) throw new Error(j.error || 'Upload failed');
-      store.set('ai.project', j.project.id); status.textContent = 'Uploaded and selected'; toast('Project uploaded, extracted, and selected'); loadProjects();
+      bindProject(j.project.id, [j.project]); status.textContent = 'Uploaded and selected'; toast('Project uploaded, extracted, and selected'); loadProjects();
     }catch(e){ status.textContent = 'Upload failed'; toast(/failed to fetch|load failed|network/i.test(String(e.message)) ? 'Upload failed: the Mac\'s helper could not be reached — is it running? (and the ZIP at most 90 MB)' : String(e.message || e)); }
     $('#projectZip').value = '';
   };
@@ -2160,10 +2234,29 @@ async function loadProjects(){
     target.innerHTML = found.length ? found.map((p,i)=>`<div class="trow2"><span class="tt"><b>${esc(p.name)}</b><small>${esc(p.path)}${p.test ? ' · suggested: ' + esc(p.test) : ' · add a test command'}</small></span>${p.imported ? '<small>Imported</small>' : `<button class="ghost" type="button" data-import="${i}">Import</button>`}</div>`).join('') : '<p class="sub">No projects found in common development folders. You can still add one manually.</p>';
     target.querySelectorAll('[data-import]').forEach(b=>b.onclick = () => { const p = found[Number(b.dataset.import)]; $('#projectName').value = p.name; $('#projectPath').value = p.path; $('#projectTest').value = p.test; $('#projectTest').focus(); toast(p.test ? 'Review the suggested test command, then add the project.' : 'Enter the project test command, then add it.'); });
   };
-  $('#projectForm').onsubmit = async e => { e.preventDefault(); const r = await post('/projects', {name: $('#projectName').value, path: $('#projectPath').value, test: $('#projectTest').value}).catch(()=>null); if(r && r.project){ store.set('ai.project', r.project.id); toast('Project added and selected'); loadProjects(); } else toast('Could not add this project — check its folder and test command.'); };
+  $('#projectForm').onsubmit = async e => { e.preventDefault(); const r = await post('/projects', {name: $('#projectName').value, path: $('#projectPath').value, test: $('#projectTest').value}).catch(()=>null); if(r && r.project){ bindProject(r.project.id, [r.project]); toast('Project added — this chat works on it'); loadProjects(); } else toast('Could not add this project — check its folder and test command.'); };
 }
 /* YOUR AI KEYS: each service with its light; paste a new key, test it, or remove it — all on this Mac */
 const LIGHT = {green: '🟢', yellow: '🟡', red: '🔴'};
+/* CONFIGURE SEQUENCE (beside the keys): for each use, its models in order — ↑ ↓ to move one, × to take it off, Add for the
+   others, Reset for the default. The helper keeps it (~/.money-ai/sequences.json); every answer reads it. */
+async function loadSequences(box){
+  let q = null; try{ q = await fetch(HELPER + '/sequences').then(r=>r.json()); }catch(e){} if(!q || !q.uses) return;
+  const nm = id => (q.names || {})[id] || id, have = new Set((q.have || []).concat(['chatgpt', 'pcc', 'apple', 'local']));
+  const chip = (u, id, i) => `<span class="seqchip${have.has(id) ? '' : ' off'}" title="${have.has(id) ? '' : 'No key for it on this Mac — skipped'}"><b>${i + 1}</b>${esc(nm(id))}`
+    + `<button type="button" data-seq-up="${i}" aria-label="Move ${esc(nm(id))} up" ${i ? '' : 'disabled'}>↑</button><button type="button" data-seq-down="${i}" aria-label="Move ${esc(nm(id))} down" ${i < u.order.length - 1 ? '' : 'disabled'}>↓</button>`
+    + `<button type="button" data-seq-rm="${i}" aria-label="Take ${esc(nm(id))} off" ${u.order.length > 1 ? '' : 'disabled'}>×</button></span>`;
+  box.insertAdjacentHTML('beforeend', `<div class="kgroup" id="seqHead">Configure sequence for models</div><p class="sub">Which models answer, in which order, for each use — the next one when a model fails or is out of its free limit. Kept on this Mac; Reset brings back the default.</p>`
+    + q.uses.map(u=>`<div class="krow seqrow" data-seq="${esc(u.id)}"><div class="khead"><b>${esc(u.name)}</b>${u.changed ? '<small>yours</small>' : ''}</div><small>${esc(u.about)}</small><div class="seqchips">${u.order.map((id, i)=>chip(u, id, i)).join('')}</div>`
+      + `<div class="kedit"><select data-seq-add aria-label="Add a model to ${esc(u.name)}"><option value="">Add a model…</option>${u.options.filter(x=>!u.order.includes(x)).map(x=>`<option value="${esc(x)}">${esc(nm(x))}</option>`).join('')}</select>${u.changed ? '<button class="ghost" type="button" data-seq-reset>Reset</button>' : ''}</div></div>`).join(''));
+  const save = async (id, order) => { try{ const j = await post('/sequences', {id, order}); toast(j.error ? j.error : 'Saved — ' + order.map(nm).join(' → ')); }catch(e){ toast('Not saved: ' + e.message); } loadKeys(); };
+  box.querySelectorAll('[data-seq]').forEach(r=>{ const u = q.uses.find(x=>x.id === r.dataset.seq); if(!u) return; const o = u.order.slice();
+    r.querySelectorAll('[data-seq-up]').forEach(b=>b.onclick = () => { const i = +b.dataset.seqUp; [o[i - 1], o[i]] = [o[i], o[i - 1]]; save(u.id, o); });
+    r.querySelectorAll('[data-seq-down]').forEach(b=>b.onclick = () => { const i = +b.dataset.seqDown; [o[i + 1], o[i]] = [o[i], o[i + 1]]; save(u.id, o); });
+    r.querySelectorAll('[data-seq-rm]').forEach(b=>b.onclick = () => { o.splice(+b.dataset.seqRm, 1); save(u.id, o); });
+    const add = r.querySelector('[data-seq-add]'); if(add) add.onchange = () => { if(add.value) save(u.id, o.concat(add.value)); };
+    const rs = r.querySelector('[data-seq-reset]'); if(rs) rs.onclick = async () => { try{ await post('/sequences', {reset: u.id}); toast('Back to the default'); }catch(e){} loadKeys(); }; });
+}
 async function loadKeys(){
   const box = $('#keysList');
   let st = null; try{ st = await fetch(HELPER + '/keys/status').then(r=>r.json()); }catch(e){}
@@ -2184,6 +2277,7 @@ async function loadKeys(){
     }catch(e){ toast('That did not work: ' + e.message); }
     loadKeys();
   });
+  loadSequences(box);
 }
 const openKeys = on => { $('#keysPanel').classList.toggle('open', on); $('#scrim').classList.toggle('open', on); if(on){ menuOpen(false); loadKeys(); } };
 $('#openKeys').onclick = () => openKeys(true);
