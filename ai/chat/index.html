@@ -78,6 +78,11 @@ body{padding-left:var(--sb)}
 .sbx,.menuBtn{display:none}
 .newchat{display:flex; align-items:center; gap:8px; border:1px solid var(--line); background:var(--card); color:var(--ink); border-radius:12px; padding:10px 12px; font-weight:600; font-size:14.5px; cursor:pointer; box-shadow:var(--shadow)}
 .newchat:hover{border-color:var(--think)}
+.modeswitch{display:flex; gap:3px; background:var(--page); border:1px solid var(--line); border-radius:12px; padding:3px; align-self:flex-start}
+.modeswitch button{display:flex; align-items:center; gap:6px; border:0; background:transparent; color:var(--mut); padding:6px 12px; border-radius:9px; cursor:pointer; font:600 13px/1 inherit; min-height:34px}
+.modeswitch button[aria-selected="true"]{background:var(--card); color:var(--ink); box-shadow:0 1px 3px rgba(0,0,0,.12)}
+.codepick{display:flex; flex-direction:column; gap:4px; font-size:12px; color:var(--mut)} .codepick select{border:1px solid var(--line); background:var(--card); color:var(--ink); border-radius:10px; padding:8px 10px; font-size:13.5px}
+body:not(.codeMode) .codeOnly, body.codeMode .chatOnly{display:none !important}
 .sbsearch{border:1px solid var(--line); background:var(--page); border-radius:10px; padding:8px 11px; font-size:13.5px; color:var(--ink)}
 .chatlist{flex:1; overflow-y:auto; margin:4px -4px 0; padding:0 4px}
 .chatlist h6{font-size:11.5px; font-weight:700; color:var(--mut); margin:14px 8px 4px; letter-spacing:.01em}
@@ -524,12 +529,17 @@ button, a, summary, label{touch-action:manipulation}
 <body>
 <aside class="sidebar" id="sidebar" aria-label="Chats and settings">
   <div class="sbtop"><div class="brand"><div class="orb" id="orb"></div>Cygnus AI</div><button class="iconbtn sbx" id="sbClose" type="button" aria-label="Close the menu">×</button></div>
+  <div class="modeswitch" role="tablist" aria-label="Chat or code">
+    <button id="modeChat" type="button" role="tab" aria-selected="true" title="Chat — questions, research, your apps; never a coding project"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 17H6a3 3 0 0 1-3-3V7a3 3 0 0 1 3-3h9a3 3 0 0 1 3 3v1"/><path d="M11 11h7a3 3 0 0 1 3 3v3a3 3 0 0 1-3 3h-1l-2 2v-2h-4a3 3 0 0 1-3-3v-3a3 3 0 0 1 3-3z"/></svg><span>Chat</span></button>
+    <button id="modeCode" type="button" role="tab" aria-selected="false" title="Code — chats bound to a coding project (SoGPT)"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m8 7-5 5 5 5"/><path d="m16 7 5 5-5 5"/></svg><span>Code</span></button>
+  </div>
+  <label class="codeOnly codepick"><span>Project</span><select id="codeProject" aria-label="The project for a new coding chat"></select></label>
   <button class="newchat" id="newChat" type="button"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>New chat</button>
   <input class="sbsearch" id="chatSearch" type="search" placeholder="Search chats" aria-label="Search chats">
   <nav class="chatlist" id="chats" aria-label="Your chats"></nav>
   <div class="sbnav">
     <button class="navbtn" id="openTasks" type="button"><i>⏰</i>Tasks</button>
-    <button class="navbtn" id="openProjects" type="button"><i>⌘</i>Projects</button>
+    <button class="navbtn codeOnly" id="openProjects" type="button"><i>⌘</i>Projects</button>
     <button class="navbtn" id="openConn" type="button"><i>🔌</i>Connectors</button>
     <button class="navbtn" id="openSkills" type="button" hidden><i>🧰</i>Skills</button>
     <button class="navbtn" id="openUsage" type="button"><i>📊</i>Usage</button>
@@ -629,12 +639,12 @@ button, a, summary, label{touch-action:manipulation}
     <button type="button" class="mchip model" id="mModel" title="Which model answers (Auto picks the best for each question)">✦ <span id="mModelName">Auto</span> ▾</button>
     <button type="button" class="mchip" data-m="council" title="Two models write it, an editor merges them">💭 Think</button>
     <button type="button" class="mchip" data-m="deep" title="Deeper research; ChatGPT and Private Cloud write it, merged">🧠 Deep</button>
-    <button type="button" class="mchip" data-m="research" title="More searches and pages read, with sources">🔎 Research</button>
-    <button type="button" class="mchip" data-m="notebook" id="mNotebook" title="Answer from your open notebook — its sources only, with [n]. A message that is only a link adds it to the notebook">📒 <span id="mNotebookName">Notebook</span></button>
+    <button type="button" class="chatOnly mchip" data-m="research" title="More searches and pages read, with sources">🔎 Research</button>
+    <button type="button" class="chatOnly mchip" data-m="notebook" id="mNotebook" title="Answer from your open notebook — its sources only, with [n]. A message that is only a link adds it to the notebook">📒 <span id="mNotebookName">Notebook</span></button>
     <button type="button" class="mchip" id="mSkills" aria-haspopup="menu" title="Skills you use with a / command — pick one instead of remembering it">🧰 <span id="mSkillsName">Skills</span> ▾</button>
     <button type="button" class="mchip" data-m="agents" title="Several agents work on parts of the task at the same time, then their findings are merged">🤖 Agents</button>
-    <button type="button" class="mchip" data-m="image" title="A picture from your words">🎨 Image</button>
-    <button type="button" class="mchip" data-m="video" title="A short video, made on your Mac">🎞 Video</button>
+    <button type="button" class="chatOnly mchip" data-m="image" title="A picture from your words">🎨 Image</button>
+    <button type="button" class="chatOnly mchip" data-m="video" title="A short video, made on your Mac">🎞 Video</button>
     <button type="button" class="mchip run" id="mRun" hidden title="What is running now — answers, each agent and its step, background jobs">⚙ <span id="mRunN">0</span> running</button>
     <button type="button" class="mchip voice" id="mVoice" title="Voice mode — talk, and hear the answer" hidden>〰 Voice</button>
   </div>
@@ -1059,6 +1069,7 @@ async function ask(q, opt){
   // A request belongs to the chat that started it.  Do not use the selected chat's
   // global state after an await: the user may have switched to another chat meanwhile.
   // /cas password …: kept on this Mac straight away — never a chat message (its history goes to the models with the next question)
+  if(uiMode === 'code' && !/^\//.test(q) && !projectOf(sessionId)){ toast('Pick the project for this coding chat (above New coding chat), or add one in ⌘ Projects'); return; }
   const casPw = /^\/cas\s+password\s+(\S+)$/i.exec(q);
   if(casPw){ const r = await post('/cas', {password: casPw[1]}).catch(()=>null); toast(r && r.ok ? '🔐 CAS password kept on this Mac only — attach the CAS PDF and ask' : 'Could not keep it: ' + (r && r.error || 'the helper did not answer')); return; }
   const requestSessionId = sessionId;
@@ -1100,7 +1111,7 @@ async function ask(q, opt){
     const vids = out.videos || [];
     if(imgs.length) Promise.all(imgs.map(im=>preview(im.b64))).then(p=>{ const h = requestHistory.find(x=>x.answer && x.answer.text === out.text); if(h){ h.answer.images = p.map((t, i)=>t ? {thumb: t, label: imgs[i].label, file: imgs[i].file, mime: imgs[i].mime} : null).filter(Boolean); saveChat({id: requestSessionId, history: requestHistory, goal: requestGoal, chatName: requestChatName}); } });
     requestHistory.push({q, answer: {kind: out.kind, videos: vids.length ? vids.map(v=>({note: 'The video is saved on your Mac: ' + String(v.file || '').replace(/^\/Users\/[^/]+/, '~')})) : undefined, images: imgs.length ? imgs.map(im=>({file: im.file, label: im.label, mime: im.mime})).filter(im=>im.file) : undefined, text: out.text, understood: out.understood, sources: out.sources, read: out.read, by: out.by, secs: out.secs, model: out.model, chart: out.chart, trust: out.trust ? {confidence: out.trust.confidence, checked: out.trust.checked, ok: out.trust.ok} : undefined, saved: out.saved,
-      skillsUsed: out.skillsUsed, changes: out.changes}, steps,          // the skills it used, kept with the chat (gone when it was opened again) traces: slim(traces)});
+      skillsUsed: out.skillsUsed, changes: out.changes}, steps, traces: slim(traces)});          // skillsUsed: the skills it used, kept with the chat (gone when it was opened again)
     const kept = requestHistory.slice(-60).map((h, i, all)=>i < all.length - 8 ? Object.assign({}, h, {traces: (h.traces || []).map(t=>({kind: t.kind, title: t.title}))}) : h);
     requestHistory.splice(0, requestHistory.length, ...kept);
     if(sessionId === requestSessionId){
@@ -1417,7 +1428,7 @@ async function detect(){
   }
   loadLearned();
   loadSavedEdit();
-  syncProject();
+  syncProject(); loadCodeProjects();
 }
 const grow = () => { const t = $('#q'); t.style.height = 'auto'; t.style.height = Math.min(180, t.scrollHeight) + 'px'; };
 const hour = new Date().getHours();
@@ -1992,9 +2003,49 @@ function setChatProject(id, pid){ const m = chatProjects(); if(pid) m[id] = pid;
 // a project picked: the chat open now takes it when it is empty or already this project's; otherwise a new coding chat
 function bindProject(pid, list){
   if(history.length && projectOf() !== (pid || '')) newChat(true);
-  setChatProject(sessionId, pid); showProject((list || []).find(p=>p.id === pid)); drawChats(); setTitle();
+  setChatProject(sessionId, pid); showProject((list || []).find(p=>p.id === pid));
+  // a project makes it a coding chat (the Code side); no project, a chat (the Chat side)
+  if((pid ? 'code' : 'chat') !== uiMode){ uiMode = pid ? 'code' : 'chat'; try{ store.set('ai.uiMode', uiMode); }catch(e){} paintMode(); }
+  if(pid && $('#codeProject').value !== pid){ $('#codeProject').value = pid; try{ store.set('ai.codeProject', pid); }catch(e){} }
+  drawChats(); setTitle();
   if(pid) post('/projects', {select: pid}).catch(()=>null);          // the terminal starts its next conversation with it
   return pid;
+}
+/* CHAT AND CODE, TWO SCREENS (like Claude's 💬 / </>): the Chat side lists only chats, the Code side only coding chats —
+   each bound to its project, picked above "New coding chat". A chat opened from either side takes the page to its own. */
+let uiMode = (()=>{ try{ return store.get('ai.uiMode', 'chat') === 'code' ? 'code' : 'chat'; }catch(e){ return 'chat'; } })();
+const isCodeChat = c => !!(c && (c.project || projectOf(c.id)));
+const LEAD_CHAT = 'Ask about anything. It searches the web, reads the pages, works out sums and dates exactly, and checks its own answer before you see it.';
+function paintMode(){
+  const code = uiMode === 'code';
+  document.body.classList.toggle('codeMode', code);
+  $('#modeChat').setAttribute('aria-selected', String(!code)); $('#modeCode').setAttribute('aria-selected', String(code));
+  $('#newChat').lastChild.textContent = code ? 'New coding chat' : 'New chat';
+  $('#q').placeholder = code ? 'Ask about the project: read it, change it, run its tests…  ( / for commands)' : 'Ask anything…  ( / for commands)';
+  const sp = $('#greet').querySelector('span'); if(sp) sp.textContent = code ? 'What shall we build or fix?' : 'What are you curious about?';
+  $('#hello .lead').textContent = code ? 'A coding chat works on one project on this Mac: SoGPT reads it, edits it, runs its tests and keeps only what passes. Pick the project above New coding chat.' : LEAD_CHAT;
+  const tr = $('#hello .tries'); if(tr) tr.hidden = code;
+}
+const codePick = () => $('#codeProject').value || '';
+async function loadCodeProjects(){
+  const sel = $('#codeProject'); if(mode !== 'mac'){ sel.innerHTML = '<option value="">Coding projects are on your Mac</option>'; return; }
+  let list = []; try{ list = (await fetch(HELPER + '/projects').then(r=>r.json())).list || []; projectList = list; }catch(e){}
+  const want = projectOf() || (()=>{ try{ return store.get('ai.codeProject', ''); }catch(e){ return ''; } })();
+  sel.innerHTML = list.length ? list.map(p=>`<option value="${esc(p.id)}">${esc(p.name)}</option>`).join('') : '<option value="">No project yet — add one in ⌘ Projects</option>';
+  if(list.some(p=>p.id === want)) sel.value = want;
+  // an empty coding chat takes the project shown
+  if(uiMode === 'code' && !history.length && codePick() && !projectOf()){ setChatProject(sessionId, codePick()); showChatProject(); }
+}
+function setSide(m){
+  m = m === 'code' ? 'code' : 'chat'; if(m === uiMode) return;
+  // back to where you were on that side (like Claude's 💬 / </>): its last chat, else a fresh one
+  if(history.length) try{ const last = store.get('ai.lastChat', {}); last[uiMode] = sessionId; store.set('ai.lastChat', last); }catch(e){}      // an empty chat is not "where you were"
+  uiMode = m; try{ store.set('ai.uiMode', m); }catch(e){} paintMode();
+  let back = ''; try{ back = (store.get('ai.lastChat', {}) || {})[m] || ''; }catch(e){}
+  if(back && back !== sessionId && chatCache.some(c=>c.id === back && isCodeChat(c) === (m === 'code'))) openChat(back);
+  else if(history.length || isCodeChat({id: sessionId}) !== (m === 'code')) newChat(true);
+  else drawChats();
+  loadCodeProjects();
 }
 async function saveChat(state){
   state = state || {};
@@ -2026,6 +2077,8 @@ async function openChat(id){
   history = (x.turns || []).filter(t=>t && t.answer && !t.answer.pending); store.set('moneyai.history', history);
   goal = x.goal || ''; store.set('ai.goal', goal); showGoal();
   if(x.project) setChatProject(x.id, x.project); showChatProject();
+  if((isCodeChat(x) ? 'code' : 'chat') !== uiMode){ uiMode = isCodeChat(x) ? 'code' : 'chat'; try{ store.set('ai.uiMode', uiMode); }catch(e){} paintMode(); }
+  if(x.project && $('#codeProject').querySelector('option[value="' + CSS.escape(x.project) + '"]')) $('#codeProject').value = x.project;
   drawHistory();
   // a question still being answered (in another tab, or before a reload): shown for 10 minutes, not forever when it failed
   if(x.pending && x.pending.q && !activeRequests.has(x.id) && Date.now() - Date.parse(x.pending.at || 0) < 600000) turnEl(x.pending.q);
@@ -2050,7 +2103,7 @@ const dayGroup = iso => { const d = new Date(iso), now = new Date(), start = new
   return diff <= 0 ? 'Today' : diff === 1 ? 'Yesterday' : diff < 7 ? 'Previous 7 days' : diff < 30 ? 'Previous 30 days' : 'Older'; };
 function drawChats(){
   const f = ($('#chatSearch').value || '').trim().toLowerCase(), box = $('#chats');
-  const list = chatCache.filter(c=>!f || String(c.title || '').toLowerCase().includes(f));
+  const list = chatCache.filter(c=>(!f || String(c.title || '').toLowerCase().includes(f)) && isCodeChat(c) === (uiMode === 'code'));
   if(!list.length){ box.innerHTML = `<p class="sub" style="padding:8px">${f ? 'No chat matches.' : 'Your chats will be listed here.'}</p>`; return; }
   let last = '', html = '';
   for(const c of list){
@@ -2103,9 +2156,10 @@ function newChat(quiet){
   chatOpenSeq++;
   sessionId = newId(); store.set('ai.session', sessionId); chatName = ''; store.set('ai.chatName', '');
   history = []; store.set('moneyai.history', []); goal = ''; store.set('ai.goal', ''); showGoal(); showProject(null);
+  if(uiMode === 'code' && codePick()){ setChatProject(sessionId, codePick()); showChatProject(); }
   $('#turns').innerHTML = ''; $('#hello').hidden = false; syncRequestUI(); openChats(false); setTitle();
   drawChats(); $('#q').focus();
-  if(!quiet) toast('New chat — the last one is in the list');
+  if(!quiet) toast(uiMode === 'code' ? 'New coding chat' + (codePick() ? ' — ' + ($('#codeProject').selectedOptions[0] || {}).textContent : ': pick its project above') : 'New chat — the last one is in the list');
 }
 let chatName = store.get('ai.chatName', '');
 const setTitle = () => { const t = history.length ? chatName || history[0].q : 'New chat'; $('#exportChat').hidden = !history.length; $('#chatTitle').textContent = t; document.title = history.length ? String(t).slice(0, 50) + ' — Cygnus AI' : 'Cygnus AI'; };
@@ -2114,6 +2168,13 @@ const openChats = on => { document.body.classList.toggle('sbOpen', !!on && inner
 $('#sbOpen').onclick = () => openChats(true);
 $('#sbClose').onclick = () => openChats(false);
 $('#newChat').onclick = () => newChat();
+$('#modeChat').onclick = () => setSide('chat');
+$('#modeCode').onclick = () => setSide('code');
+$('#codeProject').onchange = () => { const v = codePick(); try{ store.set('ai.codeProject', v); }catch(e){}
+  if(!v) return; if(history.length && projectOf() !== v) newChat(true); else { setChatProject(sessionId, v); showChatProject(); drawChats(); } };
+// the page opens on the side of the chat it shows
+if(projectOf()) uiMode = 'code'; else if(history.length) uiMode = 'chat';
+paintMode();
 
 /* ---------------------------------------------------------------- scheduled tasks (run by the helper on the Mac) */
 const DAYS_TXT = d => { const k = JSON.stringify(d); return k === '[0,1,2,3,4,5,6]' ? 'Every day' : k === '[1,2,3,4,5]' ? 'Weekdays' : k === '[0,6]' ? 'Weekends' : d.map(x=>['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][x]).join(', '); };

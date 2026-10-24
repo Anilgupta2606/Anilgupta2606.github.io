@@ -68,11 +68,13 @@ const MoneyAI = (function(){
     {id:'cohere', name:'Cohere (Command)', signupUrl:'https://dashboard.cohere.com/api-keys', placeholder:'key', models:['command-a-plus-05-2026','command-a-03-2025','north-mini-code']},
     // (OmniRoute, a gateway on this Mac, was taken off: it had no providers connected and only repeated this order)
     // (Cerebras, Mistral and Anthropic were taken off, 22 Oct 2026: no key for them on this Mac or in the apps)
+    // LLM7.io (24 Oct 2026): its free tier is a small model (gpt-oss 20B) at about one request a second — a last backup
+    {id:'llm7', name:'LLM7.io (free tier)', signupUrl:'https://dash.llm7.io', placeholder:'token', models:['default','fast']},
     {id:'openrouter', name:'OpenRouter', signupUrl:'https://openrouter.ai/keys', placeholder:'sk-or-…', models:['openrouter/free']},
     // Private AI (in this browser) is gone: Your own AI (on your Mac) is the private one — a key saved for it is not used
     // Local (Ollama) is gone from here: the models on the Mac are reached through Your own AI (local:…), one way for every app
   ];
-  const OPENAI_BASE = {ollamacloud:'http://127.0.0.1:11434/v1', groq:'https://api.groq.com/openai/v1', nvidia:'https://integrate.api.nvidia.com/v1', zai:'https://api.z.ai/api/paas/v4', cohere:'https://api.cohere.ai/compatibility/v1', openrouter:'https://openrouter.ai/api/v1'};
+  const OPENAI_BASE = {ollamacloud:'http://127.0.0.1:11434/v1', groq:'https://api.groq.com/openai/v1', nvidia:'https://integrate.api.nvidia.com/v1', zai:'https://api.z.ai/api/paas/v4', cohere:'https://api.cohere.ai/compatibility/v1', llm7:'https://api.llm7.io/v1', openrouter:'https://openrouter.ai/api/v1'};
   const DEVICE_ONLY = {ollama: true, webllm: true, mac: true};         // this computer's own: not shared with your other devices
   const SYNCED_AI = 'tripvault-ai-synced';          // keys that came from another device through Trip Vault's encrypted sync
   /* The keys this device uses, to carry to your other devices inside the encrypted sync (not Ollama: it is this computer's). */
@@ -415,7 +417,7 @@ const MoneyAI = (function(){
        auto · chatgpt · pcc · apple (through Siri / on the Mac) · council (Thinking) · deep
        cloud:<service> (a key on the Mac) · local:<model> (a model on the Mac)      -> [[id, label]]
      Picture and video models are not in it: an app asks your AI for words. */
-  const MAC_CLOUD = {ollamacloud: 'Beam (Ollama Cloud)', gemini: 'Google Gemini', groq: 'Groq — gpt-oss-120b', nvidia: 'NVIDIA — Nemotron', zai: 'Z.ai — GLM', cohere: 'Cohere — Command', openrouter: 'OpenRouter'};
+  const MAC_CLOUD = {ollamacloud: 'Beam (Ollama Cloud)', gemini: 'Google Gemini', groq: 'Groq — gpt-oss-120b', nvidia: 'NVIDIA — Nemotron', zai: 'Z.ai — GLM', cohere: 'Cohere — Command', llm7: 'LLM7.io (free)', openrouter: 'OpenRouter'};
   function macModels(info){
     const d = info || {}, a = d.apple || {}, cloud = d.cloud || [], local = (d.local || []).map(m=>m.name || m).filter(n=>n && !/embed|guard|vision|llava/i.test(n));
     const out = [['auto', 'Auto (recommended) — your AI picks the best available model for each request']];
@@ -641,7 +643,8 @@ const MoneyAI = (function(){
     // longer lists (NVIDIA's gpt-oss-120b was retired and kept being tried), plus new models of the same family when they come
     // (FAMILY: chat models only — no embedding, safety, vision or translation ones). Z.ai's list leaves out its free -flash
     // models, so its short list stays as it is
-    if(id === 'nvidia' || id === 'zai' || id === 'cohere' || id === 'ollamacloud'){
+    // (LLM7 lists 67 models, nearly all paid: only its free 'default' and 'fast')
+    if(id === 'nvidia' || id === 'zai' || id === 'cohere' || id === 'ollamacloud' || id === 'llm7'){
       const mine = PROVIDERS.find(p=>p.id === id).models;
       if(id !== 'nvidia' && id !== 'cohere') return mine;
       const names = await liveNames(id, key);
