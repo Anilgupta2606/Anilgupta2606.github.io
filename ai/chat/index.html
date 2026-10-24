@@ -369,6 +369,7 @@ code{font-family:var(--mono); font-size:.85em; background:var(--page2); padding:
 .skillused{display:inline-flex; align-items:center; gap:4px; font-size:11.5px; padding:2px 8px; border-radius:999px; border:1px solid var(--line, rgba(127,127,127,.25)); opacity:.85; margin-left:6px; white-space:nowrap}
 .memsw{font-size:12px; font-weight:400; margin-left:8px}
 .setrow .khead{justify-content:space-between; gap:10px}
+.skpair{display:block; color:var(--accent, #6a8cff); margin-top:2px}
 .skh{font-size:13px; margin:16px 0 6px; color:var(--muted, inherit); text-transform:uppercase; letter-spacing:.04em}
 .kdot.green{background:#22c55e; color:#22c55e} .kdot.yellow{background:#f5b301; color:#f5b301} .kdot.red{background:#ef4444; color:#ef4444}
 .krow .kedit{display:flex; gap:8px; flex-wrap:wrap} .krow .kedit input{flex:1 1 180px; min-width:0; padding:9px 11px; border-radius:10px; border:1px solid var(--line); background:var(--page); color:var(--ink); font:inherit}
@@ -407,6 +408,19 @@ body{font-size:15px; line-height:1.6}
 .chatlist h6{font-size:11px; margin:12px 8px 3px}
 .chat{padding:5px 8px 5px 10px; font-size:13px; border-radius:8px}
 .navbtn{padding:6px 10px; font-size:13px; gap:9px}
+/* THE SIDEBAR'S TOOLS AS TILES (24 Oct, "UI looks congested"): seven full-width rows left the chats two lines; four
+   tiles a row, icon over a short name (the full one on hover), give the chat list the room. Code mode: the project
+   and "+ New" share one row. */
+.sbnav{display:grid; grid-template-columns:repeat(4, minmax(0, 1fr)); gap:2px; padding-top:6px}
+.navbtn{flex-direction:column; justify-content:center; align-items:center; gap:2px; padding:7px 2px 6px; font-size:11px; line-height:1.15; text-align:center; position:relative; min-height:50px; border-radius:10px}
+.navbtn i{font-size:17px; width:auto; line-height:1}
+.navbtn span{white-space:nowrap}
+.navbtn .count{position:absolute; top:3px; right:4px; margin:0; font-size:10px; padding:0 5px; min-width:16px}
+.sbstart{display:flex; flex-direction:column; gap:8px}
+body.codeMode .sbstart{flex-direction:row; align-items:flex-end; gap:6px}
+body.codeMode .sbstart .codepick{flex:1; min-width:0}
+body.codeMode .sbstart .codepick select{width:100%; padding:7px 8px; font-size:13px}
+body.codeMode #newChat{flex:none; padding:8px 11px; white-space:nowrap}
 .acctrow{padding:6px} .acctrow .avatar{width:30px; height:30px; font-size:13px} .who2 b{font-size:13px} .who2 small{font-size:11.5px}
 header.topbar{min-height:46px; padding:7px 18px}
 .ctitle{font-size:14px}
@@ -556,18 +570,18 @@ button, a, summary, label{touch-action:manipulation}
     <button id="modeChat" type="button" role="tab" aria-selected="true" title="Chat — questions, research, your apps; never a coding project"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 17H6a3 3 0 0 1-3-3V7a3 3 0 0 1 3-3h9a3 3 0 0 1 3 3v1"/><path d="M11 11h7a3 3 0 0 1 3 3v3a3 3 0 0 1-3 3h-1l-2 2v-2h-4a3 3 0 0 1-3-3v-3a3 3 0 0 1 3-3z"/></svg><span>Chat</span></button>
     <button id="modeCode" type="button" role="tab" aria-selected="false" title="Code — chats bound to a coding project (SoGPT)"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m8 7-5 5 5 5"/><path d="m16 7 5 5-5 5"/></svg><span>Code</span></button>
   </div>
-  <label class="codeOnly codepick"><span>Project</span><select id="codeProject" aria-label="The project for a new coding chat"></select></label>
-  <button class="newchat" id="newChat" type="button"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>New chat</button>
+  <div class="sbstart"><label class="codeOnly codepick"><span>Project</span><select id="codeProject" aria-label="The project for a new coding chat"></select></label>
+  <button class="newchat" id="newChat" type="button"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>New chat</button></div>
   <input class="sbsearch" id="chatSearch" type="search" placeholder="Search chats" aria-label="Search chats">
   <nav class="chatlist" id="chats" aria-label="Your chats"></nav>
   <div class="sbnav">
-    <button class="navbtn" id="openTasks" type="button"><i>⏰</i>Tasks</button>
-    <button class="navbtn codeOnly" id="openProjects" type="button"><i>⌘</i>Projects</button>
-    <button class="navbtn" id="openConn" type="button"><i>🔌</i>Connectors</button>
-    <button class="navbtn" id="openSkills" type="button" hidden><i>🧰</i>Skills</button>
-    <button class="navbtn" id="openSeq" type="button" hidden><i>🧭</i>Who answers</button>
-    <button class="navbtn" id="openUsage" type="button"><i>📊</i>Usage</button>
-    <button class="navbtn" id="openLearned" type="button"><i>✦</i><span>What it learned</span><b class="count" id="learnedCount" hidden></b></button>
+    <button class="navbtn" id="openTasks" type="button" title="Tasks: /loop and /schedule"><i>⏰</i>Tasks</button>
+    <button class="navbtn codeOnly" id="openProjects" type="button" title="Your coding projects"><i>⌘</i>Projects</button>
+    <button class="navbtn" id="openConn" type="button" title="Connectors"><i>🔌</i>Connect</button>
+    <button class="navbtn" id="openSkills" type="button" title="Skills" hidden><i>🧰</i>Skills</button>
+    <button class="navbtn" id="openSeq" type="button" title="Who answers: the order of the models" hidden><i>🧭</i>Models</button>
+    <button class="navbtn" id="openUsage" type="button" title="Model usage"><i>📊</i>Usage</button>
+    <button class="navbtn" id="openLearned" type="button" title="What it learned"><i>✦</i><span>Learned</span><b class="count" id="learnedCount" hidden></b></button>
   </div>
   <div class="acct">
     <button class="acctrow" id="acctBtn" type="button" aria-haspopup="true" aria-expanded="false"><span class="avatar" id="avatarLetter">A</span><span class="who2"><b id="whoName">Anil</b><small id="sbStatus">Starting…</small></span><span class="dots3">⋯</span></button>
@@ -1102,7 +1116,7 @@ async function ask(q, opt){
   // A request belongs to the chat that started it.  Do not use the selected chat's
   // global state after an await: the user may have switched to another chat meanwhile.
   // /cas password …: kept on this Mac straight away — never a chat message (its history goes to the models with the next question)
-  if(uiMode === 'code' && !/^\//.test(q) && !projectOf(sessionId)){ toast('Pick the project for this coding chat (above New coding chat), or add one in ⌘ Projects'); return; }
+  if(uiMode === 'code' && !/^\//.test(q) && !projectOf(sessionId)){ toast('Pick the project for this coding chat (beside + New), or add one in ⌘ Projects'); return; }
   const casPw = /^\/cas\s+password\s+(\S+)$/i.exec(q);
   if(casPw){ const r = await post('/cas', {password: casPw[1]}).catch(()=>null); toast(r && r.ok ? '🔐 CAS password kept on this Mac only — attach the CAS PDF and ask' : 'Could not keep it: ' + (r && r.error || 'the helper did not answer')); return; }
   const requestSessionId = sessionId;
@@ -2053,10 +2067,10 @@ function paintMode(){
   const code = uiMode === 'code';
   document.body.classList.toggle('codeMode', code);
   $('#modeChat').setAttribute('aria-selected', String(!code)); $('#modeCode').setAttribute('aria-selected', String(code));
-  $('#newChat').lastChild.textContent = code ? 'New coding chat' : 'New chat';
+  $('#newChat').lastChild.textContent = code ? 'New' : 'New chat'; $('#newChat').title = code ? 'New coding chat on the project beside it' : 'New chat';
   $('#q').placeholder = code ? 'Ask about the project: read it, change it, run its tests…  ( / for commands)' : 'Ask anything…  ( / for commands)';
   const sp = $('#greet').querySelector('span'); if(sp) sp.textContent = code ? 'What shall we build or fix?' : 'What are you curious about?';
-  $('#hello .lead').textContent = code ? 'A coding chat works on one project on this Mac: SoGPT reads it, edits it, runs its tests and keeps only what passes. Pick the project above New coding chat.' : LEAD_CHAT;
+  $('#hello .lead').textContent = code ? 'A coding chat works on one project on this Mac: SoGPT reads it, edits it, runs its tests and keeps only what passes. Pick the project next to + New.' : LEAD_CHAT;
   const tr = $('#hello .tries'); if(tr) tr.hidden = code;
 }
 const codePick = () => $('#codeProject').value || '';
@@ -2310,7 +2324,7 @@ async function loadProjects(){
   let list = [], active = projectOf(); try{ const j = await fetch(HELPER + '/projects').then(r=>r.json()); list = j.list || []; projectList = list; }catch(e){}
   showProject(list.find(p=>p.id === active));
   box.innerHTML = (list.length ? `<label class="trow2"><input type="radio" name="project" data-use="" ${active ? '' : 'checked'}><span class="tt"><b>No project</b><small>A normal chat: never touches a project</small></span></label>` + list.map(p=>`<label class="trow2"><input type="radio" name="project" data-use="${esc(p.id)}" ${p.id === active ? 'checked' : ''}><span class="tt"><b>${esc(p.name)}</b><small>${esc(p.path)}${p.test ? ' · test: ' + esc(p.test) : ' · no test command detected'}</small><span class="popts"><label title="Let the AI run npm install for this project when packages are missing"><input type="checkbox" data-popt="allowInstall" data-pid="${esc(p.id)}" ${p.allowInstall ? 'checked' : ''}> Allow installs</label> <label title="Its code never leaves this Mac: the model here answers (slower)"><input type="checkbox" data-popt="private" data-pid="${esc(p.id)}" ${p.private ? 'checked' : ''}> Private</label></span></span><button class="ghost" type="button" data-project-del="${esc(p.id)}">Remove</button></label>`).join('') : '<p class="sub">No project selected. Upload a ZIP or import an existing folder.</p>') +
-    `<h3>Start a new project</h3><p class="sub">An empty folder in ~/Developer for a new app — then ask for it: “create a todo app in node with tests”.</p><form class="cform" id="newProjectForm"><input id="newProjectName" placeholder="Name, e.g. todo-app" maxlength="60" required><button class="btn">Create</button></form><h3>Upload a project</h3><p class="sub">ZIP files are extracted on this Mac. The AI then reads the extracted project through its project tools — the ZIP itself is not sent blindly to the model.</p><input id="projectZip" type="file" accept=".zip,application/zip" hidden><button class="btn" type="button" id="uploadProject">Upload ZIP</button><span id="projectUploadStatus" class="sub" style="margin-left:8px"></span><h3>Import an existing project</h3><button class="btn" type="button" id="findProjects">Find local projects</button><div id="projectImports"></div><h3>Add manually</h3><form class="cform" id="projectForm"><input id="projectName" placeholder="Name, e.g. My website" maxlength="60" required><input id="projectPath" placeholder="Local folder, e.g. /Users/anilgupta/AI" required><input id="projectTest" placeholder="Test command, e.g. npm test" maxlength="300"><button class="btn">Add project</button></form>`;
+    `<h3>Start a new project</h3><p class="sub">An empty folder in ~/Developer for a new app — then ask for it: “create a todo app in node with tests”.</p><form class="cform" id="newProjectForm"><input id="newProjectName" placeholder="Name, e.g. todo-app" maxlength="60" required><button class="btn">Create</button></form><h3>Upload a project</h3><p class="sub">ZIP files are extracted on this Mac. The AI then reads the extracted project through its project tools — the ZIP itself is not sent blindly to the model.</p><input id="projectZip" type="file" accept=".zip,application/zip" hidden><button class="btn" type="button" id="uploadProject">Upload ZIP</button><span id="projectUploadStatus" class="sub" style="margin-left:8px"></span><h3>Import an existing project</h3><button class="btn" type="button" id="findProjects">Find local projects</button><div id="projectImports"></div><h3>Add manually</h3><form class="cform" id="projectForm"><input id="projectName" placeholder="Name, e.g. My website" maxlength="60" required><input id="projectPath" placeholder="Local folder, e.g. /Users/anilgupta/AI" required><button class="ghost" type="button" id="browseProject" title="Choose the folder in macOS's own picker (on the Mac)">Browse…</button><input id="projectTest" placeholder="Test command, e.g. npm test" maxlength="300"><button class="btn">Add project</button></form>`;
   box.querySelectorAll('[data-popt]').forEach(c=>{ c.onclick = e => e.stopPropagation(); c.onchange = async () => { const r = await post('/projects', {id: c.dataset.pid, option: c.dataset.popt, value: c.checked}).catch(()=>null); toast(r && r.project ? (c.dataset.popt === 'private' ? (c.checked ? 'Private: its code stays on this Mac' : 'Not private: Auto may use ChatGPT for it') : (c.checked ? 'Installs allowed for this project' : 'Installs not allowed')) : 'Could not save that'); }; });
   box.querySelectorAll('[data-use]').forEach(i=>i.onchange = () => { const was = history.length; bindProject(i.dataset.use || '', list); const p = list.find(x=>x.id === i.dataset.use);
     toast(p ? (was && !history.length ? '🧩 New coding chat for ' + p.name : '🧩 This chat works on ' + p.name) + ' — other chats are not affected' : was && !history.length ? 'New chat, with no project' : 'This chat has no project'); });
@@ -2328,6 +2342,11 @@ async function loadProjects(){
     }catch(e){ status.textContent = 'Upload failed'; toast(/failed to fetch|load failed|network/i.test(String(e.message)) ? 'Upload failed: the Mac\'s helper could not be reached — is it running? (and the ZIP at most 90 MB)' : String(e.message || e)); }
     $('#projectZip').value = '';
   };
+  $('#browseProject').onclick = async () => { const b = $('#browseProject'); b.disabled = true; b.textContent = 'Choose on the Mac…';
+    try{ const r = await post('/projects', {browse: true});
+      if(r.error) toast(r.error); else if(r.path){ $('#projectPath').value = r.path; if(!$('#projectName').value) $('#projectName').value = r.name; if(r.test && !$('#projectTest').value) $('#projectTest').value = r.test; toast('Chosen: ' + r.path + ' - check the test command, then Add'); } }
+    catch(e){ toast('That did not work: ' + e.message); }
+    b.disabled = false; b.textContent = 'Browse…'; };
   $('#findProjects').onclick = async () => {
     const target = $('#projectImports'); target.innerHTML = '<p class="sub">Looking in common local development folders…</p>';
     let found = []; try{ found = (await fetch(HELPER + '/projects?discover=1').then(r=>r.json())).list || []; }catch(e){}
@@ -2344,7 +2363,7 @@ const LIGHT = {green: '🟢', yellow: '🟡', red: '🔴'};
    one's light (green working, amber resting at a limit, red refused, grey no key). Drag (or ‹ ›) to reorder, × to take off,
    + to add; saved at once. The same as /sequence in the terminal. */
 const SEQ_GROUPS = [['everyday', 'Everyday', ['chat', 'extras', 'checks']], ['think', 'Thinking & Deep', ['think-write', 'think-merge', 'deep-write', 'deep-merge']],
-  ['code', 'Coding', ['code']], ['agents', 'Agents', ['agents']], ['ats', 'ATS', ['ats-market', 'ats-batch']], ['private', 'Private', ['private']]];
+  ['code', 'Coding', ['code']], ['agents', 'Agents', ['agents']], ['ats', 'ATS', ['ats-market', 'ats-batch']], ['apps', 'Your apps', ['apps']], ['media', 'Pictures & videos', ['pictures', 'videos']], ['private', 'Private', ['private']]];
 const SEQ_ICON = {chat: '💬', extras: '🏷', checks: '✅', 'think-write': '💭', 'think-merge': '🧩', 'deep-write': '🧠', 'deep-merge': '🔗', code: '</>', agents: '🤖', 'ats-market': '📈', 'ats-batch': '🗂', private: '🔒'};
 let seqData = null, seqSaved = {}, seqLights = {}, seqTab = (()=>{ try{ return store.get('ai.seqTab', 'everyday'); }catch(e){ return 'everyday'; } })();
 async function loadSequences(){
@@ -2421,8 +2440,8 @@ async function loadKeys(){
   let st = null; try{ st = await fetch(HELPER + '/keys/status').then(r=>r.json()); }catch(e){}
   if(!st || !st.services){ box.innerHTML = '<p class="sub">Your Mac\'s AI is not answering — is the helper running?</p>'; return; }
   const row = x => `<div class="krow" data-k="${esc(x.id)}"><div class="khead"><span class="kdot ${esc(x.light)}" title="${esc(x.light)}"></span><b>${esc(x.name)}</b>${x.ending ? `<small>${esc(x.ending)}</small>` : ''}${(st.backup || []).includes(x.id) ? '<small title="Kept by Money Home for when your Mac is off">backup</small>' : ''}</div><small>${esc(x.why)}</small>`
-    + (x.kind === 'cloud' && x.count > 1 ? `<div class="kmore"><small>${x.count} keys — when the one in use hits its limit, the next takes over:</small>` + [{ending: x.ending, now: true}].concat(x.spare || []).map(k=>`<div class="kkey"><small>${esc(k.ending)} · ${k.now ? 'in use' : k.restingUntil ? 'resting — back at ' + new Date(k.restingUntil).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'}) : 'ready, next in turn'}</small><span><button class="ghost" data-act="test" data-end="${esc(k.ending)}" type="button">Test</button> <button class="ghost" data-act="remove1" data-end="${esc(k.ending)}" type="button">Remove</button></span></div>`).join('') + '</div>' : '')
-    + (x.kind === 'cloud' ? `<div class="kedit"><input type="password" autocomplete="off" spellcheck="false" placeholder="${x.hasKey ? 'Add another account\'s key' : 'Paste your key (' + esc(x.hint || '') + ')'}"><button class="ghost" data-act="save" type="button">${x.hasKey ? 'Add' : 'Save'}</button>${x.hasKey ? '<button class="ghost" data-act="test" type="button">Test</button>' + (x.count > 1 ? '' : '<button class="ghost" data-act="remove" type="button">Remove</button>') : ''}</div><small><a href="${esc(x.signup)}" target="_blank" rel="noopener">Get a ${x.hasKey ? 'key from another account' : 'key'}</a></small>` : '') + '</div>';
+    + (x.kind === 'cloud' && x.count >= 1 ? `<div class="kmore"><small>${x.count === 1 ? '1 key — add another account\'s key and it takes over when this one hits its limit:' : x.count + ' keys — when the one in use hits its limit, the next takes over:'}</small>` + [{ending: x.ending, now: true}].concat(x.spare || []).map(k=>`<div class="kkey"><small>${esc(k.ending)} · ${k.now ? 'in use' : k.restingUntil ? 'resting — back at ' + new Date(k.restingUntil).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'}) : 'ready, next in turn'}</small><span><button class="ghost" data-act="test" data-end="${esc(k.ending)}" type="button">Test</button> <button class="ghost" data-act="remove1" data-end="${esc(k.ending)}" type="button">Remove</button></span></div>`).join('') + '</div>' : '')
+    + (x.kind === 'cloud' ? `<div class="kedit"><input type="password" autocomplete="off" spellcheck="false" placeholder="${x.hasKey ? 'Add another account\'s key' : 'Paste your key (' + esc(x.hint || '') + ')'}"><button class="ghost" data-act="save" type="button">${x.hasKey ? 'Add' : 'Save'}</button>${x.hasKey ? '<button class="ghost" data-act="test" type="button">Test</button>' + '' : ''}</div><small><a href="${esc(x.signup)}" target="_blank" rel="noopener">Get a ${x.hasKey ? 'key from another account' : 'key'}</a></small>` : '') + '</div>';
   const group = (title, kind) => { const L = st.services.filter(x=>x.kind === kind); return L.length ? `<div class="kgroup">${title}</div>` + L.map(row).join('') : ''; };
   box.innerHTML = group('Through your Mac (no key needed)', 'apple') + group('Cloud keys', 'cloud') + group('Models on this Mac', 'mac');
   box.querySelectorAll('.krow [data-act]').forEach(b=>b.onclick = async () => {
@@ -2432,7 +2451,6 @@ async function loadKeys(){
       if(act === 'save'){ const v = inp.value.trim(); if(v.length < 10){ toast('Paste the whole key first'); return loadKeys(); } const j = await post('/keys', {keys: {[id]: v}}); inp.value = ''; toast((j.saved || []).includes(id) ? (r.querySelector('[data-act="test"]') ? 'Added — used when the key before it hits its limit' : 'Saved — testing it now') : 'That does not look like a key'); setTimeout(loadKeys, 6000); }
       else if(act === 'remove1'){ await post('/keys', {remove: id, ending: b.dataset.end}); toast('Removed ' + b.dataset.end); }
       else if(act === 'test'){ const j = await post('/keys/test', {id, ending: b.dataset.end || ''}); toast((b.dataset.end ? b.dataset.end + ': ' : '') + (j.ok ? 'It works ✓' : 'Not working: ' + (j.why || '').slice(0, 110))); }
-      else if(act === 'remove'){ await post('/keys', {remove: id}); toast('Removed'); }
     }catch(e){ toast('That did not work: ' + e.message); }
     loadKeys();
   });
@@ -2486,10 +2504,14 @@ async function loadSkills(){
   const repo = s => (s.links || []).length ? '🔗 ' + s.links.map(link).join(' · ') : /^https?:/.test(s.source) ? '🔗 ' + link(s.source) : esc(s.source);
   // installed tools, then the built-in ones (rules and ways of working taken from GitHub repos into the AI's own code)
   const row = s => { const state = s.pending ? ['yellow', 'Planned — not installed yet (reply “install it” in its chat)'] : s.off ? ['grey', 'Switched off — ' + (s.builtin ? 'not used until you switch it on' : 'kept installed, not used')] : s.tested && s.tested.ok ? ['green', 'Working — checked ' + when(s.tested.at)] : s.tested ? ['red', 'Not working — ' + (s.tested.why || 'failed its check').replace(/\s+/g, ' ').slice(0, 140)] : ['green', s.core ? 'Always on — part of how answers are kept honest' : 'On — press Test to check it'];
-    return `<div class="krow skrow" data-k="${esc(s.slug)}" data-b="${s.builtin ? 1 : ''}"><div class="khead"><span class="kdot ${state[0]}"></span><b>${esc(s.name)}</b>${s.pending || s.core ? '' : `<label title="Use this skill"><input type="checkbox" data-act="on" ${s.off ? '' : 'checked'}></label>`}</div><small>${esc(s.description)}</small><small>${esc(state[1])}</small><div class="kedit">${s.pending ? '' : '<button class="ghost" data-act="test" type="button">Test</button>'}${s.builtin ? '' : '<button class="ghost" data-act="remove" type="button">Remove</button>'}</div><small class="skfrom">${repo(s)}</small></div>`; };
+    return `<div class="krow skrow" data-k="${esc(s.slug)}" data-b="${s.builtin ? 1 : ''}"><div class="khead"><span class="kdot ${state[0]}"></span><b>${esc(s.name)}</b>${s.pending || s.core ? '' : `<label title="Use this skill"><input type="checkbox" data-act="on" ${s.off ? '' : 'checked'}></label>`}</div><small>${esc(s.description)}</small><small>${esc(state[1])}</small><div class="kedit">${s.pending ? '' : '<button class="ghost" data-act="test" type="button">Test</button>'}${s.builtin ? '' : '<button class="ghost" data-act="remove" type="button">Remove</button>'}</div>${(d.pairs || {})[s.slug] ? `<small class="skpair">↔ ${esc(d.pairs[s.slug])}</small>` : ''}<small class="skfrom">${s.builtin ? 'Built in' : 'Installed tool'} · ${repo(s)}</small></div>`; };
   const b = d.builtin || [];
-  box.innerHTML = `<h3 class="skh">Installed · ${d.skills.length}</h3>` + (d.skills.length ? d.skills.map(row).join('') : '<p class="sub">None yet. Ask in the chat: <b>integrate https://github.com/owner/repo</b></p>')
-    + (b.length ? `<h3 class="skh">Built in · ${b.length}</h3><p class="sub">Ideas and rules taken from GitHub repos into your AI's own code.</p>` + b.map(row).join('') : '');
+  // grouped by WHERE each works (coding, every answer, files, money, media); installed tools sit beside the rules that use them
+  const all = d.skills.concat(b), placed = new Set(), areas = d.areas || [];
+  const sect = (name, list) => list.length ? `<h3 class="skh">${esc(name)} · ${list.length}</h3>` + list.map(row).join('') : '';
+  box.innerHTML = areas.map(([k, name, slugs]) => sect(name, slugs.map(x=>all.find(s=>s.slug === x)).filter(s=>s && !placed.has(s.slug) && placed.add(s.slug)))).join('')
+    + sect(areas.length ? 'Other' : 'Skills', all.filter(s=>!placed.has(s.slug)))
+    + (d.skills.length ? '' : '<p class="sub">No tools installed yet. Ask in the chat: <b>integrate https://github.com/owner/repo</b></p>');
   // MCP SERVERS: tool servers plugged in — the same as /mcp in the chat: on/off, read-only or all tools, remove, add one
   let mc = null; try{ mc = await fetch(HELPER + '/mcp').then(r=>r.json()); }catch(e){}
   if(mc && mc.list) box.insertAdjacentHTML('beforeend', `<h3 class="skh">MCP servers · ${mc.list.length}</h3><p class="sub">Tool servers your AI can use (Model Context Protocol). Read-only tools run freely; with “All tools”, anything that changes something still waits for your yes. Never from iMessage.</p>`
