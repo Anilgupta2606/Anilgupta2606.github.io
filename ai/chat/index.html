@@ -424,7 +424,7 @@ main{max-width:800px; padding:22px 20px 170px}
 .popMenu{position:fixed; bottom:auto; max-height:min(60vh, 460px); overflow-y:auto; width:300px; z-index:30}
 .runMenu{width:360px} .runMenu .ritem{padding:8px 10px; border-radius:11px} .runMenu .ritem + .ritem{border-top:1px solid var(--line)}
 .runMenu .ritem b{font-size:13.5px} .runMenu .ritem small{display:block; color:var(--mut); font-size:12px; overflow-wrap:anywhere} .runMenu .sub{margin-left:18px}
-.runMenu .rstop{float:right; margin:0 0 4px 8px; padding:3px 9px; border-radius:8px; border:1px solid var(--line); background:transparent; color:inherit; font-size:12px; cursor:pointer; min-height:28px} .runMenu .rstop:hover{border-color:#d9534f; color:#d9534f} .runMenu .rall{text-align:right} .runMenu .rall .rstop{float:none}
+.runMenu .rstop{float:right; width:auto; display:inline-flex; gap:4px; margin:0 0 4px 8px; padding:3px 9px; border-radius:8px; border:1px solid var(--line); background:transparent; color:inherit; font-size:12px; cursor:pointer; min-height:28px} .runMenu .rstop:hover{border-color:#d9534f; color:#d9534f} .runMenu .rall{text-align:right} .runMenu .rall .rstop{float:none}
 @media (max-width:600px){ .popMenu{width:calc(100vw - 32px)!important; left:16px!important} }
 @media (max-width:600px){ .modes{margin-top:6px} .mchip{padding:6px 10px; font-size:12.5px} .mchip.voice{margin-left:0} }
 .modechip{display:inline-flex; align-items:center; gap:4px; flex:none; background:var(--think-bg); color:var(--think); border-radius:999px; padding:3px 4px 3px 10px; font-size:12.5px; font-weight:600; white-space:nowrap; align-self:center}
@@ -947,7 +947,8 @@ function render(out){
   let src = '';
   if(cited.length) src += `<div class="srchead">Sources</div><ul class="src">${cited.map(srcCard).join('')}</ul>`;
   if(also.length) src += `<details class="also"><summary>Also read ${also.length} page${also.length === 1 ? '' : 's'}</summary><ul class="src">${also.map(srcCard).join('')}</ul></details>`;
-  if(!cited.length && !also.length && usedModel) src += `<p class="memory">From the model's own knowledge — no web pages were read for this answer.</p>`;
+  // a coding answer read your project's files (not the web, not "its own knowledge" — it said so after reading cli/ai.mjs)
+  if(!cited.length && !also.length && usedModel) src += out.kind === 'code' ? `<p class="memory">From your project's files, read on this Mac — no web pages.</p>` : `<p class="memory">From the model's own knowledge — no web pages were read for this answer.</p>`;
   return imagesHtml(out) + chartSvg(out.chart) + answerMd(out.text, urls) + src;
 }
 /* "How it got here": every step, each opening to what it did — searched (and the results), read (the passage),
@@ -1098,7 +1099,8 @@ async function ask(q, opt){
     const imgs = out.images || [];
     const vids = out.videos || [];
     if(imgs.length) Promise.all(imgs.map(im=>preview(im.b64))).then(p=>{ const h = requestHistory.find(x=>x.answer && x.answer.text === out.text); if(h){ h.answer.images = p.map((t, i)=>t ? {thumb: t, label: imgs[i].label, file: imgs[i].file, mime: imgs[i].mime} : null).filter(Boolean); saveChat({id: requestSessionId, history: requestHistory, goal: requestGoal, chatName: requestChatName}); } });
-    requestHistory.push({q, answer: {kind: out.kind, videos: vids.length ? vids.map(v=>({note: 'The video is saved on your Mac: ' + String(v.file || '').replace(/^\/Users\/[^/]+/, '~')})) : undefined, images: imgs.length ? imgs.map(im=>({file: im.file, label: im.label, mime: im.mime})).filter(im=>im.file) : undefined, text: out.text, understood: out.understood, sources: out.sources, read: out.read, by: out.by, secs: out.secs, model: out.model, chart: out.chart, trust: out.trust ? {confidence: out.trust.confidence, checked: out.trust.checked, ok: out.trust.ok} : undefined, saved: out.saved}, steps, traces: slim(traces)});
+    requestHistory.push({q, answer: {kind: out.kind, videos: vids.length ? vids.map(v=>({note: 'The video is saved on your Mac: ' + String(v.file || '').replace(/^\/Users\/[^/]+/, '~')})) : undefined, images: imgs.length ? imgs.map(im=>({file: im.file, label: im.label, mime: im.mime})).filter(im=>im.file) : undefined, text: out.text, understood: out.understood, sources: out.sources, read: out.read, by: out.by, secs: out.secs, model: out.model, chart: out.chart, trust: out.trust ? {confidence: out.trust.confidence, checked: out.trust.checked, ok: out.trust.ok} : undefined, saved: out.saved,
+      skillsUsed: out.skillsUsed, changes: out.changes}, steps,          // the skills it used, kept with the chat (gone when it was opened again) traces: slim(traces)});
     const kept = requestHistory.slice(-60).map((h, i, all)=>i < all.length - 8 ? Object.assign({}, h, {traces: (h.traces || []).map(t=>({kind: t.kind, title: t.title}))}) : h);
     requestHistory.splice(0, requestHistory.length, ...kept);
     if(sessionId === requestSessionId){
@@ -1177,8 +1179,8 @@ async function ask(q, opt){
     if(doneShown){ activeRequests.delete(requestSessionId); syncRequestUI(); return; }    // only the suggestions were cut short
     // stopped here, or with ■ Stop in ⚙ Running (the helper ends it with "Stopped"): the same quiet mark, not an error
     if(request.controller.signal.aborted || /^Stopped\b/.test(e.message || '')){
-      // stopped: what was written so far stays, marked as stopped
-      flushDraft(el);
+      // stopped: what was written so far stays, marked as stopped — the step header too (it kept saying "Searching…")
+      flushDraft(el); box.innerHTML = stepHtml({t: '■ Stopped after ' + steps.length + ' step' + (steps.length === 1 ? '' : 's'), k: kindOf('■ Stopped')}, false);
       const d = el.querySelector('.draft'), part = d && !d.hidden ? d.innerHTML.replace('<div class="dlabel">Writing…</div>', '') : '';
       el.querySelector('.slot').innerHTML = `<div class="a">${part}<p class="stopped">■ Stopped.</p></div>`;
       if(d) d.hidden = true;
@@ -1490,6 +1492,8 @@ function drawRunning(){
   $('#runMenu').querySelectorAll('[data-stop]').forEach(b=>b.onclick = async e => { e.stopPropagation(); b.disabled = true; b.textContent = 'Stopping…';
     const r = await post('/activity', {stop: b.dataset.stop}).catch(()=>null);
     toast(r && r.stopped && r.stopped.length ? '■ Stopped' + (r.stopped.length > 1 ? ' ' + r.stopped.length + ' tasks' : '') : 'Could not stop it — it may have just finished'); setTimeout(pollRunning, 600); });
+  // nothing left and the ⚙ chip gone: close (placed against the hidden chip it jumped to the top-left corner)
+  if(!runList.length && $('#mRun').hidden){ $('#runMenu').hidden = true; return; }
   placeMenu($('#runMenu'), $('#mRun'));
 }
 $('#mRun').onclick = e => { e.stopPropagation(); const m = $('#runMenu'); m.hidden = !m.hidden; if(!m.hidden){ $('#skillsMenu').hidden = true; drawRunning(); } };
