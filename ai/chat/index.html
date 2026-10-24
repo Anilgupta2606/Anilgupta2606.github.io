@@ -1175,7 +1175,8 @@ async function ask(q, opt){
   }catch(e){
     const w = el.querySelector('.work .orb'); if(w) w.classList.remove('busy');
     if(doneShown){ activeRequests.delete(requestSessionId); syncRequestUI(); return; }    // only the suggestions were cut short
-    if(request.controller.signal.aborted){
+    // stopped here, or with ■ Stop in ⚙ Running (the helper ends it with "Stopped"): the same quiet mark, not an error
+    if(request.controller.signal.aborted || /^Stopped\b/.test(e.message || '')){
       // stopped: what was written so far stays, marked as stopped
       flushDraft(el);
       const d = el.querySelector('.draft'), part = d && !d.hidden ? d.innerHTML.replace('<div class="dlabel">Writing…</div>', '') : '';
