@@ -78,6 +78,29 @@ body{padding-left:var(--sb)}
 .sbx,.menuBtn{display:none}
 .newchat{display:flex; align-items:center; gap:8px; border:1px solid var(--line); background:var(--card); color:var(--ink); border-radius:12px; padding:10px 12px; font-weight:600; font-size:14.5px; cursor:pointer; box-shadow:var(--shadow)}
 .newchat:hover{border-color:var(--think)}
+.panel.seqpanel{width:min(700px, 100vw)}
+.linky{border:0; background:none; padding:0; color:var(--ink); text-decoration:underline; cursor:pointer; font:inherit}
+.seqbar{display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin:4px 0 6px; position:sticky; top:0; z-index:2; background:var(--card); padding:6px 0}
+.seqbar .btn[disabled]{opacity:.5; cursor:default} #seqDirty{color:#b26b00}
+.seqtabs{display:flex; flex-wrap:wrap; gap:6px; margin:6px 0 12px} .seqtabs button{border:1px solid var(--line); background:var(--card); color:var(--mut); border-radius:999px; padding:6px 12px; font-size:13px; cursor:pointer; min-height:32px}
+.seqtabs button[aria-selected="true"]{background:var(--ink); color:var(--page); border-color:var(--ink)}
+.lane{border:1px solid var(--line); border-radius:16px; padding:12px 14px; margin:0 0 12px; background:var(--card)}
+.lane header{display:flex; align-items:flex-start; gap:10px} .lane .lico{font-size:20px; line-height:1.2} .lane header div{flex:1; min-width:0}
+.lane header b{font-size:14.5px} .lane header small{display:block; color:var(--mut); font-size:12.5px; margin-top:2px}
+.lane .yours{font-size:11px; border-radius:999px; padding:2px 8px; background:var(--search-bg, #eef); color:var(--ink); margin-left:6px}
+.lane .lreset{border:0; background:none; color:var(--mut); font-size:12px; cursor:pointer; text-decoration:underline; min-height:28px}
+.flow{list-style:none; display:flex; flex-wrap:wrap; align-items:center; gap:4px 2px; padding:10px 0 4px; margin:0}
+.flow li{display:flex; align-items:center; gap:6px; border:1px solid var(--line); background:var(--page); border-radius:12px; padding:6px 6px 6px 8px; font-size:13px; cursor:grab; user-select:none; touch-action:none}
+.flow li + li::before{content:'→'; color:var(--mut); margin:0 4px 0 -2px; font-size:13px; position:relative; left:-8px}
+.flow li.drag{opacity:.4} .flow li.over{outline:2px dashed var(--ink); outline-offset:2px}
+.flow .num{font:700 11px/1 inherit; width:18px; height:18px; border-radius:50%; display:grid; place-items:center; background:var(--ink); color:var(--page)}
+.flow .sdot{width:8px; height:8px; border-radius:50%; background:#9aa0a6} .flow .sdot.green{background:#2da44e} .flow .sdot.yellow{background:#d29922} .flow .sdot.red{background:#cf222e}
+.flow li button{border:0; background:none; color:var(--mut); cursor:pointer; font-size:14px; line-height:1; padding:2px 4px; min-width:24px; min-height:24px; border-radius:6px}
+.flow li button:hover{background:var(--line); color:var(--ink)}
+/* ‹ › keep their place (shown on hover or focus): showing them on focus moved × away from the pointer mid-click */
+.flow li .mv{visibility:hidden} .flow li:hover .mv, .flow li:focus-within .mv{visibility:visible} @media (pointer:coarse){ .flow li .mv{visibility:visible} }
+.bench{display:flex; flex-wrap:wrap; gap:6px; margin-top:6px} .bench button{border:1px dashed var(--line); background:none; color:var(--mut); border-radius:10px; padding:5px 9px; font-size:12.5px; cursor:pointer; min-height:30px}
+.bench button:hover{color:var(--ink); border-color:var(--ink)}
 .modeswitch{display:flex; gap:3px; background:var(--page); border:1px solid var(--line); border-radius:12px; padding:3px; align-self:flex-start}
 .modeswitch button{display:flex; align-items:center; gap:6px; border:0; background:transparent; color:var(--mut); padding:6px 12px; border-radius:9px; cursor:pointer; font:600 13px/1 inherit; min-height:34px}
 .modeswitch button[aria-selected="true"]{background:var(--card); color:var(--ink); box-shadow:0 1px 3px rgba(0,0,0,.12)}
@@ -542,6 +565,7 @@ button, a, summary, label{touch-action:manipulation}
     <button class="navbtn codeOnly" id="openProjects" type="button"><i>⌘</i>Projects</button>
     <button class="navbtn" id="openConn" type="button"><i>🔌</i>Connectors</button>
     <button class="navbtn" id="openSkills" type="button" hidden><i>🧰</i>Skills</button>
+    <button class="navbtn" id="openSeq" type="button" hidden><i>🧭</i>Who answers</button>
     <button class="navbtn" id="openUsage" type="button"><i>📊</i>Usage</button>
     <button class="navbtn" id="openLearned" type="button"><i>✦</i><span>What it learned</span><b class="count" id="learnedCount" hidden></b></button>
   </div>
@@ -666,6 +690,7 @@ button, a, summary, label{touch-action:manipulation}
   <button class="ghost close" id="closeKeys">Close</button>
   <h2>Your AI keys</h2>
   <p class="sub">All your keys live here, on your Mac — Money Home and every app use them through your own AI. 🟢 working · 🟡 resting or being checked · 🔴 needs a key.</p>
+  <p class="sub"><button class="linky" type="button" id="keysToSeq">🧭 Which model answers what, in which order → Who answers</button></p>
   <div id="keysList"><p class="sub">Loading…</p></div>
 </aside>
 <aside class="panel" id="projectPanel" aria-label="Coding projects">
@@ -686,6 +711,14 @@ button, a, summary, label{touch-action:manipulation}
     <p class="err" id="pwErr" hidden></p>
     <button class="btn wide" type="submit">Change password</button>
   </form>
+</aside>
+<aside class="panel seqpanel" id="seqPanel" aria-label="Who answers what">
+  <button class="ghost close" id="closeSeq">Close</button>
+  <h2>Who answers</h2>
+  <p class="sub">For each kind of work, the models that answer it, in order — when one fails, is busy or out of its free limit, the next one takes over. Drag a model to move it (or ‹ ›), × takes it off, + adds one, then Save.</p>
+  <div class="seqbar"><button class="btn" type="button" id="seqSave" disabled>Save changes</button><button class="ghost" type="button" id="seqResetAll">Reset all to defaults</button><small id="seqDirty" class="sub"></small></div>
+  <div class="seqtabs" id="seqTabs" role="tablist" aria-label="Kinds of work"></div>
+  <div id="seqLanes"><p class="sub">Loading…</p></div>
 </aside>
 <aside class="panel" id="usagePanel" aria-label="Model usage">
   <button class="ghost close" id="closeUsage">Close</button>
@@ -1410,7 +1443,7 @@ async function detect(){
     showModel(d.model || 'No model (ollama pull qwen3:4b-instruct)', !!d.model);
     // with Apple Intelligence set up, Auto mostly writes with ChatGPT and Private Cloud — the label says so
     fetch(HELPER + '/models').then(r=>r.json()).then(m=>{ if(m && m.apple && (m.apple.chatgpt || m.apple.pcc)) showModel([m.apple.chatgpt ? 'ChatGPT' : '', m.apple.pcc ? 'Private Cloud' : '', 'this Mac'].filter(Boolean).join(' + '), true); }).catch(()=>{});
-    if(mode === 'mac'){ $('#openKeys').hidden = false; $('#openSkills').hidden = false; if(location.hash === '#keys') setTimeout(()=>openKeys(true), 0); }     // Money Home's "Keys" link lands here
+    if(mode === 'mac'){ $('#openKeys').hidden = false; $('#openSkills').hidden = false; $('#openSeq').hidden = false; if(location.hash === '#keys') setTimeout(()=>openKeys(true), 0); }     // Money Home's "Keys" link lands here
     fetch(HELPER + '/warm', {method: 'POST', headers: {'content-type': 'application/json'}, body: '{}'}).catch(()=>{});     // load the model now, not on the first question
     swap();
   } else if(engineHere()){
@@ -1928,7 +1961,7 @@ async function runCommand(line){
   else if(c === '/stop'){ if(mode !== 'mac') return toast('That stops work on your Mac — open this page there (or over Tailscale)'); ask('/stop' + (arg ? ' ' + arg : '')); }
   else if(c === '/ps'){ if(mode !== 'mac') return toast('That shows your Mac — open this page there (or over Tailscale)'); ask('/ps'); }
   else if(c === '/mode'){ if(mode !== 'mac') return toast('The mode is set on your Mac — open this page there (or over Tailscale)'); ask('/mode' + (arg ? ' ' + arg : '')); }
-  else if(c === '/sequence' || c === '/sequences'){ if(mode !== 'mac') return toast('Sequences are kept on your Mac — open this page there (or over Tailscale)'); ask('/sequence' + (arg ? ' ' + arg : '')); }
+  else if(c === '/sequence' || c === '/sequences'){ if(mode !== 'mac') return toast('Sequences are kept on your Mac — open this page there (or over Tailscale)'); if(!arg) return openSeq(true); ask('/sequence' + (arg ? ' ' + arg : '')); }
   else if(c === '/mcp'){ if(mode !== 'mac') return toast('MCP servers run on your Mac — open this page there (or over Tailscale)'); ask('/mcp' + (arg ? ' ' + arg : '')); }
   else if(c === '/security'){ if(mode !== 'mac') return toast('That checks your Mac — open this page there (or over Tailscale)'); ask('/security'); }
   else if(c === '/pins' || c === '/profile' || c === '/rules') openPanel(true);
@@ -2238,7 +2271,8 @@ async function loadUsage(){
   const health = '<h3>Health</h3>' + ((u.warnings || []).length ? (u.warnings || []).map(w=>`<div class="urow" style="border-left:3px solid #d29922;padding-left:8px"><small>⚠ ${esc(w)}</small></div>`).join('')
       : '<div class="urow"><small>✓ Healthy — no loops, no model failing often, no Apple bridge at its limit</small></div>')
     + ((u.callers || []).length ? '<div class="urow"><small><b>Who asked:</b> ' + u.callers.map(c=>esc(c.from) + ': ' + (c.asks || 0) + ' question' + (c.asks === 1 ? '' : 's') + ' (' + (c.asksLastHour || 0) + ' in the last hour), ' + c.calls + ' model calls' + (c.failed ? ', ' + c.failed + ' failed' : '')).join(' · ') + '</small></div>' : '')
-    + '<div class="urow"><small><b>Shortcuts runs in the last 24 hours:</b> ' + (u.shortcutsToday || 0) + '</small></div>';
+    + '<div class="urow"><small><b>Shortcuts runs in the last 24 hours:</b> ' + (u.shortcutsToday || 0) + '</small></div>'
+    + (u.headroom ? '<div class="urow"><small><b>Smaller tool results (Headroom):</b> ' + (!u.headroom.on ? 'off (Skills)' : u.headroom.shrunk ? u.headroom.shrunk + ' made smaller since the helper started — ' + Math.round((1 - u.headroom.after / u.headroom.before) * 100) + '% fewer characters (' + Math.round((u.headroom.before - u.headroom.after) / 3.2).toLocaleString('en-IN') + ' tokens saved)' : 'on — nothing large enough yet') + '</small></div>' : '');
   box.innerHTML = health + '<h3>Models</h3><p class="sub">Bars: each model\'s share of the ' + total + ' calls in this period — not a limit.</p>' + u.models.map(m=>`<div class="urow"><div class="uhead"><b>${esc(m.model)}</b><small>${esc(m.by)}</small></div><div class="ubar"><i style="width:${Math.max(2, pct(m))}%"></i></div><small>${m.calls} call${m.calls === 1 ? '' : 's'} (${pct(m)}%) · ${m.today} today · ${m.images ? m.images + ' picture' + (m.images === 1 ? '' : 's') : n(m.in) + ' in / ' + n(m.out) + ' out tokens'}${m.ms ? ' · ' + (m.ms / m.calls / 1000).toFixed(1) + 's a call' : ''}<br>${esc(Object.entries(m.roles).map(([r, c])=>r + ' ' + c).join(' · '))}</small></div>`).join('')
     + '<h3>Who wrote the answers</h3>' + u.writers.map(w=>`<div class="urow"><div class="uhead"><b>${esc(w.writer)}</b><small>${w.answers} answer${w.answers === 1 ? '' : 's'} · ${Math.round(w.secs / w.answers)}s on average</small></div><small>${esc(Object.entries(w.kinds).map(([k, c])=>k + ' ' + c).join(' · '))}</small></div>`).join('');
 }
@@ -2306,23 +2340,82 @@ async function loadProjects(){
 const LIGHT = {green: '🟢', yellow: '🟡', red: '🔴'};
 /* CONFIGURE SEQUENCE (beside the keys): for each use, its models in order — ↑ ↓ to move one, × to take it off, Add for the
    others, Reset for the default. The helper keeps it (~/.money-ai/sequences.json); every answer reads it. */
-async function loadSequences(box){
-  let q = null; try{ q = await fetch(HELPER + '/sequences').then(r=>r.json()); }catch(e){} if(!q || !q.uses) return;
-  const nm = id => (q.names || {})[id] || id, have = new Set((q.have || []).concat(['chatgpt', 'pcc', 'apple', 'local']));
-  const chip = (u, id, i) => `<span class="seqchip${have.has(id) ? '' : ' off'}" title="${have.has(id) ? '' : 'No key for it on this Mac — skipped'}"><b>${i + 1}</b>${esc(nm(id))}`
-    + `<button type="button" data-seq-up="${i}" aria-label="Move ${esc(nm(id))} up" ${i ? '' : 'disabled'}>↑</button><button type="button" data-seq-down="${i}" aria-label="Move ${esc(nm(id))} down" ${i < u.order.length - 1 ? '' : 'disabled'}>↓</button>`
-    + `<button type="button" data-seq-rm="${i}" aria-label="Take ${esc(nm(id))} off" ${u.order.length > 1 ? '' : 'disabled'}>×</button></span>`;
-  box.insertAdjacentHTML('beforeend', `<div class="kgroup" id="seqHead">Configure sequence for models</div><p class="sub">Which models answer, in which order, for each use — the next one when a model fails or is out of its free limit. Kept on this Mac; Reset brings back the default.</p>`
-    + q.uses.map(u=>`<div class="krow seqrow" data-seq="${esc(u.id)}"><div class="khead"><b>${esc(u.name)}</b>${u.changed ? '<small>yours</small>' : ''}</div><small>${esc(u.about)}</small><div class="seqchips">${u.order.map((id, i)=>chip(u, id, i)).join('')}</div>`
-      + `<div class="kedit"><select data-seq-add aria-label="Add a model to ${esc(u.name)}"><option value="">Add a model…</option>${u.options.filter(x=>!u.order.includes(x)).map(x=>`<option value="${esc(x)}">${esc(nm(x))}</option>`).join('')}</select>${u.changed ? '<button class="ghost" type="button" data-seq-reset>Reset</button>' : ''}</div></div>`).join(''));
-  const save = async (id, order) => { try{ const j = await post('/sequences', {id, order}); toast(j.error ? j.error : 'Saved — ' + order.map(nm).join(' → ')); }catch(e){ toast('Not saved: ' + e.message); } loadKeys(); };
-  box.querySelectorAll('[data-seq]').forEach(r=>{ const u = q.uses.find(x=>x.id === r.dataset.seq); if(!u) return; const o = u.order.slice();
-    r.querySelectorAll('[data-seq-up]').forEach(b=>b.onclick = () => { const i = +b.dataset.seqUp; [o[i - 1], o[i]] = [o[i], o[i - 1]]; save(u.id, o); });
-    r.querySelectorAll('[data-seq-down]').forEach(b=>b.onclick = () => { const i = +b.dataset.seqDown; [o[i + 1], o[i]] = [o[i], o[i + 1]]; save(u.id, o); });
-    r.querySelectorAll('[data-seq-rm]').forEach(b=>b.onclick = () => { o.splice(+b.dataset.seqRm, 1); save(u.id, o); });
-    const add = r.querySelector('[data-seq-add]'); if(add) add.onchange = () => { if(add.value) save(u.id, o.concat(add.value)); };
-    const rs = r.querySelector('[data-seq-reset]'); if(rs) rs.onclick = async () => { try{ await post('/sequences', {reset: u.id}); toast('Back to the default'); }catch(e){} loadKeys(); }; });
+/* 🧭 WHO ANSWERS (its own panel — it was squeezed under Your keys): each kind of work is a lane of models in order, with each
+   one's light (green working, amber resting at a limit, red refused, grey no key). Drag (or ‹ ›) to reorder, × to take off,
+   + to add; saved at once. The same as /sequence in the terminal. */
+const SEQ_GROUPS = [['everyday', 'Everyday', ['chat', 'extras', 'checks']], ['think', 'Thinking & Deep', ['think-write', 'think-merge', 'deep-write', 'deep-merge']],
+  ['code', 'Coding', ['code']], ['agents', 'Agents', ['agents']], ['ats', 'ATS', ['ats-market', 'ats-batch']], ['private', 'Private', ['private']]];
+const SEQ_ICON = {chat: '💬', extras: '🏷', checks: '✅', 'think-write': '💭', 'think-merge': '🧩', 'deep-write': '🧠', 'deep-merge': '🔗', code: '</>', agents: '🤖', 'ats-market': '📈', 'ats-batch': '🗂', private: '🔒'};
+let seqData = null, seqSaved = {}, seqLights = {}, seqTab = (()=>{ try{ return store.get('ai.seqTab', 'everyday'); }catch(e){ return 'everyday'; } })();
+async function loadSequences(){
+  const lanes = $('#seqLanes');
+  let q = null, st = null;
+  try{ [q, st] = await Promise.all([fetch(HELPER + '/sequences').then(r=>r.json()), fetch(HELPER + '/keys/status').then(r=>r.json()).catch(()=>null)]); }catch(e){}
+  if(!q || !q.uses){ lanes.innerHTML = '<p class="sub">Your Mac\'s AI is not answering — is the helper running?</p>'; return; }
+  seqData = q; seqLights = {}; seqSaved = Object.fromEntries(q.uses.map(u=>[u.id, u.order.slice()]));
+  for(const x of (st && st.services) || []) seqLights[x.id] = {light: x.light, why: x.why || ''};
+  drawSeqTabs(); drawSeqLanes();
 }
+function drawSeqTabs(){
+  $('#seqTabs').innerHTML = SEQ_GROUPS.map(([k, n])=>`<button type="button" role="tab" data-tab="${k}" aria-selected="${k === seqTab}">${esc(n)}</button>`).join('');
+  $('#seqTabs').querySelectorAll('[data-tab]').forEach(b=>b.onclick = () => { seqTab = b.dataset.tab; try{ store.set('ai.seqTab', seqTab); }catch(e){} drawSeqTabs(); drawSeqLanes(); });
+}
+function seqLight(id){
+  const L = seqLights[id]; if(L) return L;
+  const have = new Set(((seqData || {}).have || []).concat(['local']));
+  return have.has(id) ? {light: 'green', why: ''} : {light: 'none', why: 'No key for it on this Mac — skipped'};
+}
+// what is changed and not saved yet (the lanes show the draft)
+const seqChanged = () => (seqData ? seqData.uses : []).filter(u=>JSON.stringify(u.order) !== JSON.stringify(seqSaved[u.id] || []));
+function paintSeqBar(){ const n = seqChanged().length; $('#seqSave').disabled = !n; $('#seqDirty').textContent = n ? n + ' change' + (n === 1 ? '' : 's') + ' not saved yet' : ''; }
+async function saveSeq(){
+  const ch = seqChanged(); if(!ch.length) return;
+  $('#seqSave').disabled = true; $('#seqSave').textContent = 'Saving…'; const bad = [];
+  for(const u of ch){ try{ const j = await post('/sequences', {id: u.id, order: u.order}); if(j.error) bad.push(u.name + ': ' + j.error); else { u.order = j.order; u.changed = true; seqSaved[u.id] = j.order.slice(); } }catch(e){ bad.push(u.name + ': ' + e.message); } }
+  $('#seqSave').textContent = 'Save changes'; drawSeqLanes(); toast(bad.length ? 'Not saved — ' + bad.join(' · ') : 'Saved ' + ch.length + ' change' + (ch.length === 1 ? '' : 's'));
+}
+async function resetAllSeq(){
+  const b = $('#seqResetAll'); if(!b.dataset.sure){ b.dataset.sure = '1'; b.textContent = 'Click again: every use back to its default'; setTimeout(()=>{ delete b.dataset.sure; b.textContent = 'Reset all to defaults'; }, 4000); return; }
+  delete b.dataset.sure; b.textContent = 'Resetting…';
+  for(const u of seqData.uses) try{ await post('/sequences', {reset: u.id}); }catch(e){}
+  b.textContent = 'Reset all to defaults'; await loadSequences(); toast('Every use is back to its default');
+}
+$('#seqSave').onclick = saveSeq; $('#seqResetAll').onclick = resetAllSeq;
+function drawSeqLanes(){
+  const q = seqData; if(!q) return; paintSeqBar();
+  const nm = id => (q.names || {})[id] || id, ids = (SEQ_GROUPS.find(g=>g[0] === seqTab) || SEQ_GROUPS[0])[2];
+  $('#seqLanes').innerHTML = ids.map(id=>q.uses.find(u=>u.id === id)).filter(Boolean).map(u=>{
+    const bench = u.options.filter(x=>!u.order.includes(x));
+    return `<section class="lane" data-seq="${esc(u.id)}"><header><span class="lico" aria-hidden="true">${SEQ_ICON[u.id] || '•'}</span><div><b>${esc(u.name)}</b>${u.changed ? '<span class="yours">yours</span>' : ''}<small>${esc(u.about)}</small></div>`
+      + (JSON.stringify(u.order) !== JSON.stringify(u.def || []) ? `<button class="lreset" type="button" data-reset>Reset to default</button>` : '') + `</header>`
+      + `<ol class="flow" aria-label="${esc(u.name)}: the models in order">` + u.order.map((m, i)=>{ const L = seqLight(m);
+        return `<li draggable="true" data-m="${esc(m)}" title="${esc(L.why || '')}"><span class="num">${i + 1}</span><span class="sdot ${esc(L.light)}"></span>${esc(nm(m))}`
+          + `<button class="mv" type="button" data-mv="-1" aria-label="Move ${esc(nm(m))} earlier" ${i ? '' : 'disabled'}>‹</button><button class="mv" type="button" data-mv="1" aria-label="Move ${esc(nm(m))} later" ${i < u.order.length - 1 ? '' : 'disabled'}>›</button>`
+          + `<button type="button" data-rm aria-label="Take ${esc(nm(m))} off" ${u.order.length > 1 ? '' : 'disabled'}>×</button></li>`; }).join('') + `</ol>`
+      + (bench.length ? `<div class="bench">${bench.map(m=>`<button type="button" data-add="${esc(m)}" title="${esc(seqLight(m).why || '')}">+ ${esc(nm(m))}</button>`).join('')}</div>` : '')
+      + `</section>`; }).join('');
+  $('#seqLanes').querySelectorAll('.lane').forEach(lane=>{
+    const u = q.uses.find(x=>x.id === lane.dataset.seq); if(!u) return;
+    const save = order => { if(!order.length) return; u.order = order; drawSeqLanes(); };          // the draft: kept until Save
+    lane.querySelector('[data-reset]') && (lane.querySelector('[data-reset]').onclick = () => { u.order = (u.def || []).slice(); drawSeqLanes(); });
+    lane.querySelectorAll('[data-add]').forEach(b=>b.onclick = () => save(u.order.concat(b.dataset.add)));
+    lane.querySelectorAll('.flow li').forEach(li=>{
+      const i = () => u.order.indexOf(li.dataset.m);
+      li.querySelector('[data-rm]').onclick = () => save(u.order.filter(x=>x !== li.dataset.m));
+      li.querySelectorAll('[data-mv]').forEach(b=>b.onclick = () => { const o = u.order.slice(), a = i(), z = a + +b.dataset.mv; [o[a], o[z]] = [o[z], o[a]]; save(o); });
+      // drag to reorder, within the lane
+      li.addEventListener('dragstart', e => { li.classList.add('drag'); e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', u.id + '|' + li.dataset.m); });
+      li.addEventListener('dragend', () => li.classList.remove('drag'));
+      li.addEventListener('dragover', e => { e.preventDefault(); li.classList.add('over'); });
+      li.addEventListener('dragleave', () => li.classList.remove('over'));
+      li.addEventListener('drop', e => { e.preventDefault(); li.classList.remove('over'); const [use, m] = String(e.dataTransfer.getData('text/plain')).split('|');
+        if(use !== u.id || m === li.dataset.m) return; const o = u.order.filter(x=>x !== m); o.splice(o.indexOf(li.dataset.m) + (i() > u.order.indexOf(m) ? 1 : 0), 0, m); save(o); });
+    });
+  });
+}
+const openSeq = on => { if(!on && seqChanged().length) toast('Not saved yet: ' + seqChanged().length + ' change' + (seqChanged().length === 1 ? '' : 's') + ' — Save keeps them'); $('#seqPanel').classList.toggle('open', on); $('#scrim').classList.toggle('open', on); if(on){ openChats(false); menuOpen(false); loadSequences(); } };
+$('#openSeq').onclick = () => openSeq(true);
+$('#closeSeq').onclick = () => openSeq(false);
 async function loadKeys(){
   const box = $('#keysList');
   let st = null; try{ st = await fetch(HELPER + '/keys/status').then(r=>r.json()); }catch(e){}
@@ -2343,8 +2436,8 @@ async function loadKeys(){
     }catch(e){ toast('That did not work: ' + e.message); }
     loadKeys();
   });
-  loadSequences(box);
 }
+$('#keysToSeq').onclick = () => { openKeys(false); openSeq(true); };
 const openKeys = on => { $('#keysPanel').classList.toggle('open', on); $('#scrim').classList.toggle('open', on); if(on){ menuOpen(false); loadKeys(); } };
 $('#openKeys').onclick = () => openKeys(true);
 $('#closeKeys').onclick = () => openKeys(false);
