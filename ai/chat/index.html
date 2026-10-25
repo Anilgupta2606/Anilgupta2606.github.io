@@ -553,6 +553,7 @@ button, a, summary, label{touch-action:manipulation}
 /* maths (KaTeX): a wide formula scrolls sideways on a phone instead of widening the page */
 .md .katex{font-size:1.06em} .md .katex-display{overflow-x:auto; overflow-y:hidden; padding:4px 0; margin:6px 0 12px; overscroll-behavior-x:contain}
 .md .tex-err{font-family:var(--mono); font-size:.9em; color:var(--warn-ink)}
+.mdpick{display:block;margin:6px 0} .mdpick small.warn{color:#cf222e}
 .changebox{margin:10px 0 4px} .changebox .diffs summary{cursor:pointer;color:var(--mut);font-size:13px}
 .changebox .dfile{margin:8px 0} .changebox .dfile small{color:var(--mut)}
 .changebox pre.diff{margin:4px 0 0;padding:8px 10px;border:1px solid var(--line);border-radius:8px;overflow-x:auto;font-size:12px;line-height:1.45;max-height:420px}
@@ -2528,10 +2529,26 @@ async function loadSkills(){
     + (d.skills.length ? '' : '<p class="sub">No tools installed yet. Ask in the chat: <b>integrate https://github.com/owner/repo</b></p>');
   // SKILLS FROM GITHUB (SKILL.md files: archify, hypit…): the same switch and Remove as the others; the terminal (oc) follows
   const md = d.md || [];
-  if(md.length) box.insertAdjacentHTML('beforeend', `<h3 class="skh">Skills from GitHub · ${md.length}</h3><p class="sub">Added with <b>/skills add</b> or <b>integrate &lt;link&gt;</b> in the chat. Used when a question fits them, on the page and in the terminal.</p>`
+  box.insertAdjacentHTML('beforeend', `<h3 class="skh">Skills from GitHub · ${md.length}</h3>`);
+  if(md.length) box.insertAdjacentHTML('beforeend', `<p class="sub">Added with <b>/skills add</b> or <b>integrate &lt;link&gt;</b> in the chat. Used when a question fits them, on the page and in the terminal.</p>`
     + md.map(m=>`<div class="krow skrow" data-md="${esc(m.slug)}"><div class="khead"><span class="kdot ${m.off ? 'grey' : 'green'}"></span><b>${esc(m.name)}</b><label title="Use this skill"><input type="checkbox" data-md-on ${m.off ? '' : 'checked'}></label></div>`
       + `<small>${esc(m.off ? 'Switched off — kept, not used' : m.description.slice(0, 220))}</small>${m.source ? `<small>🔗 ${/^https?:/.test(m.source) ? link(m.source) : link('https://github.com/' + m.source)}</small>` : ''}`
       + `<div class="kedit"><button class="ghost" type="button" data-md-rm>Remove</button></div></div>`).join(''));
+  // ADD ONE: a GitHub link (or owner/repo) → the skills in it, each to tick → Install (unsafe ones are refused and say why)
+  box.insertAdjacentHTML('beforeend', `<div class="krow" id="mdAdd"><div class="khead"><b>Add a skill from GitHub</b></div><small>A GitHub link or owner/repo with SKILL.md skills in it. You see what is in it first; nothing is installed until you pick.</small>`
+    + `<div class="kedit"><input id="mdLink" placeholder="https://github.com/owner/repo" autocomplete="off" aria-label="GitHub link"><button class="ghost" id="mdLook" type="button">Look</button></div><div id="mdFound"></div></div>`);
+  const mdLook = $('#mdLook'); if(mdLook) mdLook.onclick = async () => {
+    const link = $('#mdLink').value.trim(), out = $('#mdFound'); if(!link) return toast('Paste a GitHub link or owner/repo');
+    mdLook.disabled = true; mdLook.textContent = 'Reading the repo…'; out.innerHTML = '';
+    const r = await post('/skills', {look: link}).catch(e=>({error: e.message})); mdLook.disabled = false; mdLook.textContent = 'Look';
+    if(r.error || !(r.skills || []).length){ out.innerHTML = `<p class="sub">${esc(r.error || 'No SKILL.md skills found in it.')}</p>`; return; }
+    out.innerHTML = `<p class="sub">${esc(r.repo)} · ${r.skills.length} skill${r.skills.length === 1 ? '' : 's'}</p>` + r.skills.map((x, i)=>`<label class="mdpick"><input type="checkbox" data-pick="${esc(x.name)}" ${x.unsafe || x.installed ? 'disabled' : r.skills.length === 1 ? 'checked' : ''}> <b>${esc(x.name)}</b>${x.installed ? ' <small>(installed)</small>' : ''}${x.unsafe ? ' <small class="warn">— refused: it asks for something a skill may not</small>' : ''}<br><small>${esc(x.description)}</small></label>`).join('')
+      + `<div class="kedit"><button class="ghost" id="mdInstall" type="button">Install</button></div>`;
+    $('#mdInstall').onclick = async e => { const names = [...out.querySelectorAll('[data-pick]:checked')].map(c=>c.dataset.pick); if(!names.length) return toast('Tick the skills to install');
+      e.target.disabled = true; e.target.textContent = 'Installing…';
+      const j = await post('/skills', {install: link, names}).catch(err=>({error: err.message}));
+      toast(j.error ? 'Not installed: ' + j.error : 'Installed: ' + (j.installed || []).map(x=>x.name + (x.leftOutCount ? ' (' + x.leftOutCount + ' files left out)' : '')).join(', ') + ((j.skipped || []).length ? ' · not: ' + j.skipped.map(x=>x.name).join(', ') : ''));
+      loadSkills(); }; };
   box.querySelectorAll('[data-md]').forEach(r=>{ const k = r.dataset.md;
     r.querySelector('[data-md-on]').onchange = async e => { await post('/skills', {md: true, slug: k, on: e.target.checked}).catch(()=>null); toast(e.target.checked ? 'Switched on' : 'Switched off'); loadSkills(); };
     r.querySelector('[data-md-rm]').onclick = async e => { e.target.disabled = true; e.target.textContent = 'Removing…'; await post('/skills', {md: true, slug: k, remove: true}).catch(()=>null); toast('Removed'); loadSkills(); }; });

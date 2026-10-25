@@ -610,10 +610,10 @@ const MoneyAI = (function(){
   }
   /* What a key can use (asked once a day), ranked for the task. */
   /* NEW MODELS OF NVIDIA AND COHERE: only their own chat families are taken in when they appear — Nemotron ultra / super /
-     lightning / nano ("nvidia/nemotron-4-ultra-…"), Command A and A+ ("command-a-plus-11-2026") and North code models;
+     lightning / nano / bolt ("nvidia/nemotron-4-ultra-…"), Command A and A+ ("command-a-plus-11-2026") and North code models;
      never a vision (-vl), omni, embedding, safety, reward, parse, reasoning or translation one */
   const FAMILY = {
-    nvidia: /^nvidia\/nemotron-\d+(\.\d+)?-(ultra|super|lightning|nano)-(?!.*\b(vl|omni|embed|safety|guard|reward|parse)\b)/,
+    nvidia: /^nvidia\/nemotron-\d+(\.\d+)?-(ultra|super|lightning|nano|bolt)-(?!.*\b(vl|omni|embed|safety|guard|reward|parse)\b)/,
     cohere: /^(command-a(-plus)?-\d{2}-\d{4}|north-[\w-]*code[\w-]*)$/,
   };
   // the strongest first, the newest first within it: Nemotron ultra, super, lightning, nano by version; Cohere's Command
@@ -621,7 +621,8 @@ const MoneyAI = (function(){
   function familyOrder(id, list){
     const uniq = Array.from(new Set(list));
     if(id === 'nvidia'){
-      const TIER = {ultra: 0, super: 1, lightning: 2, nano: 3}, t = m => { const x = /-(ultra|super|lightning|nano)-/.exec(m); return x ? TIER[x[1]] : 4; };
+      // (bolt: Nemotron 3.5 Bolt E4B, 25 Oct - the small fast one, answering in about a second: last, when the bigger ones are busy)
+      const TIER = {ultra: 0, super: 1, lightning: 2, nano: 3, bolt: 4}, t = m => { const x = /-(ultra|super|lightning|nano|bolt)-/.exec(m); return x ? TIER[x[1]] : 5; };
       const v = m => +((/nemotron-(\d+(?:\.\d+)?)-/.exec(m) || [])[1] || 0);
       return uniq.sort((a, b)=>t(a) - t(b) || v(b) - v(a));
     }
