@@ -553,6 +553,11 @@ button, a, summary, label{touch-action:manipulation}
 /* maths (KaTeX): a wide formula scrolls sideways on a phone instead of widening the page */
 .md .katex{font-size:1.06em} .md .katex-display{overflow-x:auto; overflow-y:hidden; padding:4px 0; margin:6px 0 12px; overscroll-behavior-x:contain}
 .md .tex-err{font-family:var(--mono); font-size:.9em; color:var(--warn-ink)}
+.changebox{margin:10px 0 4px} .changebox .diffs summary{cursor:pointer;color:var(--mut);font-size:13px}
+.changebox .dfile{margin:8px 0} .changebox .dfile small{color:var(--mut)}
+.changebox pre.diff{margin:4px 0 0;padding:8px 10px;border:1px solid var(--line);border-radius:8px;overflow-x:auto;font-size:12px;line-height:1.45;max-height:420px}
+.changebox .dadd{color:#1a7f37;background:rgba(46,160,67,.12);display:inline-block;min-width:100%} .changebox .ddel{color:#cf222e;background:rgba(248,81,73,.12);display:inline-block;min-width:100%} .changebox .dhunk{color:var(--mut)}
+.changebox .undo{margin-top:6px} .changebox .undone{display:inline-block;margin-top:6px;font-size:13px}
 </style>
 <!-- answers: Markdown (marked), sanitising (DOMPurify), maths (KaTeX + auto-render), code colours (highlight.js) - exact
      versions from cdnjs, checked by their hashes. Deferred: the page never waits for them; if one does not load, the
@@ -1059,6 +1064,15 @@ function finish(el, q, out, steps, traces, pending){
   // a command waiting for your OK: Run / Don't run, right under the answer (the same as replying "run it" or "no")
   if(out.pending && out.pending.cmd){ const a = el.querySelector('.a'); a.querySelector('.foot').insertAdjacentHTML('beforebegin', `<div class="approve${out.pending.danger ? ' danger' : ''}"><div class="apq">${out.pending.danger ? '✋ This cannot easily be undone. ' : ''}Run this on your Mac?</div><pre><code>${esc(out.pending.cmd)}</code></pre><div class="apb"><button type="button" class="primary" data-ap="run it">▶ Run</button><button type="button" class="ghost" data-ap="don't run">Don't run</button></div></div>`);
     a.querySelectorAll('[data-ap]').forEach(b=>b.onclick = () => { a.querySelectorAll('[data-ap]').forEach(x=>x.disabled = true); b.textContent = b.dataset.ap === 'run it' ? 'Running…' : 'Not run'; ask(b.dataset.ap); }); }
+  // A CODE CHANGE: each file's diff to open, and Undo this change (the files put back while still as it left them)
+  if((out.changes || []).some(c=>c.diff) || out.changeId){ const a = el.querySelector('.a'), ch = out.changes || [];
+    const line = l => `<span class="${/^\+(?!\+\+)/.test(l) ? 'dadd' : /^-(?!--)/.test(l) ? 'ddel' : /^@@/.test(l) ? 'dhunk' : ''}">${esc(l)}</span>`;
+    a.querySelector('.foot').insertAdjacentHTML('beforebegin', `<div class="changebox"><details class="diffs"><summary>Show the changes · ${ch.length} file${ch.length === 1 ? '' : 's'}</summary>`
+      + ch.map(c=>`<div class="dfile"><b>${esc(c.path)}</b> <small>${c.created ? 'new · ' : ''}+${c.added || 0} −${c.removed || 0}</small><pre class="diff">${String(c.diff || '').split('\n').map(line).join('\n')}</pre></div>`).join('')
+      + `</details>${out.changeId ? '<button class="ghost undo" type="button" title="Put the files back as they were before this change">Undo this change</button>' : ''}</div>`);
+    const ub = a.querySelector('.undo'); if(ub) ub.onclick = async () => { ub.disabled = true; ub.textContent = 'Undoing…';
+      const r = await post('/undo', {id: out.changeId}).catch(e=>({why: e.message}));
+      ub.outerHTML = `<span class="${r.ok ? 'ok' : 'warn'} undone">${r.ok ? '↩︎ Undone: ' + esc(r.undone.join(', ')) + (r.left && r.left.length ? ' · left as they are: ' + esc(r.why) : '') : esc(r.why || 'Nothing undone')}</span>`; }; }
   if(out.kind === 'clarify'){ const a = el.querySelector('.a'); a.classList.add('ask'); a.querySelector('.foot').insertAdjacentHTML('beforebegin', '<p class="asknote">Tap an answer, or type your own below.</p>'); }
   if(out.followups && out.followups.length) setTimeout(()=>showFollow(el, out.followups));
   el.querySelector('.foot .up').onclick = async e => {
@@ -1158,7 +1172,7 @@ async function ask(q, opt){
     const vids = out.videos || [];
     if(imgs.length) Promise.all(imgs.map(im=>preview(im.b64))).then(p=>{ const h = requestHistory.find(x=>x.answer && x.answer.text === out.text); if(h){ h.answer.images = p.map((t, i)=>t ? {thumb: t, label: imgs[i].label, file: imgs[i].file, mime: imgs[i].mime} : null).filter(Boolean); saveChat({id: requestSessionId, history: requestHistory, goal: requestGoal, chatName: requestChatName}); } });
     requestHistory.push({q, answer: {kind: out.kind, videos: vids.length ? vids.map(v=>({note: 'The video is saved on your Mac: ' + String(v.file || '').replace(/^\/Users\/[^/]+/, '~')})) : undefined, images: imgs.length ? imgs.map(im=>({file: im.file, label: im.label, mime: im.mime})).filter(im=>im.file) : undefined, text: out.text, understood: out.understood, sources: out.sources, read: out.read, by: out.by, secs: out.secs, model: out.model, chart: out.chart, trust: out.trust ? {confidence: out.trust.confidence, checked: out.trust.checked, ok: out.trust.ok} : undefined, saved: out.saved,
-      skillsUsed: out.skillsUsed, changes: out.changes}, steps, traces: slim(traces)});          // skillsUsed: the skills it used, kept with the chat (gone when it was opened again)
+      skillsUsed: out.skillsUsed, changes: out.changes, changeId: out.changeId}, steps, traces: slim(traces)});          // skillsUsed: the skills it used, kept with the chat (gone when it was opened again)
     const kept = requestHistory.slice(-60).map((h, i, all)=>i < all.length - 8 ? Object.assign({}, h, {traces: (h.traces || []).map(t=>({kind: t.kind, title: t.title}))}) : h);
     requestHistory.splice(0, requestHistory.length, ...kept);
     if(sessionId === requestSessionId){
