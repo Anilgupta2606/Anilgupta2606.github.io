@@ -2512,6 +2512,15 @@ async function loadSkills(){
   box.innerHTML = areas.map(([k, name, slugs]) => sect(name, slugs.map(x=>all.find(s=>s.slug === x)).filter(s=>s && !placed.has(s.slug) && placed.add(s.slug)))).join('')
     + sect(areas.length ? 'Other' : 'Skills', all.filter(s=>!placed.has(s.slug)))
     + (d.skills.length ? '' : '<p class="sub">No tools installed yet. Ask in the chat: <b>integrate https://github.com/owner/repo</b></p>');
+  // SKILLS FROM GITHUB (SKILL.md files: archify, hypit…): the same switch and Remove as the others; the terminal (oc) follows
+  const md = d.md || [];
+  if(md.length) box.insertAdjacentHTML('beforeend', `<h3 class="skh">Skills from GitHub · ${md.length}</h3><p class="sub">Added with <b>/skills add</b> or <b>integrate &lt;link&gt;</b> in the chat. Used when a question fits them, on the page and in the terminal.</p>`
+    + md.map(m=>`<div class="krow skrow" data-md="${esc(m.slug)}"><div class="khead"><span class="kdot ${m.off ? 'grey' : 'green'}"></span><b>${esc(m.name)}</b><label title="Use this skill"><input type="checkbox" data-md-on ${m.off ? '' : 'checked'}></label></div>`
+      + `<small>${esc(m.off ? 'Switched off — kept, not used' : m.description.slice(0, 220))}</small>${m.source ? `<small>🔗 ${/^https?:/.test(m.source) ? link(m.source) : link('https://github.com/' + m.source)}</small>` : ''}`
+      + `<div class="kedit"><button class="ghost" type="button" data-md-rm>Remove</button></div></div>`).join(''));
+  box.querySelectorAll('[data-md]').forEach(r=>{ const k = r.dataset.md;
+    r.querySelector('[data-md-on]').onchange = async e => { await post('/skills', {md: true, slug: k, on: e.target.checked}).catch(()=>null); toast(e.target.checked ? 'Switched on' : 'Switched off'); loadSkills(); };
+    r.querySelector('[data-md-rm]').onclick = async e => { e.target.disabled = true; e.target.textContent = 'Removing…'; await post('/skills', {md: true, slug: k, remove: true}).catch(()=>null); toast('Removed'); loadSkills(); }; });
   // MCP SERVERS: tool servers plugged in — the same as /mcp in the chat: on/off, read-only or all tools, remove, add one
   let mc = null; try{ mc = await fetch(HELPER + '/mcp').then(r=>r.json()); }catch(e){}
   if(mc && mc.list) box.insertAdjacentHTML('beforeend', `<h3 class="skh">MCP servers · ${mc.list.length}</h3><p class="sub">Tool servers your AI can use (Model Context Protocol). Read-only tools run freely; with “All tools”, anything that changes something still waits for your yes. Never from iMessage.</p>`
