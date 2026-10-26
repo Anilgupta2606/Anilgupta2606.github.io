@@ -94,7 +94,8 @@ VIEWS.trips = function(main, cur){
       : n > 0 ? [String(n), n === 1 ? 'day to go' : 'days to go']
       : t.end >= todayISO() ? [String(Rules.daysBetween(t.start, todayISO()) + 1), 'of ' + total + ' days']
       : ['✓', 'trip done'];
-    html += `<section class="pass"><div class="pass-main">${passSky()}
+    if(tvLook() === 'new') html += horizonHero(t);
+    else html += `<section class="pass"><div class="pass-main">${passSky()}
         <p class="pass-when">${n === null ? 'Your trip' : n > 0 ? 'Your next trip' : t.end >= todayISO() ? 'You’re travelling' : 'Past trip'}</p>
         <h1>${esc(t.name)}</h1>
         <p class="pass-where">${esc([t.city, t.country].filter(Boolean).join(', ') || 'Where to?')}${t.start ? ' — ' + esc(fmtRange(t.start, t.end)) : ''}</p>
@@ -116,7 +117,9 @@ VIEWS.trips = function(main, cur){
   html += `<section><div class="section-head"><h2>Upcoming</h2><button class="btn soft" id="new-trip">${icon('plus')} New trip</button></div>
     <div class="trip-grid">${upcoming.map(tripCard).join('') || '<p class="muted">No upcoming trips.</p>'}</div></section>`;
   if(past.length) html += `<section><h2>Past trips</h2><div class="trip-grid">${past.map(tripCard).join('')}</div></section>`;
+  if(tvLook() === 'new') html += placesHTML();
   main.innerHTML = html;
+  if(tvLook() === 'new') horizonBind(main, cur, trips);
   main.querySelectorAll('[data-trip]').forEach(el=>{ el.onclick = e=>{ if(e.target.closest('[data-edit-trip]')) return; setTrip(el.dataset.trip); window.scrollTo(0, 0); }; el.onkeydown = e=>{ if(e.key === 'Enter') el.click(); }; });
   main.querySelectorAll('[data-edit-trip]').forEach(b=>b.onclick = ()=>VIEWS.newTrip(tripById(b.dataset.editTrip)));
   if($('new-trip')) $('new-trip').onclick = ()=>VIEWS.newTrip();
@@ -652,4 +655,141 @@ async function openPhoto(memId, i){
   if($('v-prev')) $('v-prev').onclick = ()=>openPhoto(memId, i - 1);
   if($('v-next')) $('v-next').onclick = ()=>openPhoto(memId, i + 1);
   try{ const f = await fileFor(p); $('v-photo').src = URL.createObjectURL(new Blob([f.bytes], {type: f.mime})); }catch(e){ toast(e.message, 'error'); }
+}
+
+
+/* ================================================================ the new design ("Horizon") on the Trips tab
+   The trip's city is the backdrop (its photos, drifting and crossfading), its name and a live countdown and the
+   weather there now, a 3D globe with the route from home, the next flight as a boarding pass (tap: the documents
+   checklist on its back), photo cards for every trip, and the places you have been. */
+const WX_ICON = {0: ['☀️', 'Clear'], 1: ['🌤', 'Mostly clear'], 2: ['⛅', 'Partly cloudy'], 3: ['☁️', 'Cloudy'], 45: ['🌫', 'Fog'], 48: ['🌫', 'Fog'], 51: ['🌦', 'Drizzle'], 53: ['🌦', 'Drizzle'], 55: ['🌦', 'Drizzle'],
+  61: ['🌧', 'Rain'], 63: ['🌧', 'Rain'], 65: ['🌧', 'Heavy rain'], 71: ['🌨', 'Snow'], 73: ['🌨', 'Snow'], 75: ['🌨', 'Snow'], 80: ['🌦', 'Showers'], 81: ['🌦', 'Showers'], 82: ['⛈', 'Heavy showers'], 95: ['⛈', 'Thunderstorm']};
+const tripCity = t => t.city || ((citiesOf(t)[0] || {}).city) || '';
+/* the next flight of the trip (else its first) */
+const passFlight = t => { const fl = flightsOf(t.id); return fl.find(f=>f.date && f.date >= todayISO()) || fl[0] || null; };
+function horizonHero(t){
+  const n = t.start ? daysUntil(t.start) : null, city = tripCity(t) || t.name;
+  const kick = n === null ? 'Your trip' : n > 0 ? 'Your next trip' : t.end >= todayISO() ? 'You’re travelling' : 'Past trip';
+  const total = t.start && t.end ? Rules.daysBetween(t.start, t.end) + 1 : 0;
+  const f = passFlight(t), L = checklistOf(t);
+  const ap = c => (Parse.airport(c) || {}).city || '';
+  const pass = f ? `<section class="hz-pass" id="hz-pass" title="Tap to turn it over" tabindex="0"><div class="in">
+      <div class="face front"><div class="main"><div class="al"><span>BOARDING PASS</span><span>${esc(f.airline || '')}</span></div>
+        <div class="rt"><div><b>${esc(f.from || '?')}</b><small>${esc(ap(f.from))}${f.dep ? ' · ' + esc(f.dep) : ''}</small></div><span class="path"></span><div style="text-align:right"><b>${esc(f.to || '?')}</b><small>${esc(ap(f.to))}${f.arr ? ' · ' + esc(f.arr) : ''}</small></div></div>
+        <div class="kv"><div><span>Flight</span><b>${esc(f.flight || '—')}</b></div><div><span>Date</span><b>${esc(f.date ? fmtDate(f.date) : '—')}</b></div><div><span>Travellers</span><b>${f.travellers.length || '—'}</b></div><div><span>Seat</span><b>${esc((f.seat || '—').split(',')[0])}</b></div></div>
+        <span class="hint">Tap to see the documents ↻</span></div>
+        <div class="stub"><div><small>SEAT</small><div class="seat">${esc((f.seat || '—').split(',')[0])}</div></div><div class="bar"></div></div></div>
+      <div class="face back"><h3>Documents for ${esc(t.name)} · ${L.ready} of ${L.items.length} ready</h3>
+        <div class="chk">${L.items.slice(0, 8).map(i=>{ const ok = i.status === 'done' || i.status === 'ticked'; return `<div><i class="${ok ? '' : 'no'}">${ok ? '✓' : '!'}</i>${esc(i.rule.name)}${i.person ? ' — ' + esc(i.person.split(' ')[0]) : ''}</div>`; }).join('') || '<p class="muted">No checklist yet.</p>'}</div>
+        <p class="small muted" style="margin:10px 0 0">Tap to turn back ↻ · <a href="#check">Open the checklist</a></p></div>
+    </div></section>` : '';
+  return `<section class="hz-hero">
+    <div class="hz-left">
+      <div class="hz-kick"><i></i>${esc(kick)}</div>
+      <h1 class="hz-city">${[...city].map((c, i)=>`<span style="animation-delay:${(i * .05).toFixed(2)}s">${c === ' ' ? '&nbsp;' : esc(c)}</span>`).join('')}</h1>
+      <div class="hz-where"><b>${esc(t.name !== city ? t.name : (t.country || ''))}</b>${t.start ? ' · ' + esc(fmtRange(t.start, t.end)) : ''}${total ? ' · ' + total + ' days' : ''}</div>
+      <div class="hz-facts"><div class="hz-count" id="hz-count"></div><div class="hz-wx" id="hz-wx" hidden></div></div>
+      <div class="row hz-actions"><button class="btn primary" id="go-up">${icon('upload')} Add a document</button><button class="btn soft" id="go-plan">${icon('map')} Itinerary</button><button class="btn ghost" data-edit-trip="${esc(t.id)}">${icon('edit')} Edit</button></div>
+    </div>
+    <div class="hz-globe" id="hz-globe"><canvas aria-hidden="true"></canvas><span class="hz-pin home" data-pin="home"></span><span class="hz-pin" data-pin="dest"></span></div>
+  </section>${pass}`;
+}
+function placesHTML(){
+  const list = (S.visited || []).slice().sort((a, b)=>String(b.year || '').localeCompare(String(a.year || '')) || a.city.localeCompare(b.city));
+  return `<section class="hz-places"><div class="section-head"><h2>Places you’ve been</h2><span class="muted small">${list.length ? list.length + ' place' + (list.length === 1 ? '' : 's') + ' · glowing on the globe' : 'Add them once - they glow on the globe'}</span></div>
+    <form class="hz-add" id="hz-add"><input id="hz-city" placeholder="City — Venice" required><input id="hz-country" placeholder="Country"><input id="hz-year" inputmode="numeric" maxlength="4" placeholder="Year"><button class="btn primary">${icon('plus')} Add</button></form>
+    <div class="trip-grid">${list.map(v=>`<article class="hz-place" data-city="${esc(v.city)}"><button class="hz-x" data-del-place="${esc(v.id)}" aria-label="Remove ${esc(v.city)}">×</button>
+      <div class="tx"><b>${esc(v.city)}</b><small>${esc([v.country, v.year].filter(Boolean).join(' · '))}</small></div></article>`).join('')}</div></section>`;
+}
+let hzTimer = 0, hzSlides = 0, hzCity = '';
+/* the backdrop: the city's photos, one after another, each drifting slowly */
+async function hzBackdrop(city){
+  let bg = $('hz-bg');
+  if(!bg){ bg = document.createElement('div'); bg.id = 'hz-bg'; bg.setAttribute('aria-hidden', 'true'); document.body.prepend(bg);
+    const cr = document.createElement('div'); cr.id = 'hz-credit'; document.body.appendChild(cr); }
+  if(city === hzCity && bg.children.length) return;
+  hzCity = city; clearInterval(hzTimer);
+  const files = await Photos.of(city);
+  if(city !== hzCity) return;
+  if(!files.length){ [...bg.children].forEach(o=>o.remove()); $('hz-credit').textContent = ''; return; }
+  const show = i => {
+    const f = files[i % files.length], img = new Image();
+    img.onload = () => {
+      if(city !== hzCity) return;
+      const el = document.createElement('div');
+      el.className = 'hz-ph kb' + (1 + (hzSlides++ % 3)); el.style.backgroundImage = `url("${Photos.url(f)}")`;
+      bg.appendChild(el); requestAnimationFrame(()=>requestAnimationFrame(()=>el.classList.add('on')));
+      [...bg.children].slice(0, -1).forEach(o=>{ o.classList.remove('on'); setTimeout(()=>o.remove(), 1800); });
+      $('hz-credit').innerHTML = `${esc(f.replace(/\.jpe?g$/i, '').replace(/_/g, ' '))} · <a href="https://commons.wikimedia.org/wiki/File:${encodeURIComponent(f)}" target="_blank" rel="noopener">Wikimedia Commons</a>`;
+    };
+    img.onerror = () => { if(files.length > 1 && i < files.length * 2) show(i + 1); };
+    img.src = Photos.url(f);
+  };
+  let i = 0; show(i);
+  if(files.length > 1 && !matchMedia('(prefers-reduced-motion: reduce)').matches) hzTimer = setInterval(()=>show(++i), 9000);
+}
+let hzCountTimer = 0;
+function horizonBind(main, cur, trips){
+  if(cur){
+    const t = Object.assign({}, cur, tripSpan(cur)), city = tripCity(t);
+    hzBackdrop(city);
+    // the countdown, to the first flight's departure (else the first day)
+    const f = flightsOf(t.id)[0];
+    const at = f && f.date ? new Date(f.date + 'T' + (f.dep || '00:00') + ':00') : t.start ? new Date(t.start + 'T00:00:00') : null;
+    clearInterval(hzCountTimer);
+    const box = $('hz-count');
+    const draw = () => {
+      if(!box.isConnected){ clearInterval(hzCountTimer); return; }
+      const ms = at ? at - Date.now() : -1;
+      if(!at || ms < 0){
+        const on = t.end && t.end >= todayISO() && t.start && t.start <= todayISO();
+        box.innerHTML = at ? `<div class="u"><b>${on ? Rules.daysBetween(t.start, todayISO()) + 1 : '✓'}</b><small>${on ? 'day of the trip' : 'been there'}</small></div>` : '<div class="u"><b>?</b><small>add the dates</small></div>';
+        return;
+      }
+      const parts = [['d', Math.floor(ms / 864e5), 'days'], ['h', Math.floor(ms / 36e5) % 24, 'hours'], ['m', Math.floor(ms / 6e4) % 60, 'min'], ['s', Math.floor(ms / 1e3) % 60, 'sec']];
+      if(!box.querySelector('[data-k]')) box.innerHTML = parts.map(([k, , l])=>`<div class="u" data-k="${k}"><b>00</b><small>${l}</small></div>`).join('');
+      parts.forEach(([k, v])=>{ const u = box.querySelector(`[data-k="${k}"]`), txt = String(v).padStart(2, '0');
+        if(u.firstElementChild.textContent !== txt){ u.firstElementChild.textContent = txt; u.classList.remove('flip'); void u.offsetWidth; u.classList.add('flip'); } });
+    };
+    draw(); hzCountTimer = setInterval(draw, 1000);
+    // the weather there now
+    const loc = tripLoc(t);
+    if(loc) fetch(`https://api.open-meteo.com/v1/forecast?latitude=${loc.lat}&longitude=${loc.lng}&current=temperature_2m,weather_code`).then(r=>r.json()).then(r=>{
+      const w = $('hz-wx'); if(!w || !r.current) return;
+      const code = r.current.weather_code, ic = WX_ICON[code] || ['🌡', ''];
+      w.innerHTML = `<span class="i">${ic[0]}</span><div><span class="t">${Math.round(r.current.temperature_2m)}°</span><small>${esc(ic[1])}${ic[1] ? ' in ' : 'In '}${esc(city)} now</small></div>`; w.hidden = false;
+    }).catch(()=>{});
+    // the globe: home, this trip, and every place you have been
+    const home = homeBase();
+    const dots = trips.filter(x=>x.id !== t.id).map(tripLoc).concat((S.visited || []).filter(v=>v.lat != null).map(v=>({lat: v.lat, lng: v.lng}))).filter(Boolean);
+    mountGlobe($('hz-globe'), {home: home && {lat: home.lat, lng: home.lng, name: home.name.toUpperCase()}, dest: loc && {lat: loc.lat, lng: loc.lng, name: city.toUpperCase()}, dots});
+    const pass = $('hz-pass');
+    if(pass){ pass.onclick = e=>{ if(!e.target.closest('a')) pass.classList.toggle('flipped'); }; pass.onkeydown = e=>{ if(e.key === 'Enter' || e.key === ' '){ e.preventDefault(); pass.classList.toggle('flipped'); } }; }
+  }
+  // every trip and place gets its city's photo
+  const photo = (el, city) => Photos.of(city).then(f=>{ if(f[0]){ el.style.backgroundImage = `url("${Photos.url(f[0], 640)}")`; el.classList.add('has-photo'); } });
+  main.querySelectorAll('.trip-card[data-trip]').forEach(el=>{ const t = tripById(el.dataset.trip); if(t) photo(el, tripCity(t)); });
+  main.querySelectorAll('.hz-place').forEach(el=>photo(el, el.dataset.city));
+  // the cards lean towards the pointer
+  if(matchMedia('(hover: hover) and (pointer: fine)').matches) main.querySelectorAll('.trip-card, .hz-place').forEach(el=>{
+    el.addEventListener('pointermove', e=>{ const r = el.getBoundingClientRect(); el.style.setProperty('--ry', ((e.clientX - r.left) / r.width - .5) * 8 + 'deg'); el.style.setProperty('--rx', (.5 - (e.clientY - r.top) / r.height) * 8 + 'deg'); });
+    el.addEventListener('pointerleave', ()=>{ el.style.setProperty('--rx', '0deg'); el.style.setProperty('--ry', '0deg'); });
+  });
+  // places you have been: add one (found on the map once) or take it off
+  const form = $('hz-add');
+  if(form){
+    citySuggest($('hz-city'), $('hz-country'));
+    form.onsubmit = async e=>{
+      e.preventDefault();
+      const city = $('hz-city').value.trim(), country = $('hz-country').value.trim(), year = $('hz-year').value.trim();
+      if(!city) return;
+      if((S.visited || []).some(v=>v.city.toLowerCase() === city.toLowerCase())) return toast(city + ' is already on the list.');
+      const loc = await cityLoc(city, country).catch(()=>null);
+      S.visited = S.visited || [];
+      S.visited.push(touch({id: uid('v'), city, country: country || (loc && loc.country) || '', year: /^\d{4}$/.test(year) ? year : '', lat: loc ? loc.lat : null, lng: loc ? loc.lng : null}));
+      save(); render();
+      toast(loc ? city + ' added - it glows on the globe.' : city + ' added (not found on the map, so not on the globe).');
+    };
+  }
+  main.querySelectorAll('[data-del-place]').forEach(b=>b.onclick = ()=>{ remove('visited', b.dataset.delPlace); save(); render(); });
 }

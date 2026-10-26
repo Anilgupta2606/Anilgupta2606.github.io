@@ -92,7 +92,7 @@ const Store = (function(){
   };
 })();
 
-const EMPTY = () => ({v: 1, people: [], trips: [], docs: [], plans: {}, memories: [], flightsExtra: [], shopping: [], food: [], deleted: {}, checks: {},
+const EMPTY = () => ({v: 1, people: [], trips: [], docs: [], plans: {}, memories: [], flightsExtra: [], shopping: [], food: [], visited: [], deleted: {}, checks: {},
   settings: {readerMode: 'builtin-ai', flightKeys: {}, rules: {}, lastTrip: ''}});
 let S = EMPTY();
 /* What syncs (everything but this device's keys and caches). */
@@ -124,7 +124,7 @@ function remove(listName, id){
 function mergeData(mine, theirs){
   const out = JSON.parse(JSON.stringify(mine));
   out.deleted = Object.assign({}, theirs.deleted || {}, mine.deleted || {});
-  ['people', 'trips', 'docs', 'memories', 'flightsExtra', 'shopping', 'food'].forEach(k=>{
+  ['people', 'trips', 'docs', 'memories', 'flightsExtra', 'shopping', 'food', 'visited'].forEach(k=>{
     const by = {};
     (theirs[k] || []).concat(mine[k] || []).forEach(x=>{ if(!by[x.id] || (x.updatedAt || 0) >= (by[x.id].updatedAt || 0)) by[x.id] = x; });
     out[k] = Object.values(by).filter(x=>!out.deleted[x.id] || (x.updatedAt || 0) > out.deleted[x.id]);
@@ -321,6 +321,76 @@ function tripSpan(trip){
   return {start: trip.start || ds[0] || '', end: trip.end || ds[ds.length - 1] || ''};
 }
 
+/* ---------------------------------------------------------------- the new design ("Horizon") or the classic one
+   Remembered on this device. The new one shows the trip's city as the backdrop and a 3D globe on the Trips tab. */
+const LOOK_KEY = 'tripvault-look';
+function tvLook(){ try{ return localStorage.getItem(LOOK_KEY) === 'classic' ? 'classic' : 'new'; }catch(e){ return 'new'; } }
+function setTvLook(l){
+  try{ localStorage.setItem(LOOK_KEY, l); }catch(e){}
+  document.documentElement.setAttribute('data-look', l);
+  render();
+}
+/* Home, for the globe: the airport your trips fly out of most (read from the tickets), or the one set in Settings;
+   named as you like (Settings → Look), else by its city. */
+function homeBase(){
+  const count = {};
+  S.trips.forEach(t=>{ const f = flightsOf(t.id)[0]; if(f && f.from) count[f.from] = (count[f.from] || 0) + 1; });
+  const code = String(S.settings.homeAirport || '').toUpperCase().trim() || Object.keys(count).sort((a, b)=>count[b] - count[a])[0] || '';
+  const a = code && Parse.airport(code);
+  return a && a.lat != null ? {code, lat: a.lat, lng: a.lng, name: S.settings.homeName || a.city || code, airportCity: a.city} : null;
+}
+/* Where a trip is, for the globe: its first flight away from home, else its city's airport. */
+function tripLoc(t){
+  const home = (homeBase() || {}).code;
+  const out = flightsOf(t.id).find(f=>f.to && f.to !== home);
+  let a = out && Parse.airport(out.to);
+  if(!a || a.lat == null){ const c = REF && cityAirports(t.city)[0]; a = c && Parse.airport(c); }
+  return a && a.lat != null ? {lat: a.lat, lng: a.lng} : null;
+}
+/* The city's photos, from its Wikipedia article (Wikimedia Commons): the article's own lead photo first - usually the
+   landmark - then its other photos; flags, maps and logos left out. Only the city's name is sent, and only while
+   City photos is on (Settings → Look). Kept in this browser for 30 days. */
+const Photos = (function(){
+  const KEY = 'tripvault-city-photos', SKIP = /flag|map|logo|coat|seal|emblem|locator|icon|svg|png|signature|montage|collage|ISS0|satellite|location/i;
+  let cache = {}; try{ cache = JSON.parse(localStorage.getItem(KEY) || '{}'); }catch(e){}
+  const pending = {};
+  const on = () => S.settings.cityPhotos !== false;
+  // en.wikipedia's FilePath finds both Commons files and the article's own
+  const url = (f, w) => 'https://en.wikipedia.org/wiki/Special:FilePath/' + encodeURIComponent(f) + '?width=' + (w || 1920);
+  function of(city){
+    city = String(city || '').trim();
+    if(!on() || !city) return Promise.resolve([]);
+    const k = city.toLowerCase(), c = cache[k];
+    if(c && Date.now() - c.at < 30 * 864e5) return Promise.resolve(c.files);
+    if(pending[k]) return pending[k];
+    return pending[k] = (async ()=>{
+      const files = [];
+      const add = f => { f = decodeURIComponent(String(f || '')).replace(/^File:/, ''); if(/\.jpe?g$/i.test(f) && !SKIP.test(f) && files.indexOf(f) < 0) files.push(f); };
+      try{ const r = await fetch('https://en.wikipedia.org/api/rest_v1/page/summary/' + encodeURIComponent(city)); const j = r.ok ? await r.json() : {};
+        if(j.originalimage) add(j.originalimage.source.split('/').filter(x=>/\.jpe?g$/i.test(x))[0]); }catch(e){}
+      try{ const r = await fetch('https://en.wikipedia.org/api/rest_v1/page/media-list/' + encodeURIComponent(city)); const j = r.ok ? await r.json() : {};
+        (j.items || []).forEach(i=>{ if(i.type === 'image' && files.length < 7) add(i.title); }); }catch(e){}
+      cache[k] = {at: Date.now(), files};
+      try{ localStorage.setItem(KEY, JSON.stringify(cache)); }catch(e){}
+      delete pending[k];
+      return files;
+    })();
+  }
+  return {of, url, on};
+})();
+/* The globe (horizon.js) loads on first use, with the same version stamp as this file. */
+function loadHorizon(){
+  if(document.getElementById('horizon-js')) return;
+  const me = document.querySelector('script[src*="core.js"]'), v = me ? (me.src.split('?v=')[1] || '') : '';
+  const s = document.createElement('script');
+  s.type = 'module'; s.id = 'horizon-js'; s.src = 'horizon.js' + (v ? '?v=' + v : '');
+  document.head.appendChild(s);
+}
+function mountGlobe(box, data){
+  if(window.TripHorizon) window.TripHorizon.mount(box, data);
+  else { window.__horizonPending = {box, data}; loadHorizon(); }
+}
+
 /* ---------------------------------------------------------------- flight keys: do they work? */
 const KEY_NAME = {airlabs: 'AirLabs', aerodatabox: 'AeroDataBox'};
 async function testFlightKeys(keys){
@@ -381,6 +451,7 @@ function shell(){
         <label class="trip-pick"><span class="sr">Trip</span><select id="trip-pick" aria-label="Current trip"></select></label>
         <div class="top-actions">
           <a class="home-link" href="/" title="Money Home — all your apps">${icon('apps')}<span>Money Home</span></a>
+          <button class="home-link look-link" id="look-btn" type="button"></button>
           <span id="ai-switch"></span>
           <button class="icon-btn" id="sync-btn" data-state="off" aria-label="Sync now">${icon('sync')}</button>
           <button class="icon-btn" id="settings-btn" aria-label="Settings">${icon('gear')}</button>
@@ -397,6 +468,7 @@ function shell(){
   if(typeof MoneyAI !== 'undefined' && MoneyAI.widget) MoneyAI.widget($('ai-switch'));      // which AI answers, and switching it
   $('sync-btn').onclick = ()=>Cloud.syncConfig() ? autoSync(true) : openSettings('sync');
   $('settings-btn').onclick = ()=>openSettings();
+  $('look-btn').onclick = ()=>setTvLook(tvLook() === 'new' ? 'classic' : 'new');
   $('trip-pick').onchange = e=>{
     const v = e.target.value, cur = currentTrip();
     if(v === '__new' || v === '__edit'){ e.target.value = cur ? cur.id : ''; return v === '__new' ? VIEWS.newTrip() : cur && VIEWS.newTrip(cur); }
@@ -481,6 +553,11 @@ function render(){
     trips.map(t=>`<option value="${esc(t.id)}"${cur && cur.id === t.id ? ' selected' : ''}>${esc(t.name)}${t.start ? ' · ' + esc(fmtRange(t.start, t.end)) : ''}</option>`).join('') + (cur ? '<option value="__edit">✎ Rename / edit this trip…</option>' : '') + '<option value="__new">+ New trip…</option>';
   const nav = TABS.map(t=>`<a role="tab" href="#${t.id}" class="${t.id === tab ? 'on' : ''}" aria-selected="${t.id === tab}">${icon(t.icon)}<span>${t.label}</span></a>`).join('');
   $('tabs').innerHTML = nav; $('bottom-nav').innerHTML = nav;
+  const isNew = tvLook() === 'new';
+  $('look-btn').innerHTML = isNew ? '<span aria-hidden="true">◐</span><span>Classic view</span>' : '<span aria-hidden="true">✦</span><span>New design</span>';
+  $('look-btn').title = isNew ? 'Switch to the classic design' : 'Switch to the new design';
+  // the city's photos are the backdrop of the Trips tab only
+  document.body.classList.toggle('hz-on', isNew && tab === 'trips' && !!cur);
   const main = $('main');
   try{ VIEWS[tab](main, cur); }
   catch(e){ console.error(e); main.innerHTML = `<div class="card error">Something went wrong drawing this tab: ${esc(e.message)}</div>`; }
@@ -624,6 +701,15 @@ function openSettings(section){
       <div id="people-list" class="chips">${S.people.map(p=>`<span class="chip">${esc(p.name)} <button class="chip-x" data-del-person="${esc(p.id)}" aria-label="Remove ${esc(p.name)}">×</button></span>`).join('') || '<span class="muted">No one yet.</span>'}</div>
       <form id="person-f" class="row"><input id="person-n" placeholder="Name"><button class="btn soft">Add</button></form>
     </details>
+    <details ${section === 'look' ? 'open' : ''}><summary>${icon('map')} Look and globe</summary>
+      <div class="grid2">
+        <label>Design<select id="look"><option value="new">New — the city as the backdrop, 3D globe</option><option value="classic">Classic</option></select></label>
+        <label class="check" style="align-self:end"><input type="checkbox" id="city-photos" ${S.settings.cityPhotos !== false ? 'checked' : ''}> City photos (from Wikipedia: only the city's name is sent)</label>
+        <label>Home, as it shows on the globe<input id="home-name" placeholder="${esc(((homeBase() || {}).airportCity) || 'Faridabad')}" value="${esc(S.settings.homeName || '')}"></label>
+        <label>Home airport<input id="home-airport" maxlength="3" placeholder="${esc((homeBase() || {}).code || 'DEL')} — from your tickets" value="${esc(S.settings.homeAirport || '')}" style="text-transform:uppercase"></label>
+      </div>
+      <p class="muted small">Leave the airport empty and it is read from your tickets: the one your trips fly out of most${homeBase() ? ' (now ' + esc(homeBase().code) + ')' : ''}.</p>
+    </details>
     <details><summary>${icon('lock')} Sign-in, theme, backup</summary>
       ${Cloud.loginSource ? '<p class="muted" id="login-note"></p>' : ''}
       <form id="pw-f" hidden><label>Username<input id="pw-u" autocomplete="username"></label><label>New password<input id="pw-p" type="password" autocomplete="new-password"></label><button class="btn soft">Set sign-in</button></form>
@@ -638,6 +724,7 @@ function openSettings(section){
   let theme = ''; try{ theme = localStorage.getItem('tripvault-theme') || ''; }catch(e){}
   card.querySelector('#theme').value = theme;
   card.querySelector('#theme').onchange = e=>applyTheme(e.target.value, true);
+  card.querySelector('#look').value = tvLook();
   Cloud.loginSource().then(src=>{
     const n = $('login-note');
     if(!n) return;
@@ -671,6 +758,10 @@ function openSettings(section){
       Cloud.saveAiLocal(o);
     }
     S.settings.readerMode = $('reader-mode').value;
+    S.settings.cityPhotos = $('city-photos').checked;
+    S.settings.homeName = $('home-name').value.trim();
+    S.settings.homeAirport = $('home-airport').value.trim().toUpperCase();
+    if($('look').value !== tvLook()) try{ localStorage.setItem(LOOK_KEY, $('look').value); document.documentElement.setAttribute('data-look', $('look').value); }catch(e){}
     const before = JSON.stringify(S.settings.flightKeys || {});
     S.settings.flightKeys = {aerodatabox: $('k-adb').value.trim(), airlabs: $('k-al').value.trim()};
     save({quiet: true});
