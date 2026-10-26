@@ -641,7 +641,11 @@ function draw(et, ats, tv){
     if(next){
       const days = next.start ? Math.round((Date.parse(next.start + 'T00:00:00') - Date.parse(today + 'T00:00:00')) / 86400000) : null;
       const docs = (tv.docs || []).filter(d => d.tripId === next.id && isTripDoc(d));
-      const legs = [].concat(...docs.map(d => ((d.fields || {}).segments || []))).filter(x => x.from && x.to);
+      // a flight is often in two documents (the ticket and its boarding pass): each one counts once, in date order
+      const seen = new Set(), legs = [].concat(...docs.map(d => ((d.fields || {}).segments || []))).filter(x => x.from && x.to)
+        .filter(x => { const k = [String(x.flight || '').replace(/\s+/g, '').toUpperCase(), x.date || '', String(x.from).toUpperCase(), String(x.to).toUpperCase()].join('|');
+          return seen.has(k) ? false : (seen.add(k), true); })
+        .sort((p, q) => String(p.date || '9').localeCompare(String(q.date || '9')) || String(p.dep || '').localeCompare(String(q.dep || '')));
       const hotels = docs.filter(d => d.type === 'hotel').map(d => (d.fields || {}).hotelName || d.title).filter(Boolean);
       tripBody = `<div><div class="l" style="font-size:10.5px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--mut)">Next trip</div>
           <div style="font:800 24px/1.2 var(--display);margin-top:3px">${esc(next.name)}</div>
