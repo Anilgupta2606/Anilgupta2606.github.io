@@ -2395,7 +2395,7 @@ function drawSeqTabs(){
   $('#seqTabs').querySelectorAll('[data-tab]').forEach(b=>b.onclick = () => { seqTab = b.dataset.tab; try{ store.set('ai.seqTab', seqTab); }catch(e){} drawSeqTabs(); drawSeqLanes(); });
 }
 function seqLight(id){
-  const L = seqLights[id]; if(L) return L;
+  const L = seqLights[id] || ((seqData || {}).lights || {})[id]; if(L) return L;
   const have = new Set(((seqData || {}).have || []).concat(['local']));
   return have.has(id) ? {light: 'green', why: ''} : {light: 'none', why: 'No key for it on this Mac — skipped'};
 }
@@ -2518,7 +2518,7 @@ async function loadSkills(){
   const link = u => `<a href="${esc(u)}" target="_blank" rel="noopener">${esc(String(u).replace(/^https:\/\/(www\.)?(github\.com\/)?/, '').replace(/\/$/, ''))}</a>`;
   const repo = s => (s.links || []).length ? '🔗 ' + s.links.map(link).join(' · ') : /^https?:/.test(s.source) ? '🔗 ' + link(s.source) : esc(s.source);
   // installed tools, then the built-in ones (rules and ways of working taken from GitHub repos into the AI's own code)
-  const row = s => { const state = s.pending ? ['yellow', 'Planned — not installed yet (reply “install it” in its chat)'] : s.off ? ['grey', 'Switched off — ' + (s.builtin ? 'not used until you switch it on' : 'kept installed, not used')] : s.tested && s.tested.ok ? ['green', 'Working — checked ' + when(s.tested.at)] : s.tested ? ['red', 'Not working — ' + (s.tested.why || 'failed its check').replace(/\s+/g, ' ').slice(0, 140)] : ['green', s.core ? 'Always on — part of how answers are kept honest' : 'On — press Test to check it'];
+  const row = s => { const state = s.pending ? ['yellow', 'Planned — not installed yet (reply “install it” in its chat)'] : s.off ? ['grey', 'Switched off — ' + (s.builtin ? 'not used until you switch it on' : 'kept installed, not used')] : s.tested && s.tested.ok ? ['green', 'Working — checked ' + when(s.tested.at)] : s.tested ? ['red', 'Not working — ' + (s.tested.why || 'failed its check').replace(/\s+/g, ' ').slice(0, 140)] : s.core ? ['green', 'Always on — part of how answers are kept honest'] : s.builtin ? ['green', 'On — press Test to check it'] : ['yellow', 'On, not checked yet — used once its check passes (press Test)'];
     return `<div class="krow skrow" data-k="${esc(s.slug)}" data-b="${s.builtin ? 1 : ''}"><div class="khead"><span class="kdot ${state[0]}"></span><b>${esc(s.name)}</b>${s.pending || s.core ? '' : `<label title="Use this skill"><input type="checkbox" data-act="on" ${s.off ? '' : 'checked'}></label>`}</div><small>${esc(s.description)}</small><small>${esc(state[1])}</small><div class="kedit">${s.pending ? '' : '<button class="ghost" data-act="test" type="button">Test</button>'}${s.builtin ? '' : '<button class="ghost" data-act="remove" type="button">Remove</button>'}</div>${(d.pairs || {})[s.slug] ? `<small class="skpair">↔ ${esc(d.pairs[s.slug])}</small>` : ''}<small class="skfrom">${s.builtin ? 'Built in' : 'Installed tool'} · ${repo(s)}</small></div>`; };
   const b = d.builtin || [];
   // grouped by WHERE each works (coding, every answer, files, money, media); installed tools sit beside the rules that use them

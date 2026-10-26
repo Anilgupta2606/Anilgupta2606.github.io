@@ -862,10 +862,20 @@ const MoneyAI = (function(){
       return {ok: /ok/i.test(out.text), model: models[0], ms: Date.now() - t};
     }catch(e){ return {ok: false, error: e.message}; }
   }
+  /* THE DAY'S BEST MODELS OF A SERVICE, for the code that keeps its own short lists (the coding loop, oc's menu): the
+     engine's ranking with the first key, less the models that key cannot use. OpenRouter's NVIDIA models are left out -
+     the NVIDIA key already gives them */
+  async function ranked(id, tier){
+    const key = (aiSettings().keys || {})[id]; if(!key || !PROVIDERS.some(p=>p.id === id)) return [];
+    let list = (await bestModels(id, key, tier || 'smart')).filter(m=>!isBad(id, m));
+    if(id === 'openrouter') list = list.filter(m=>!/^nvidia\//.test(m) && m !== 'openrouter/free');
+    if(id === 'nvidia') list = list.filter(m=>!/-bolt-/.test(m));                 // Bolt is the small fast one: never a writer's first
+    return list;
+  }
   const setModel = (id, m) => { const h = aiLocal(); h.model = Object.assign({}, h.model, {[id]: m}); saveAiLocal(h); };
 
   return {keysToMac, macLights, macManaged, macMaybe, BACKUP_KEY, LIGHTS_KEY, macModels, macModelLabel, macRequest, MAC_URL, macUp, macFetch, macRemote, setMacRemote, macSignIn, macBase, PRIVATE_MODELS, trialPrivate, removePrivate, privateCached, PROVIDERS, loadAi, aiSettings, aiLocal, saveAiLocal, adoptAppKeys, aiStatus, rankModels, shareableAi, takeSyncedAi,
-          aiAvailable, aiNames, canSee, canSearch, resting, wake, backAt, chat, generate, json, test, setModel, listModels, refreshModels};
+          aiAvailable, aiNames, canSee, canSearch, resting, wake, backAt, chat, generate, json, test, setModel, listModels, refreshModels, ranked};
 })();
 
 /* =========================================================
