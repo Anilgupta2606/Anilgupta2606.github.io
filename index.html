@@ -4,185 +4,247 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="robots" content="noindex">
-<meta name="theme-color" content="#0c2620">
+<meta name="theme-color" content="#050d0b">
 <title>Money Home</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%230c2620'/%3E%3Cpath d='M16 42 L28 28 L36 35 L48 20' stroke='%23e2b04a' stroke-width='6' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap">
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js"}}</script>
 <style>
+/* Money Home, in space: Cygnus at the centre, the apps in orbit around it, each one visited as you scroll.
+   The scene is a night sky, so the page is dark in both themes. */
 :root{
-  color-scheme:light;
-  --page:#eef1ec; --card:#ffffff; --card2:#f6f8f5; --ink:#132019; --ink2:#3b4a42; --mut:#6b7a72; --line:#dfe5df;
-  --hero:#0c2620; --hero2:#12372e; --hero-ink:#f3f1e8; --hero-mut:#a9bcb2; --gold:#e2b04a; --gold-soft:#f6e7c1;
-  --up:#16804a; --dn:#c2412d;
-  --ats:#4453c4; --exp:#c0701a; --led:#1f7fc9; --trip:#0E6BA8;
-  --a1:#1f7fc9; --a2:#2aa37a; --a3:#e2b04a; --a4:#c0701a; --a5:#8a5cc8; --a6:#d1537c; --a7:#5b8c96; --a8:#9aa39e;
-  --shadow:0 1px 2px rgb(15 30 25 / .05), 0 8px 24px -12px rgb(15 30 25 / .14);
+  color-scheme:dark;
+  --space:#050d0b; --ink:#eef2ec; --ink2:#c3d0c8; --mut:#8fa59a; --line:rgb(255 255 255 / .1);
+  --glass:rgb(9 22 18 / .58); --glass2:rgb(255 255 255 / .05);
+  --gold:#e2b04a; --gold2:#f6d58a; --up:#5fe0a0; --dn:#ff8a73;
+  --ats:#8b97ff; --exp:#f0a95c; --led:#5fb4f2; --trip:#4fd6c4;
+  --a1:#5fb4f2; --a2:#4cc38a; --a3:#e2b04a; --a4:#f0a95c; --a5:#a98af0; --a6:#ef7aa4; --a7:#79b4be; --a8:#9aa39e;
   --display:'Bricolage Grotesque', 'Avenir Next', system-ui, sans-serif;
   --body:'Plus Jakarta Sans', -apple-system, 'Segoe UI', sans-serif;
   --mono:'JetBrains Mono', ui-monospace, Menlo, monospace;
 }
-@media (prefers-color-scheme: dark){
-  :root:not([data-theme="light"]){ color-scheme:dark;
-    --page:#0b110f; --card:#131b18; --card2:#18221e; --ink:#e7ede9; --ink2:#c1cdc6; --mut:#8d9c94; --line:#24302b;
-    --hero:#0a1f1a; --hero2:#0f2d25; --up:#4cc38a; --dn:#ef7a66; --ats:#98a4f4; --exp:#f0a95c; --led:#72b4ee; --trip:#5AA9F2;
-    --shadow:none; }
-}
-:root[data-theme="dark"]{ color-scheme:dark;
-  --page:#0b110f; --card:#131b18; --card2:#18221e; --ink:#e7ede9; --ink2:#c1cdc6; --mut:#8d9c94; --line:#24302b;
-  --hero:#0a1f1a; --hero2:#0f2d25; --up:#4cc38a; --dn:#ef7a66; --ats:#98a4f4; --exp:#f0a95c; --led:#72b4ee; --trip:#5AA9F2; --shadow:none; }
 *{box-sizing:border-box}
 html,body{margin:0}
-body{background:var(--page);color:var(--ink);font:15px/1.5 var(--body);-webkit-font-smoothing:antialiased}
+html{scroll-behavior:smooth}
+body{background:var(--space);color:var(--ink);font:15px/1.5 var(--body);-webkit-font-smoothing:antialiased;overflow-x:hidden}
 .num{font-family:var(--mono);font-variant-numeric:tabular-nums;letter-spacing:-.01em}
 a{color:inherit}
+.up{color:var(--up)} .dn{color:var(--dn)}
 
-/* ---------- hero: a night-green ledger page ---------- */
-.hero{background:
-    linear-gradient(180deg, transparent 0 calc(100% - 1px), rgb(255 255 255 / .05) 0) 0 0 / 100% 32px,
-    radial-gradient(1200px 400px at 85% -10%, rgb(226 176 74 / .18), transparent 60%),
-    linear-gradient(160deg, var(--hero2), var(--hero));
-  color:var(--hero-ink);padding-top:env(safe-area-inset-top,0px)}
-.hero-in{max-width:1120px;margin:0 auto;padding-inline:20px;padding-block:22px 34px}
-.topline{display:flex;flex-wrap:wrap;align-items:center;gap:10px;justify-content:space-between}
+/* ---------- the stage: one fixed canvas behind everything ---------- */
+#stage{position:fixed;inset:0;width:100%;height:100%;display:block;z-index:0}
+.no3d #stage{display:none}
+.no3d body, body.no3d{background:radial-gradient(900px 600px at 70% 30%, rgb(226 176 74 / .16), transparent 60%), radial-gradient(700px 500px at 20% 80%, rgb(79 214 196 / .1), transparent 60%), var(--space)}
+.vignette{position:fixed;inset:0;pointer-events:none;z-index:1;background:radial-gradient(120% 90% at 50% 45%, transparent 55%, rgb(0 0 0 / .55))}
+#tags{position:fixed;inset:0;pointer-events:none;z-index:4;overflow:hidden}
+.tag{position:absolute;left:0;top:0;pointer-events:auto;cursor:pointer;display:flex;align-items:center;gap:8px;padding:6px 11px 6px 7px;border-radius:999px;
+  background:rgb(5 14 11 / .55);border:1px solid color-mix(in srgb,var(--c) 45%,transparent);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+  font:600 12.5px var(--body);white-space:nowrap;color:var(--ink);transition:opacity .25s;will-change:transform,opacity;text-decoration:none}
+.tag i{width:22px;height:22px;border-radius:50%;display:grid;place-items:center;background:color-mix(in srgb,var(--c) 22%,transparent);color:var(--c)}
+.tag i svg{width:13px;height:13px}
+.tag small{font:500 11.5px var(--mono);color:var(--mut)}
+@media (max-width:560px){.tag small{display:none}.tag{font-size:11.5px;padding:4px 9px 4px 5px}.tag i{width:18px;height:18px}}
+.tag.core{border-color:rgb(226 176 74 / .5);font:700 11px var(--display);letter-spacing:.32em;padding:5px 12px;color:var(--gold2)}
+
+/* ---------- content, over the stage ---------- */
+#app{position:relative;z-index:3}
+.top{position:fixed;top:0;left:0;right:0;z-index:10;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;
+  padding:calc(env(safe-area-inset-top,0px) + 14px) 20px 14px;background:linear-gradient(180deg, rgb(5 13 11 / .75), transparent)}
 .brand{display:flex;align-items:center;gap:10px;font:700 15px var(--display);letter-spacing:.01em}
 .brand svg{width:28px;height:28px}
 .chips{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
-.chip{display:inline-flex;align-items:center;gap:7px;padding:6px 11px;border-radius:999px;background:rgb(255 255 255 / .07);border:1px solid rgb(255 255 255 / .12);font-size:12.5px;color:var(--hero-ink)}
-.chip i{width:7px;height:7px;border-radius:50%;background:var(--hero-mut)}
-.chip.on i{background:#5fe0a0;box-shadow:0 0 0 3px rgb(95 224 160 / .2)}
-.chip button{all:unset;cursor:pointer}
-.hero-grid{display:grid;grid-template-columns:1.35fr 1fr;gap:28px;align-items:center;margin-top:26px}
-@media (max-width:820px){.hero-grid{grid-template-columns:1fr}}
-.hello{font:500 15px var(--body);color:var(--hero-mut)}
-.big{font:800 clamp(40px,7vw,68px)/1 var(--display);letter-spacing:-.03em;margin:8px 0 6px}
-.big .num{font-family:var(--display);letter-spacing:-.03em}
-.bigsub{color:var(--hero-mut);font-size:14px;max-width:52ch}
-.bigsub b{color:var(--hero-ink);font-weight:600}
-.day{display:inline-flex;gap:8px;align-items:center;margin-top:14px;padding:7px 12px;border-radius:10px;background:rgb(255 255 255 / .06);font-size:13.5px}
-.day .up{color:#6fe0a8} .day .dn{color:#ff9a86}
-.ringbox{display:flex;align-items:center;gap:20px;justify-self:end}
-@media (max-width:820px){.ringbox{justify-self:start}}
-.ring{width:168px;height:168px;flex:none}
-.ring text{fill:var(--hero-ink)}
-.ringfacts{display:flex;flex-direction:column;gap:12px}
-.rf .l{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--hero-mut)}
-.rf .v{font:600 18px var(--mono);color:var(--hero-ink)}
-.ribbon{margin-top:28px}
-.ribbar{display:flex;height:12px;border-radius:7px;overflow:hidden;background:rgb(255 255 255 / .08)}
-.ribbar i{display:block;height:100%}
-.ribbar i + i{border-left:2px solid var(--hero)}
-.riblegend{display:flex;flex-wrap:wrap;gap:6px 16px;margin-top:10px;font-size:12.5px;color:var(--hero-mut)}
-.riblegend span{display:inline-flex;align-items:center;gap:6px}
-.riblegend b{color:var(--hero-ink);font:500 12.5px var(--mono)}
-.riblegend em{width:9px;height:9px;border-radius:3px;display:inline-block}
+.chip{display:inline-flex;align-items:center;gap:7px;padding:6px 11px;border-radius:999px;background:rgb(255 255 255 / .06);border:1px solid var(--line);font-size:12.5px;color:var(--ink);text-decoration:none;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+.chip i{width:7px;height:7px;border-radius:50%;background:var(--mut)}
+.chip.on i{background:var(--up);box-shadow:0 0 0 3px rgb(95 224 160 / .2)}
+.chip.ai{font-weight:700;color:var(--gold2);border-color:rgb(226 176 74 / .35)}
+@media (max-width:700px){.chips .hide-s{display:none}}
 
-/* ---------- body ---------- */
-main{max-width:1120px;margin:0 auto;padding-inline:20px;padding-block:0 60px}
-.apps{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px;margin-top:-18px}
-@media (max-width:1180px){.apps{grid-template-columns:repeat(2,minmax(0,1fr))}}
-@media (max-width:900px){.apps{grid-template-columns:1fr}}
-.card{background:var(--card);border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow);padding:20px;display:flex;flex-direction:column;gap:14px;min-width:0}
-.apphead{display:flex;align-items:center;gap:12px}
-.glyph{width:40px;height:40px;border-radius:12px;display:grid;place-items:center;background:color-mix(in srgb,var(--c) 14%,var(--card));color:var(--c);flex:none}
+section.scene{min-height:100vh;min-height:100svh;display:flex;align-items:center;padding:110px 20px 70px;max-width:1240px;margin:0 auto}
+section.scene.app{min-height:125vh;min-height:125svh}
+@media (max-width:820px){
+  section.scene{align-items:flex-end;padding:120px 16px 48px}
+  section.scene.app{padding-top:46svh}
+}
+
+/* hero */
+.hero{max-width:640px}
+.kick{font:600 11.5px var(--mono);letter-spacing:.22em;text-transform:uppercase;color:var(--gold)}
+.hero h1{font:800 clamp(40px,6.6vw,78px)/.98 var(--display);letter-spacing:-.035em;margin:14px 0 16px;
+  background:linear-gradient(180deg,#fff, #cfdcd4 70%, #9bb3a7);-webkit-background-clip:text;background-clip:text;color:transparent}
+.hero h1 em{font-style:normal;background:linear-gradient(90deg,var(--gold2),var(--gold));-webkit-background-clip:text;background-clip:text;color:transparent}
+.hero p.lead{color:var(--ink2);font-size:16px;max-width:46ch;margin:0}
+.glance{margin-top:24px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;max-width:600px}
+.tile{all:unset;box-sizing:border-box;cursor:pointer;padding:12px 14px;border-radius:16px;background:var(--glass);border:1px solid var(--line);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);min-width:0;
+  transition:border-color .2s, transform .2s, background .2s}
+.tile:hover{border-color:color-mix(in srgb,var(--c,var(--gold)) 60%,transparent);transform:translateY(-2px);background:rgb(12 28 23 / .7)}
+.tile:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+.tile .l{display:flex;align-items:center;gap:6px;font-size:10.5px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tile .l i{width:7px;height:7px;border-radius:50%;background:var(--c);box-shadow:0 0 8px var(--c);flex:none}
+.tile .v{font:600 19px/1.3 var(--mono);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tile .v.none{font:500 13px/1.9 var(--body);color:var(--ink2)}
+.tile .s{font-size:11.5px;color:var(--ink2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tile.big{grid-row:span 2;display:flex;flex-direction:column;justify-content:center;border-color:rgb(226 176 74 / .3);background:linear-gradient(160deg,rgb(226 176 74 / .12),var(--glass))}
+.tile.big .v{font:800 clamp(26px,3.2vw,36px)/1.1 var(--display);letter-spacing:-.02em;color:var(--gold2)}
+@media (max-width:560px){.hero p.lead{display:none}.glance{margin-top:18px;grid-template-columns:repeat(2,minmax(0,1fr))}.tile.big{grid-row:auto;grid-column:span 2}.hero h1{font-size:36px}}
+.cue{position:absolute;left:50%;bottom:22px;transform:translateX(-50%);font-size:12px;color:var(--mut);display:flex;flex-direction:column;align-items:center;gap:8px;letter-spacing:.06em}
+.cue b{width:1px;height:38px;background:linear-gradient(var(--gold),transparent);animation:drip 2.2s ease-in-out infinite}
+@keyframes drip{0%{transform:scaleY(0);transform-origin:top}50%{transform:scaleY(1);transform-origin:top}51%{transform-origin:bottom}100%{transform:scaleY(0);transform-origin:bottom}}
+@media (max-width:820px){.cue{display:none}}
+
+/* intro: the words arrive after the core has lit */
+.rise{opacity:0;transform:translateY(18px);animation:rise .9s cubic-bezier(.2,.7,.2,1) forwards}
+@keyframes rise{to{opacity:1;transform:none}}
+
+/* app panels */
+.panel{width:min(470px,100%);background:var(--glass);border:1px solid var(--line);border-radius:24px;padding:24px;
+  backdrop-filter:blur(16px) saturate(1.2);-webkit-backdrop-filter:blur(16px) saturate(1.2);box-shadow:0 30px 80px -30px rgb(0 0 0 / .8), inset 0 1px 0 rgb(255 255 255 / .06);
+  display:flex;flex-direction:column;gap:16px;position:relative;overflow:hidden;
+  opacity:.001;transform:translateY(40px) scale(.98);transition:opacity .7s, transform .9s cubic-bezier(.2,.7,.2,1)}
+.panel.in{opacity:1;transform:none}
+.panel::before{content:"";position:absolute;inset:0 0 auto;height:2px;background:linear-gradient(90deg,transparent,var(--c),transparent)}
+.panel.wide{width:min(560px,100%)}
+.phead{display:flex;align-items:center;gap:12px}
+.glyph{width:44px;height:44px;border-radius:14px;display:grid;place-items:center;background:color-mix(in srgb,var(--c) 18%,transparent);color:var(--c);flex:none;box-shadow:0 0 24px -4px color-mix(in srgb,var(--c) 60%,transparent)}
 .glyph svg{width:22px;height:22px}
-.apphead h2{margin:0;font:700 18px/1.2 var(--display)}
-.apphead p{margin:1px 0 0;font-size:12.5px;color:var(--mut)}
-.status{margin-left:auto;font-size:11.5px;font-weight:600;padding:4px 9px;border-radius:999px;background:var(--card2);color:var(--mut);white-space:nowrap}
-.status.live{background:color-mix(in srgb,var(--up) 14%,var(--card));color:var(--up)}
-.kv{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px 12px}
-.kv .l{font-size:11px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--mut)}
-.kv .v{font:600 20px/1.25 var(--mono);font-variant-numeric:tabular-nums;margin-top:2px}
+.phead .kick{color:var(--c)}
+.phead h2{margin:2px 0 0;font:800 26px/1.1 var(--display);letter-spacing:-.02em}
+.phead p{margin:2px 0 0;font-size:13px;color:var(--mut)}
+.status{margin-left:auto;font-size:11.5px;font-weight:600;padding:4px 10px;border-radius:999px;background:var(--glass2);color:var(--mut);white-space:nowrap;align-self:flex-start}
+.status.live{background:rgb(95 224 160 / .12);color:var(--up)}
+.kv{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px 14px}
+.kv .l{font-size:10.5px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--mut)}
+.kv .v{font:600 22px/1.25 var(--mono);font-variant-numeric:tabular-nums;margin-top:3px}
 .kv .s{font-size:12px;color:var(--ink2)}
-.up{color:var(--up)} .dn{color:var(--dn)}
+.meta{font-size:12px;color:var(--mut)}
 .movers{display:flex;flex-wrap:wrap;gap:6px}
-.mv{font-size:12px;padding:5px 9px;border-radius:8px;background:var(--card2);color:var(--ink2)}
+.mv{font-size:12px;padding:5px 9px;border-radius:8px;background:var(--glass2);color:var(--ink2)}
 .mv b{font-family:var(--mono);font-weight:600}
-.empty{font-size:13px;color:var(--ink2);background:var(--card2);border-radius:12px;padding:12px 14px;line-height:1.45}
-.open{margin-top:auto;display:inline-flex;align-items:center;gap:8px;align-self:flex-start;padding:9px 15px;border-radius:11px;background:var(--c);color:#fff;text-decoration:none;font-weight:600;font-size:13.5px;transition:transform .15s}
-.open:hover{transform:translateY(-1px)}
-.opens{margin-top:auto;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
-.opens .open{margin-top:0}
+.empty{font-size:13.5px;color:var(--ink2);background:var(--glass2);border-radius:14px;padding:13px 15px;line-height:1.5}
+.opens{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.open{display:inline-flex;align-items:center;gap:8px;padding:10px 16px;border-radius:12px;background:var(--c);color:#06100d;text-decoration:none;font-weight:700;font-size:13.5px;border:0;cursor:pointer;font-family:var(--body);
+  box-shadow:0 8px 30px -10px var(--c);transition:transform .15s, box-shadow .15s}
+.open:hover{transform:translateY(-1px);box-shadow:0 12px 34px -8px var(--c)}
 .open.alt{background:transparent;color:var(--c);box-shadow:inset 0 0 0 1.5px var(--c)}
 .opens .edit{background:none;border:0;color:var(--ink2);font:inherit;font-size:12.5px;text-decoration:underline;cursor:pointer;padding:4px}
-.open:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
+.open:focus-visible,.chip:focus-visible,.tag:focus-visible{outline:2px solid var(--gold);outline-offset:3px}
+.sep{height:1px;background:var(--line);margin:2px 0}
+.sub-h{font-size:12px;color:var(--mut);margin-bottom:6px;display:flex;justify-content:space-between;gap:8px}
 
-.row2{display:grid;grid-template-columns:1.5fr 1fr;gap:16px;margin-top:16px}
-@media (max-width:900px){.row2{grid-template-columns:1fr}}
-.card h3{margin:0;font:700 17px var(--display)}
-.card .cap{margin:-8px 0 0;font-size:12.5px;color:var(--mut)}
-.flow{display:flex;height:34px;border-radius:10px;overflow:hidden;background:var(--card2)}
-.flow i{display:flex;align-items:center;padding-inline:10px;color:#fff;font:600 12px var(--mono);white-space:nowrap;overflow:hidden;min-width:0}
-.flowkey{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:12.5px;color:var(--ink2)}
+.flow{display:flex;height:30px;border-radius:9px;overflow:hidden;background:var(--glass2)}
+.flow i{display:flex;align-items:center;padding-inline:9px;color:#06100d;font:600 11.5px var(--mono);white-space:nowrap;overflow:hidden;min-width:0;transform-origin:left;animation:grow 1.1s cubic-bezier(.2,.7,.2,1) both}
+@keyframes grow{from{transform:scaleX(0)}}
+.flowkey{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12px;color:var(--ink2)}
 .flowkey span{display:inline-flex;gap:6px;align-items:center}
 .flowkey em{width:9px;height:9px;border-radius:3px}
-.bars{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;align-items:end;height:150px;padding-top:8px}
-.bars .col{display:flex;flex-direction:column;align-items:center;gap:6px;justify-content:flex-end}
-.bars .stack{width:100%;max-width:44px;display:flex;flex-direction:column-reverse;border-radius:7px 7px 3px 3px;overflow:hidden}
+.bars{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;align-items:end;height:120px}
+.bars .col{display:flex;flex-direction:column;align-items:center;gap:6px;justify-content:flex-end;height:100%}
+.bars .stack{width:100%;max-width:34px;display:flex;flex-direction:column-reverse;border-radius:7px 7px 3px 3px;overflow:hidden;transform-origin:bottom;transition:transform 1s cubic-bezier(.2,.7,.2,1)}
+.panel:not(.in) .bars .stack{transform:scaleY(0)}
 .bars .stack i{display:block}
-.bars .m{font-size:11px;color:var(--mut)}
-.sip{display:flex;flex-direction:column;gap:6px}
-.track{height:10px;border-radius:6px;background:var(--card2);overflow:hidden}
-.track i{display:block;height:100%;border-radius:6px;background:linear-gradient(90deg,var(--led),color-mix(in srgb,var(--led) 60%,#7fd3b5))}
-.todo{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
-.todo li{display:grid;grid-template-columns:auto 1fr;gap:3px 12px;padding:11px 0;border-top:1px solid var(--line)}
-.todo li:first-child{border-top:0;padding-top:2px}
-.when{grid-row:span 2;font:600 11.5px/1.2 var(--mono);color:var(--mut);background:var(--card2);border-radius:8px;padding:6px 8px;text-align:center;min-width:58px}
-.when b{display:block;font-size:15px;color:var(--ink)}
-.todo .a{font-weight:600;font-size:14px}
-.todo .f{font-size:12.5px;color:var(--mut)}
-.pr{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:6px;vertical-align:1px}
-.foot{margin-top:24px;display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;font-size:12.5px;color:var(--mut)}
-.btn{font:600 12.5px var(--body);border:1px solid var(--line);background:var(--card);color:var(--ink2);border-radius:9px;padding:7px 12px;cursor:pointer}
-.btn:hover{color:var(--ink)}
+.bars .m{font-size:10.5px;color:var(--mut)}
+.track{height:8px;border-radius:6px;background:var(--glass2);overflow:hidden}
+.track i{display:block;height:100%;border-radius:6px;background:linear-gradient(90deg,var(--led),#7fd3b5)}
 
-/* ---------- sign-in ---------- */
-.gate{min-height:100vh;display:grid;place-items:center;padding:24px 16px;background:linear-gradient(160deg,var(--hero2),var(--hero))}
-.gate form{width:min(380px,100%);background:var(--card);border-radius:20px;padding:28px 26px;display:flex;flex-direction:column;gap:8px;box-shadow:0 30px 60px -20px rgb(0 0 0 / .5)}
-.gate h1{font:800 28px/1.1 var(--display);margin:6px 0 4px;letter-spacing:-.02em}
-.gate .sub{color:var(--mut);font-size:13.5px;margin:0 0 10px}
-.gate label{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--mut);font-weight:600;margin-top:6px}
-.gate input{padding:11px 13px;border:1px solid var(--line);border-radius:11px;background:var(--card2);color:var(--ink);font:15px var(--body)}
-.gate input:focus{outline:none;border-color:var(--ats)}
-.gate button{margin-top:12px;padding:12px;border:0;border-radius:11px;background:var(--hero);color:var(--gold);font:700 14.5px var(--body);cursor:pointer}
-.gate .err{color:var(--dn);font-size:13px}
-.skel{opacity:.55}
-/* ---------- Ask AI ---------- */
-.ask{margin-top:16px}
-.ask .top{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-.ask .top h3{margin-right:auto}
-.ask .hub{font-size:12.5px;color:var(--mut);text-decoration:none;border:1px solid var(--line);border-radius:999px;padding:4px 10px}
-.ask .hub:hover{color:var(--ink)}
+.ringrow{display:flex;align-items:center;gap:18px}
+.ring{width:128px;height:128px;flex:none}
+.ring .arc{transition:stroke-dasharray 1.6s cubic-bezier(.2,.7,.2,1)}
+.ringfacts{display:flex;flex-direction:column;gap:10px}
+.rf .l{font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--mut)}
+.rf .v{font:600 17px var(--mono)}
+.ribbar{display:flex;height:10px;border-radius:6px;overflow:hidden;background:var(--glass2)}
+.ribbar i{display:block;height:100%}
+.ribbar i + i{border-left:2px solid rgb(5 13 11 / .8)}
+.riblegend{display:flex;flex-wrap:wrap;gap:5px 14px;margin-top:9px;font-size:12px;color:var(--mut)}
+.riblegend span{display:inline-flex;align-items:center;gap:6px}
+.riblegend b{color:var(--ink);font:500 12px var(--mono)}
+.riblegend em{width:9px;height:9px;border-radius:3px;display:inline-block}
+.todo{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.todo li{display:grid;grid-template-columns:auto 1fr;gap:2px 12px;padding:9px 0;border-top:1px solid var(--line)}
+.todo li:first-child{border-top:0;padding-top:0}
+.when{grid-row:span 2;font:600 11px/1.2 var(--mono);color:var(--mut);background:var(--glass2);border-radius:8px;padding:5px 7px;text-align:center;min-width:54px}
+.when b{display:block;font-size:14px;color:var(--ink)}
+.todo .a{font-weight:600;font-size:13.5px}
+.todo .f{font-size:12px;color:var(--mut)}
+.pr{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:6px;vertical-align:1px}
+.countdown{display:flex;align-items:baseline;gap:8px}
+.countdown b{font:800 54px/1 var(--display);letter-spacing:-.03em;color:var(--c)}
+.route{display:flex;flex-direction:column;gap:6px}
+.leg{display:flex;align-items:center;gap:10px;font:500 12.5px var(--mono);color:var(--ink2);padding:8px 11px;border-radius:10px;background:var(--glass2)}
+.leg .path{flex:1;height:1px;background:repeating-linear-gradient(90deg,var(--c) 0 4px,transparent 4px 8px);position:relative}
+.leg .path::after{content:"✈";position:absolute;top:-9px;left:0;font-size:12px;color:var(--c);animation:fly 3.5s linear infinite}
+@keyframes fly{to{left:calc(100% - 10px)}}
+
+/* Ask, at the core */
+.askwrap{width:min(560px,100%)}
+.ask{display:flex;flex-direction:column;gap:12px}
+.ask .cap{margin:0;font-size:12.5px;color:var(--mut)}
 .ask form{display:flex;gap:8px}
-.ask textarea{flex:1;min-width:0;resize:vertical;min-height:46px;font:14.5px/1.45 var(--body);color:var(--ink);background:var(--card2);border:1px solid var(--line);border-radius:12px;padding:11px 13px}
+.ask textarea{flex:1;min-width:0;resize:vertical;min-height:50px;font:15px/1.45 var(--body);color:var(--ink);background:rgb(0 0 0 / .3);border:1px solid var(--line);border-radius:14px;padding:13px 14px}
 .ask textarea:focus{outline:2px solid var(--gold);outline-offset:1px}
-.ask button.go{border:0;border-radius:12px;background:var(--hero);color:var(--gold);font:700 14px var(--body);padding:0 18px;cursor:pointer}
+.ask button.go{border:0;border-radius:14px;background:linear-gradient(135deg,var(--gold2),var(--gold));color:#1a1405;font:800 14px var(--body);padding:0 20px;cursor:pointer;box-shadow:0 10px 30px -10px var(--gold)}
 .ask button.go:disabled{opacity:.6}
+.ask .hub{font-size:12px;color:var(--mut);text-decoration:none;border:1px solid var(--line);border-radius:999px;padding:4px 10px;align-self:flex-start}
 .sugg{display:flex;flex-wrap:wrap;gap:6px}
-.sugg button{font:500 12.5px var(--body);border:1px solid var(--line);background:var(--card);color:var(--ink2);border-radius:999px;padding:5px 11px;cursor:pointer}
+.sugg button{font:500 12.5px var(--body);border:1px solid var(--line);background:var(--glass2);color:var(--ink2);border-radius:999px;padding:6px 11px;cursor:pointer}
 .sugg button:hover{color:var(--ink);border-color:var(--gold)}
-.convo{display:flex;flex-direction:column;gap:10px}
-.convo .q{align-self:flex-end;background:var(--card2);border-radius:14px 14px 4px 14px;padding:8px 12px;max-width:85%;font-weight:600;font-size:14px}
-.convo .a{background:color-mix(in srgb,var(--gold) 9%,var(--card));border:1px solid var(--line);border-radius:14px 14px 14px 4px;padding:10px 13px;font-size:14px;white-space:pre-wrap;overflow-wrap:anywhere}
+.convo{display:flex;flex-direction:column;gap:10px;max-height:46vh;overflow:auto}
+.convo .q{align-self:flex-end;background:rgb(255 255 255 / .08);border-radius:14px 14px 4px 14px;padding:8px 12px;max-width:85%;font-weight:600;font-size:14px}
+.convo .a{background:rgb(226 176 74 / .08);border:1px solid rgb(226 176 74 / .2);border-radius:14px 14px 14px 4px;padding:10px 13px;font-size:14px;white-space:pre-line;overflow-wrap:anywhere}
 .convo .by{display:block;margin-top:6px;font-size:11.5px;color:var(--mut)}
 .convo .srcs{display:flex;flex-wrap:wrap;gap:4px 10px;margin-top:6px;font-size:12px}
 .convo .srcs a{color:inherit;opacity:.8}
-.convo .a{white-space:pre-line}
 .convo .err{color:var(--dn)}
-@media (max-width:600px){.ask form{flex-direction:column}.ask button.go{padding:12px}}
-@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+@media (max-width:600px){.ask form{flex-direction:column}.ask button.go{padding:13px}}
+.foot{max-width:1240px;margin:0 auto;padding:10px 20px calc(env(safe-area-inset-bottom,0px) + 30px);display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;font-size:12.5px;color:var(--mut);position:relative;z-index:3}
+.btn{font:600 12.5px var(--body);border:1px solid var(--line);background:var(--glass);color:var(--ink2);border-radius:10px;padding:7px 12px;cursor:pointer}
+.btn:hover{color:var(--ink)}
+.demo{position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 62px);transform:translateX(-50%);z-index:12;font:600 11.5px var(--mono);letter-spacing:.08em;padding:6px 12px;border-radius:999px;background:rgb(226 176 74 / .15);border:1px solid rgb(226 176 74 / .4);color:var(--gold2)}
+
+/* the rail: where you are in the system */
+.rail{position:fixed;right:18px;top:50%;transform:translateY(-50%);z-index:11;display:flex;flex-direction:column;gap:14px}
+.rail a{display:flex;align-items:center;justify-content:flex-end;gap:10px;text-decoration:none;color:var(--mut);font-size:12px}
+.rail a span{opacity:0;transform:translateX(6px);transition:.25s}
+.rail a:hover span,.rail a.on span{opacity:1;transform:none}
+.rail a b{width:9px;height:9px;border-radius:50%;border:1.5px solid var(--c);transition:.25s}
+.rail a.on b{background:var(--c);box-shadow:0 0 12px var(--c);transform:scale(1.25)}
+.rail a.on{color:var(--ink)}
+@media (max-width:820px){.rail{right:8px;gap:12px}.rail a span{display:none}}
+@media (max-width:560px){.rail{display:none}}
+
+/* sign-in, over the running scene */
+.gate{min-height:100vh;min-height:100svh;display:grid;place-items:center;padding:24px 16px;position:relative;z-index:3}
+.gate form{width:min(380px,100%);background:var(--glass);border:1px solid var(--line);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);border-radius:22px;padding:28px 26px;display:flex;flex-direction:column;gap:8px;box-shadow:0 30px 80px -20px rgb(0 0 0 / .7)}
+.gate h1{font:800 28px/1.1 var(--display);margin:6px 0 4px;letter-spacing:-.02em}
+.gate .sub{color:var(--mut);font-size:13.5px;margin:0 0 10px}
+.gate label{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--mut);font-weight:600;margin-top:6px}
+.gate input{padding:11px 13px;border:1px solid var(--line);border-radius:11px;background:rgb(0 0 0 / .3);color:var(--ink);font:15px var(--body)}
+.gate input:focus{outline:none;border-color:var(--gold)}
+.gate button{margin-top:12px;padding:12px;border:0;border-radius:11px;background:linear-gradient(135deg,var(--gold2),var(--gold));color:#1a1405;font:800 14.5px var(--body);cursor:pointer}
+.gate .err{color:var(--dn);font-size:13px}
+
+@media (prefers-reduced-motion:reduce){
+  html{scroll-behavior:auto}
+  *,*::before,*::after{animation:none!important;transition:none!important}
+  .rise,.panel{opacity:1;transform:none}
+}
 </style>
 </head>
 <body>
+<canvas id="stage" aria-hidden="true"></canvas>
+<div class="vignette"></div>
+<div id="tags" aria-hidden="true"></div>
 <div id="app"></div>
 <script src="/ai/ai.js"></script>
 <script src="/ai/brain.js"></script>
 <script src="/ai/ask.js"></script>
 <script src="/ai/web.js"></script>
 <script src="/InvestmentPlan/cloud.js"></script>
-<script>
+<script type="module">
 "use strict";
+import * as THREE from 'three';
+
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const inr = n => (n < 0 ? '−' : '') + '₹' + Math.round(Math.abs(n)).toLocaleString('en-IN');
@@ -192,29 +254,32 @@ const pct = (n, d = 2) => (n >= 0 ? '+' : '−') + Math.abs(n).toFixed(d) + '%';
 const ym = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
 const ymLabel = (m, style = 'long') => new Date(+m.slice(0, 4), +m.slice(5, 7) - 1, 1).toLocaleDateString('en-IN', {month: style, year: style === 'long' ? 'numeric' : undefined});
 const ago = ms => { const s = (Date.now() - ms) / 1000; return s < 90 ? 'just now' : s < 3600 ? Math.round(s / 60) + ' min ago' : s < 86400 ? Math.round(s / 3600) + ' h ago' : Math.round(s / 86400) + ' d ago'; };
-/* ATS's address on this device: the one it was linked from (your Mac's Tailscale address on the phone), else this Mac */
-/* ATS away from the Mac: its Tailscale address, set once (here, or by linking a device through it) and carried,
-   encrypted, to your other devices with the settings - never written into this public page */
+const shiftM = (m, k) => ym(new Date(+m.slice(0, 4), +m.slice(5, 7) - 1 + k, 1));
+const HAS_CLOUD = typeof Cloud !== 'undefined';
+const DEMO = /[?&]demo\b/.test(location.search);
 const MOBILE = /iPhone|iPad|Android/i.test(navigator.userAgent);
+const CALM = matchMedia('(prefers-reduced-motion: reduce)').matches;
+/* the opening plays once a session; after that the page opens with everything already lit */
+const SEEN = (() => { try{ const s = sessionStorage.getItem('money-home-intro') === 'seen'; sessionStorage.setItem('money-home-intro', 'seen'); return s; }catch(e){ return false; } })();
+const QUICK = CALM || SEEN;
+
+/* ATS: on this Mac, and away from it through Tailscale (as on the current Money Home) */
+const LINKS = {ats:'http://localhost:8765/', exp:'/expenseTracker/', led:'/InvestmentPlan/', trip:'/tripManangement/'};
 const atsRemote = () => { try{ const r = MoneyShared.atsRemote && MoneyShared.atsRemote(); if(r) return r.url;
-  const l = typeof Cloud !== 'undefined' && Cloud.atsLink(); if(l && /^https:\/\//.test(l.url || '')){ MoneyShared.setAtsRemote(l.url); return l.url.replace(/\/+$/, ''); } }catch(e){} return ''; };
+  const l = HAS_CLOUD && Cloud.atsLink(); if(l && /^https:\/\//.test(l.url || '')){ MoneyShared.setAtsRemote(l.url); return l.url.replace(/\/+$/, ''); } }catch(e){} return ''; };
 function askAtsRemote(){
   const cur = atsRemote();
   const v = prompt('ATS address for your other devices - your Mac\'s Tailscale address (https://…ts.net).\nLeave empty to remove it.', cur || 'https://');
   if(v === null) return;
   try{ MoneyShared.setAtsRemote(v === 'https://' ? '' : v); }catch(e){ alert(e.message); return; }
-  try{ if(MoneyShared.status().setup) MoneyShared.sync().catch(()=>{}); }catch(e){}       // on to your other devices now
+  try{ if(MoneyShared.status().setup) MoneyShared.sync().catch(()=>{}); }catch(e){}
   render();
 }
-const atsUrl = () => { const l = typeof Cloud !== 'undefined' && Cloud.atsLink(); return l && /^https?:\/\//.test(l.url || '') ? l.url.replace(/\/+$/, '') + '/' : LINKS.ats; };
-const LINKS = {ats:'http://localhost:8765/', exp:'/expenseTracker/', led:'/InvestmentPlan/', trip:'/tripManangement/'};
-/* Trip Vault's personal documents (its Document Vault): everything that is not a travel paper */
+const atsUrl = () => { const l = HAS_CLOUD && Cloud.atsLink(); return l && /^https?:\/\//.test(l.url || '') ? l.url.replace(/\/+$/, '') + '/' : LINKS.ats; };
 const TRAVEL_DOC = ['boarding-pass', 'flight', 'hotel', 'train', 'bus', 'visa', 'car', 'activity'];
 const DOC_LABEL = {passport: 'Passport', aadhaar: 'Aadhaar', pan: 'PAN card', licence: 'Driving licence', 'voter-id': 'Voter ID', tax: 'Tax papers', bank: 'Bank statement',
   investment: 'Investment statement', insurance: 'Insurance', property: 'Property / rent', vehicle: 'Vehicle papers', medical: 'Medical', education: 'Education', employment: 'Employment', bill: 'Bill / warranty', other: 'Other'};
-function personalDocs(tv){ return ((tv && tv.docs) || []).filter(d=>TRAVEL_DOC.indexOf(d.type) < 0); }
-/* a trip's own documents, as Trip Vault counts them: travel papers, or a passport / travel insurance / unsorted one
-   attached to it - never Aadhaar, PAN, bank and the other personal ones, even when attached to a trip */
+const personalDocs = tv => ((tv && tv.docs) || []).filter(d => TRAVEL_DOC.indexOf(d.type) < 0);
 const isTripDoc = d => !!d && (TRAVEL_DOC.indexOf(d.type) >= 0 || (!!d.tripId && ['passport', 'insurance', 'other'].indexOf(d.type) >= 0));
 const SESSION = 'money-home-session';
 const ICON = {
@@ -226,94 +291,32 @@ const ICON = {
 const ASSET = {EPF:'EPF', ESOPS_RSUS:'ESOPs & RSUs', STOCK:'Indian stocks & ETFs', IND_STOCK:'Indian stocks & ETFs', MF:'Mutual funds', US_STOCK:'US stocks',
   US_STOCK_WALLET:'US cash', NPS:'NPS', GOLD:'Gold', PHYSICAL_GOLD:'Physical gold', VEHICLE:'Vehicle', CRYPTO:'Crypto', FD:'FDs', PPF:'PPF', BOND:'Bonds'};
 const PAL = ['--a1','--a2','--a3','--a4','--a5','--a6','--a7','--a8'];
+const logo = () => `<svg viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="16" fill="#0c2620"/><path d="M16 42 L28 28 L36 35 L48 20" stroke="#e2b04a" stroke-width="6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 
-const signedIn = () => { try{ return sessionStorage.getItem(SESSION) === 'yes'; }catch(e){ return false; } };
-function ledger(){ try{ return JSON.parse(localStorage.getItem('ledger-draft-v2') || localStorage.getItem('ledger-state-v2') || 'null'); }catch(e){ return null; } }
+const signedIn = () => DEMO || (() => { try{ return sessionStorage.getItem(SESSION) === 'yes'; }catch(e){ return false; } })();
+function ledger(){ if(DEMO) return DEMO_DATA.plan; try{ return JSON.parse(localStorage.getItem('ledger-draft-v2') || localStorage.getItem('ledger-state-v2') || 'null'); }catch(e){ return null; } }
 
-/* ---------- Ask AI: one assistant for all the apps, through the site's central AI (the AI hub, /ai/) */
-const ASK = {turns: [], busy: false, ctl: null, ctx: '', data: null};
-const hasAsk = () => typeof MoneyAsk !== 'undefined';
-const hasAi = () => typeof MoneyAI !== 'undefined' && MoneyAI.aiAvailable();
-function askCard(){
-  const conv = ASK.turns.map(t => t.role === 'user' ? `<div class="q">${esc(t.content)}</div>`
-    : `<div class="a ${t.error ? 'err' : ''}">${esc(t.content)}${(t.sources || []).length ? `<span class="srcs">${t.sources.map((x, i) => `<a href="${esc(x.url)}" target="_blank" rel="noopener">[${i + 1}] ${esc(x.title)}</a>`).join(' ')}</span>` : ''}${t.by ? `<span class="by">${esc(t.by)}</span>` : ''}</div>`).join('');
-  const sugg = ['How much did I spend last month, and on what?', 'Am I on track for my retirement target?', 'EMI for 50 lakh at 8.5% for 20 years', '100 USD to INR', 'Weather in Dubai this week', 'What is a mutual fund?'];
-  return `<section class="card ask"><div class="top"><h3>Ask</h3><a class="hub" href="/setup/#ai">AI · ${hasAi() ? esc(MoneyAI.aiNames()[0]) + ' first' : 'add a key'}</a></div>
-    <p class="cap">Your plan, spending, trips and documents${ASK.ctx && /ATS/.test(ASK.ctx) ? ', ATS holdings' : ''} are answered from your own data; money sums (EMI, SIP, CAGR, GST), exchange rates, weather, meanings and facts are looked up on the web — with the sources shown.</p>
-    ${conv ? `<div class="convo" id="convo">${conv}</div>` : ''}
-    ${hasAi() || hasAsk() ? `<form id="askf"><textarea id="askq" rows="1" placeholder="Ask about your money, plan or trips…"></textarea><button class="go" id="askgo">${ASK.busy ? 'Stop' : 'Ask'}</button></form>
-      ${ASK.turns.length ? '' : `<div class="sugg">${sugg.map(q => `<button type="button" data-q="${esc(q)}">${esc(q)}</button>`).join('')}</div>`}`
-    : `<div class="empty">Add a free AI key in <a href="/setup/#ai">Setup</a> (Google Gemini is the most useful) — every app then uses it.</div>`}</section>`;
+/* ---------- the apps' own sums (as on the current Money Home) */
+function month(txns, m){
+  const a = {spend:0, refunds:0, invested:0, redeemed:0, income:0};
+  txns.forEach(t => { if(!t.date.startsWith(m) || t.excluded || t.kind === 'ignore') return; const out = t.direction === 'debit';
+    if(t.kind === 'spend'){ if(out) a.spend += t.amount; else a.refunds += t.amount; }
+    else if(t.kind === 'investment'){ if(out) a.invested += t.amount; else a.redeemed += t.amount; }
+    else if(t.kind === 'cc_bill'){ if(out && !t.paired) a.spend += t.amount; }
+    else if(t.kind === 'income' && !out) a.income += t.amount; });
+  a.spend -= a.refunds;
+  return a;
 }
-function bindAsk(){
-  const f = $('askf');
-  if(!f) return;
-  const q = $('askq');
-  q.onkeydown = e => { if(e.key === 'Enter' && !e.shiftKey){ e.preventDefault(); f.requestSubmit(); } };
-  document.querySelectorAll('.sugg [data-q]').forEach(b => b.onclick = () => { q.value = b.dataset.q; f.requestSubmit(); });
-  f.onsubmit = async e => {
-    e.preventDefault();
-    if(ASK.busy){ if(ASK.ctl) ASK.ctl.abort(); return; }
-    const text = q.value.trim();
-    if(!text) return;
-    ASK.turns.push({role: 'user', content: text});
-    ASK.busy = true; ASK.ctl = new AbortController();
-    render();
-    // your own data first: spending, income, savings, trips, documents and the plan are answered exactly, without AI
-    const own = hasAsk() && ASK.data ? MoneyAsk.answer(text, ASK.data) : null;
-    if(own){
-      ASK.turns.push({role: 'assistant', content: own.text, by: own.by});
-      ASK.busy = false; ASK.ctl = null; render();
-      setTimeout(() => { const c = $('convo'); if(c) c.lastElementChild.scrollIntoView({block: 'nearest'}); const i = $('askq'); if(i) i.focus(); }, 50);
-      return;
-    }
-    // beyond the apps: calculators, live facts, and reading the web — then, with an AI, a plain answer held to what was read
-    let web = null;
-    if(typeof MoneyWeb !== 'undefined'){
-      try{ web = await MoneyWeb.answer(text); }catch(e){ web = null; }
-      // a question for the whole web: your relay searches and reads, an AI thinks it through (sources shown)
-      const relay = MoneyWeb.relay((MoneyAI.aiLocal() || {}).relay);
-      if(relay && (!web || web.kind === 'read' || web.kind === 'not-found')){
-        try{
-          const chat = hasAi() ? (sys, turns, o) => MoneyAI.chat(sys, turns, o, ASK.ctl && ASK.ctl.signal) : null;
-          const out = await MoneyWeb.deep(text, {search: relay.search, read: relay.read, chat, onStep: t => { const e = document.querySelector('.convo'); if(e) e.dataset.step = t; }});
-          ASK.turns.push({role: 'assistant', content: out.text, sources: out.sources, by: out.by || ('Searched the web via ' + (out.provider || 'your relay'))});
-          ASK.busy = false; ASK.ctl = null; render();
-          setTimeout(() => { const c = $('convo'); if(c) c.lastElementChild.scrollIntoView({block: 'nearest'}); const i = $('askq'); if(i) i.focus(); }, 50);
-          return;
-        }catch(e){ if(e.code === 'cancelled'){ ASK.busy = false; render(); return; } /* the relay failed: carry on without it */ }
-      }
-      if(web && web.kind !== 'not-found'){
-        let out = web, by = 'Money Brain · ' + ({calculator: 'worked out exactly', currency: 'live rate', weather: 'live forecast', time: 'world clock', definition: 'dictionary', fact: 'Wikidata'}[web.kind] || 'read from the web') + ' (no AI)';
-        if(web.passages && hasAi()){
-          try{ out = await MoneyWeb.rephrase(text, web, (sys, turns, o) => MoneyAI.chat(sys, turns, o, ASK.ctl && ASK.ctl.signal)); if(out.by) by = 'Read from the web, put in words by ' + out.by; }catch(e){ out = web; }
-        }
-        ASK.turns.push({role: 'assistant', content: out.text + (out.note ? '\n\n' + out.note : ''), sources: out.sources, by});
-        ASK.busy = false; ASK.ctl = null; render();
-        setTimeout(() => { const c = $('convo'); if(c) c.lastElementChild.scrollIntoView({block: 'nearest'}); const i = $('askq'); if(i) i.focus(); }, 50);
-        return;
-      }
-    }
-    if(!hasAi()){
-      ASK.turns.push({role: 'assistant', content: web && web.kind === 'not-found' ? web.text + ' An AI key (free, in Setup) would let me answer from general knowledge.' : 'I answer from your own data (spending, trips, documents, plan) and look things up on the web (sums, rates, weather, facts). For anything else, add a free AI key in Setup.', error: true});
-      ASK.busy = false; ASK.ctl = null; render(); return;
-    }
-    const system = `You are the assistant on "Money Home", the start page of the owner's personal apps: the 16-Year Ledger (investment plan), the Expense Tracker (bank statements), Trip Vault (trips) and ATS (trading dashboard). Answer in plain, short sentences (Indian rupees, ₹, lakh/crore), using only the figures below; say so when something is not in them, and which app to open to see it. You explain and help plan; you do not give licensed investment advice or tell them to buy or sell a specific security.
-Today is ${new Date().toISOString().slice(0, 10)}.
-${ASK.ctx || 'No data from the apps in this browser yet.'}`;
-    try{
-      const r = await MoneyAI.chat(system, ASK.turns.filter(t => !t.error).map(t => ({role: t.role, content: t.content})).slice(-10), {}, ASK.ctl.signal);
-      // the AI's figures checked against your data: one it made up is pointed out
-      const made = hasAsk() ? MoneyAsk.checkFigures(r.text, ASK.ctx) : [];
-      ASK.turns.push({role: 'assistant', content: r.text.trim() + (made.length ? '\n\n⚠ Not in your data: ' + made.join(', ') + ' — check before relying on ' + (made.length === 1 ? 'it' : 'them') + '.' : ''), by: r.provider + ' · ' + r.model + ' — from its own knowledge, not checked against the web'});
-    }catch(err){
-      if(err.code !== 'cancelled') ASK.turns.push({role: 'assistant', content: err.message, error: true});
-    }finally{ ASK.busy = false; ASK.ctl = null; render(); setTimeout(() => { const c = $('convo'); if(c) c.lastElementChild.scrollIntoView({block: 'nearest'}); const i = $('askq'); if(i) i.focus(); }, 50); }
-  };
+function market(){
+  const ist = new Date(Date.now() + (330 + new Date().getTimezoneOffset()) * 60000);
+  const d = ist.getDay(), mins = ist.getHours() * 60 + ist.getMinutes();
+  if(d === 0 || d === 6) return {on:false, text:'NSE closed · weekend'};
+  if(mins < 555) return {on:false, text:'NSE opens 09:15'};
+  if(mins < 930) return {on:true, text:'NSE open · closes 15:30'};
+  return {on:false, text:'NSE closed · opens 09:15'};
 }
-
-/* ---------- Trip Vault's trips, as that app keeps them in this browser (read only; a missing database is not created) */
 async function tripVault(){
+  if(DEMO) return DEMO_DATA.tv;
   try{
     if(!window.indexedDB) return null;
     if(indexedDB.databases && !(await indexedDB.databases()).some(d => d.name === 'trip-vault')) return null;
@@ -325,79 +328,155 @@ async function tripVault(){
   }catch(e){ return null; }
 }
 
-/* ---------- sign-in: the Expense Tracker's (else the Ledger's own, else admin / admin) */
+/* ---------- ?demo: made-up numbers, to see the design anywhere (never saved) */
+const DEMO_DATA = (() => {
+  const now = new Date(), m0 = ym(now), txns = [];
+  for(let k = -5; k <= 0; k++){
+    const m = shiftM(m0, k), f = 1 + Math.sin(k * 1.7) * .18;
+    txns.push({date: m + '-01', kind: 'income', direction: 'credit', amount: 412000});
+    txns.push({date: m + '-05', kind: 'investment', direction: 'debit', amount: 120000 + (k % 2 ? 15000 : 0)});
+    ['Rent', 'Food', 'Travel', 'Shopping', 'Bills'].forEach((c, i) => txns.push({date: m + '-1' + i, kind: 'spend', direction: 'debit', category: c, amount: Math.round([65000, 28000, 22000, 18000, 9000][i] * f)}));
+  }
+  const d = n => { const x = new Date(Date.now() + n * 864e5); return x.toISOString().slice(0, 10); };
+  return {
+    plan: {importedSnapshot: {rows: [{asset_type: 'MF', current_value: 18400000}, {asset_type: 'STOCK', current_value: 9100000}, {asset_type: 'EPF', current_value: 6200000},
+        {asset_type: 'US_STOCK', current_value: 5300000}, {asset_type: 'ESOPS_RSUS', current_value: 4100000}, {asset_type: 'NPS', current_value: 1900000}, {asset_type: 'GOLD', current_value: 1200000}, {asset_type: 'VEHICLE', current_value: 900000}]},
+      corpusExclude: ['VEHICLE'], targetLowCr: 9, targetHighCr: 12, retireAge: 50, plan: {dob: '1987-06-14'}, indiaFunds: [{monthly: 95000}], usFunds: [{monthly: 30000}],
+      snapshots: [{date: '2023-04-01', value: 21500000}, {date: d(-20), value: 46300000}], atsReadAt: new Date(Date.now() - 42 * 60000).toISOString(),
+      calendar: [{year: 2026, age: 39, action: 'Step up SIPs by 10%', fund: 'All India funds', pr: 'gold'}, {year: 2027, age: 40, action: 'Rebalance to 70 / 30', fund: 'MF + EPF', why: 'equity above band', pr: 'warning'},
+        {year: 2028, age: 41, action: 'Start the glide path', fund: 'NPS', pr: 'good'}, {year: 2030, age: 43, action: 'Review term cover', pr: 'critical'}]},
+    et: {txns},
+    ats: {ok: true, total: {value: 9100000, invested: 7350000, gain: 1750000, gain_pct: 23.8, day: 38420, day_pct: .42}, updated_at: new Date(Date.now() - 6 * 60000).toISOString(), source: 'Zerodha · Groww',
+      items: [{symbol: 'TATAMOTORS.NS', pct: 3.1, value: 1}, {symbol: 'HDFCBANK.NS', pct: 1.4, value: 1}, {symbol: 'INFY.NS', pct: -1.2, value: 1}, {symbol: 'ITC.NS', pct: -.6, value: 1}]},
+    tv: {trips: [{id: 't1', name: 'Dubai with family', city: 'Dubai', start: d(19), end: d(24)}, {id: 't0', name: 'Goa', city: 'Goa', start: d(-60), end: d(-56)}],
+      docs: [{tripId: 't1', type: 'flight', fields: {segments: [{flight: 'EK 501', from: 'BOM', to: 'DXB', date: d(19), dep: '04:30'}, {flight: 'EK 500', from: 'DXB', to: 'BOM', date: d(24), dep: '22:10'}]}},
+        {tripId: 't1', type: 'hotel', title: 'Hotel', fields: {hotelName: 'Address Downtown'}}, {tripId: 't1', type: 'visa'},
+        {type: 'passport', person: 'You', fields: {validUntil: '2031-02-01'}}, {type: 'pan'}, {type: 'aadhaar'}, {type: 'insurance', fields: {validUntil: '2027-03-31'}}]},
+  };
+})();
+
+/* ---------- Ask: the same assistant as the current Money Home */
+const ASK = {turns: [], busy: false, ctl: null, ctx: '', data: null};
+const hasAsk = () => typeof MoneyAsk !== 'undefined';
+const hasAi = () => typeof MoneyAI !== 'undefined' && MoneyAI.aiAvailable();
+function askCard(){
+  const conv = ASK.turns.map(t => t.role === 'user' ? `<div class="q">${esc(t.content)}</div>`
+    : `<div class="a ${t.error ? 'err' : ''}">${esc(t.content)}${(t.sources || []).length ? `<span class="srcs">${t.sources.map((x, i) => `<a href="${esc(x.url)}" target="_blank" rel="noopener">[${i + 1}] ${esc(x.title)}</a>`).join(' ')}</span>` : ''}${t.by ? `<span class="by">${esc(t.by)}</span>` : ''}</div>`).join('');
+  const sugg = ['How much did I spend last month, and on what?', 'Am I on track for my retirement target?', 'EMI for 50 lakh at 8.5% for 20 years', '100 USD to INR', 'Weather in Dubai this week'];
+  return `<div class="ask"><a class="hub" href="/setup/#ai">AI · ${hasAi() ? esc(MoneyAI.aiNames()[0]) + ' first' : 'add a key'}</a>
+    <p class="cap">Your plan, spending, trips and documents${ASK.ctx && /ATS/.test(ASK.ctx) ? ', ATS holdings' : ''} are answered from your own data; sums, rates, weather and facts are looked up on the web — with the sources shown.</p>
+    ${conv ? `<div class="convo" id="convo">${conv}</div>` : ''}
+    ${hasAi() || hasAsk() ? `<form id="askf"><textarea id="askq" rows="1" placeholder="Ask about your money, plan or trips…"></textarea><button class="go" id="askgo">${ASK.busy ? 'Stop' : 'Ask'}</button></form>
+      ${ASK.turns.length ? '' : `<div class="sugg">${sugg.map(q => `<button type="button" data-q="${esc(q)}">${esc(q)}</button>`).join('')}</div>`}`
+    : `<div class="empty">Add a free AI key in <a href="/setup/#ai">Setup</a> (Google Gemini is the most useful) — every app then uses it.</div>`}</div>`;
+}
+function bindAsk(){
+  const f = $('askf');
+  if(!f) return;
+  const q = $('askq');
+  const done = () => { ASK.busy = false; ASK.ctl = null; render(); setTimeout(() => { const c = $('convo'); if(c) c.lastElementChild.scrollIntoView({block: 'nearest'}); const i = $('askq'); if(i) i.focus(); }, 50); };
+  q.onkeydown = e => { if(e.key === 'Enter' && !e.shiftKey){ e.preventDefault(); f.requestSubmit(); } };
+  document.querySelectorAll('.sugg [data-q]').forEach(b => b.onclick = () => { q.value = b.dataset.q; f.requestSubmit(); });
+  f.onsubmit = async e => {
+    e.preventDefault();
+    if(ASK.busy){ if(ASK.ctl) ASK.ctl.abort(); return; }
+    const text = q.value.trim();
+    if(!text) return;
+    ASK.turns.push({role: 'user', content: text});
+    ASK.busy = true; ASK.ctl = new AbortController(); STAGE.think(true);
+    render();
+    try{
+      const own = hasAsk() && ASK.data ? MoneyAsk.answer(text, ASK.data) : null;
+      if(own){ ASK.turns.push({role: 'assistant', content: own.text, by: own.by}); return done(); }
+      let web = null;
+      if(typeof MoneyWeb !== 'undefined'){
+        try{ web = await MoneyWeb.answer(text); }catch(e){ web = null; }
+        const relay = MoneyWeb.relay((MoneyAI.aiLocal() || {}).relay);
+        if(relay && (!web || web.kind === 'read' || web.kind === 'not-found')){
+          try{
+            const chat = hasAi() ? (sys, turns, o) => MoneyAI.chat(sys, turns, o, ASK.ctl && ASK.ctl.signal) : null;
+            const out = await MoneyWeb.deep(text, {search: relay.search, read: relay.read, chat, onStep: () => {}});
+            ASK.turns.push({role: 'assistant', content: out.text, sources: out.sources, by: out.by || ('Searched the web via ' + (out.provider || 'your relay'))});
+            return done();
+          }catch(e){ if(e.code === 'cancelled') return done(); }
+        }
+        if(web && web.kind !== 'not-found'){
+          let out = web, by = 'Money Brain · ' + ({calculator: 'worked out exactly', currency: 'live rate', weather: 'live forecast', time: 'world clock', definition: 'dictionary', fact: 'Wikidata'}[web.kind] || 'read from the web') + ' (no AI)';
+          if(web.passages && hasAi()){
+            try{ out = await MoneyWeb.rephrase(text, web, (sys, turns, o) => MoneyAI.chat(sys, turns, o, ASK.ctl && ASK.ctl.signal)); if(out.by) by = 'Read from the web, put in words by ' + out.by; }catch(e){ out = web; }
+          }
+          ASK.turns.push({role: 'assistant', content: out.text + (out.note ? '\n\n' + out.note : ''), sources: out.sources, by});
+          return done();
+        }
+      }
+      if(!hasAi()){
+        ASK.turns.push({role: 'assistant', content: web && web.kind === 'not-found' ? web.text + ' An AI key (free, in Setup) would let me answer from general knowledge.' : 'I answer from your own data (spending, trips, documents, plan) and look things up on the web (sums, rates, weather, facts). For anything else, add a free AI key in Setup.', error: true});
+        return done();
+      }
+      const system = `You are the assistant on "Money Home", the start page of the owner's personal apps: the 16-Year Ledger (investment plan), the Expense Tracker (bank statements), Trip Vault (trips) and ATS (trading dashboard). Answer in plain, short sentences (Indian rupees, ₹, lakh/crore), using only the figures below; say so when something is not in them, and which app to open to see it. You explain and help plan; you do not give licensed investment advice or tell them to buy or sell a specific security.
+Today is ${new Date().toISOString().slice(0, 10)}.
+${ASK.ctx || 'No data from the apps in this browser yet.'}`;
+      try{
+        const r = await MoneyAI.chat(system, ASK.turns.filter(t => !t.error).map(t => ({role: t.role, content: t.content})).slice(-10), {}, ASK.ctl.signal);
+        const made = hasAsk() ? MoneyAsk.checkFigures(r.text, ASK.ctx) : [];
+        ASK.turns.push({role: 'assistant', content: r.text.trim() + (made.length ? '\n\n⚠ Not in your data: ' + made.join(', ') + ' — check before relying on ' + (made.length === 1 ? 'it' : 'them') + '.' : ''), by: r.provider + ' · ' + r.model + ' — from its own knowledge, not checked against the web'});
+      }catch(err){ if(err.code !== 'cancelled') ASK.turns.push({role: 'assistant', content: err.message, error: true}); }
+      done();
+    } finally { STAGE.think(false); }
+  };
+}
+
+/* ---------- sign-in: the same one as every app */
 async function checkLogin(u, p){
-  if(typeof MoneyShared !== 'undefined') return MoneyShared.checkLogin(u, p);     // one sign-in for every app (Setup)
-  const et = await Cloud.checkExpenseTrackerLogin(u, p);
-  if(et !== null) return et;
+  if(typeof MoneyShared !== 'undefined') return MoneyShared.checkLogin(u, p);
+  if(HAS_CLOUD){ const et = await Cloud.checkExpenseTrackerLogin(u, p); if(et !== null) return et; }
   const plan = ledger();
-  if(plan && plan.auth && plan.auth.hash) return u.trim().toLowerCase() === String(plan.auth.user).toLowerCase() && await Cloud.sha256(u.trim().toLowerCase() + ':' + p) === plan.auth.hash;
+  if(plan && plan.auth && plan.auth.hash && HAS_CLOUD) return u.trim().toLowerCase() === String(plan.auth.user).toLowerCase() && await Cloud.sha256(u.trim().toLowerCase() + ':' + p) === plan.auth.hash;
   return u.trim().toLowerCase() === 'admin' && p === 'admin';
 }
 function showLogin(){
   $('app').innerHTML = `<div class="gate"><form id="lf">
-    <div class="brand" style="color:var(--ink)">${logo()}Money Home</div>
-    <h1>Welcome back</h1><p class="sub">Your trading, spending and investment plan in one place.</p>
+    <div class="brand">${logo()}Money Home</div>
+    <h1>Welcome back</h1><p class="sub">Cygnus is warming up your apps.</p>
     <label for="u">Username</label><input id="u" autocomplete="username" autocapitalize="none" spellcheck="false" required>
     <label for="p">Password</label><input id="p" type="password" autocomplete="current-password" required>
     <p class="err" id="e" hidden>That username or password is wrong.</p>
     <button>Sign in</button>
     <p class="sub" style="margin:8px 0 0;font-size:12px">The same sign-in as the Expense Tracker, the Ledger and Trip Vault.</p></form></div>`;
+  STAGE.setApps({});
   $('u').focus();
   $('lf').onsubmit = async e => { e.preventDefault();
     if(!(await checkLogin($('u').value, $('p').value))){ $('e').hidden = false; $('p').select(); return; }
     try{ sessionStorage.setItem(SESSION, 'yes'); }catch(_){}
     render(); };
 }
-const logo = () => `<svg viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="16" fill="#0c2620"/><path d="M16 42 L28 28 L36 35 L48 20" stroke="#e2b04a" stroke-width="6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
-
-/* ---------- the Expense Tracker's own month totals (its plans.ts) */
-function month(txns, m){
-  const a = {spend:0, refunds:0, invested:0, redeemed:0, income:0};
-  txns.forEach(t => { if(!t.date.startsWith(m) || t.excluded || t.kind === 'ignore') return; const out = t.direction === 'debit';
-    if(t.kind === 'spend'){ if(out) a.spend += t.amount; else a.refunds += t.amount; }
-    else if(t.kind === 'investment'){ if(out) a.invested += t.amount; else a.redeemed += t.amount; }
-    else if(t.kind === 'cc_bill'){ if(out && !t.paired) a.spend += t.amount; }   // paired: the card's own purchases are counted
-    else if(t.kind === 'income' && !out) a.income += t.amount; });
-  a.spend -= a.refunds;
-  return a;
-}
-const shiftM = (m, k) => ym(new Date(+m.slice(0, 4), +m.slice(5, 7) - 1 + k, 1));
-
-/* NSE by the clock (09:15-15:30 IST, Mon-Fri; holidays not known here) */
-function market(){
-  const ist = new Date(Date.now() + (330 + new Date().getTimezoneOffset()) * 60000);
-  const d = ist.getDay(), mins = ist.getHours() * 60 + ist.getMinutes();
-  if(d === 0 || d === 6) return {on:false, text:'NSE closed · weekend'};
-  if(mins < 555) return {on:false, text:'NSE opens 09:15'};
-  if(mins < 930) return {on:true, text:'NSE open · closes 15:30'};
-  return {on:false, text:'NSE closed · opens 09:15'};
-}
 
 function ringSvg(p){
-  const r = 70, c = 2 * Math.PI * r, f = Math.max(0, Math.min(1, p));
-  return `<svg class="ring" viewBox="0 0 168 168" role="img" aria-label="${(f * 100).toFixed(1)}% of the target">
-    <circle cx="84" cy="84" r="${r}" fill="none" stroke="rgb(255 255 255 / .1)" stroke-width="12"/>
-    <circle cx="84" cy="84" r="${r}" fill="none" stroke="var(--gold)" stroke-width="12" stroke-linecap="round"
-      stroke-dasharray="${(c * f).toFixed(1)} ${c.toFixed(1)}" transform="rotate(-90 84 84)"/>
-    <text x="84" y="82" text-anchor="middle" style="font:800 30px var(--display)">${(f * 100).toFixed(1)}%</text>
-    <text x="84" y="104" text-anchor="middle" style="font:500 11.5px var(--body);fill:var(--hero-mut)">of the target</text></svg>`;
+  const r = 52, c = 2 * Math.PI * r, f = Math.max(0, Math.min(1, p));
+  return `<svg class="ring" viewBox="0 0 128 128" role="img" aria-label="${(f * 100).toFixed(1)}% of the target">
+    <defs><linearGradient id="rg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f6d58a"/><stop offset="1" stop-color="#e2b04a"/></linearGradient></defs>
+    <circle cx="64" cy="64" r="${r}" fill="none" stroke="rgb(255 255 255 / .08)" stroke-width="10"/>
+    <circle class="arc" cx="64" cy="64" r="${r}" fill="none" stroke="url(#rg)" stroke-width="10" stroke-linecap="round" data-full="${(c * f).toFixed(1)} ${c.toFixed(1)}"
+      stroke-dasharray="0 ${c.toFixed(1)}" transform="rotate(-90 64 64)" style="filter:drop-shadow(0 0 6px rgb(226 176 74 / .6))"/>
+    <text x="64" y="64" text-anchor="middle" fill="#eef2ec" style="font:800 23px var(--display)">${(f * 100).toFixed(1)}%</text>
+    <text x="64" y="82" text-anchor="middle" fill="#8fa59a" style="font:500 10px var(--body)">of the target</text></svg>`;
 }
 
-/* draws straight away from this browser, then again when ATS answers (it can take a few seconds) */
+/* draws straight away from this browser, then again when ATS answers */
 let RUN = 0;
 async function render(){
   const run = ++RUN;
-  const et = await Cloud.expenseTracker(true);
+  const et = DEMO ? DEMO_DATA.et : HAS_CLOUD ? await Cloud.expenseTracker(true) : null;
   const tv = await tripVault();
-  if(typeof MoneyAI !== 'undefined') await MoneyAI.loadAi();      // keys kept in the Expense Tracker count too
-  if(typeof MoneyShared !== 'undefined') MoneyShared.quiet();       // settings changed on your other device (every 10 min at most)
-  const linked = !!Cloud.atsLink();
+  if(typeof MoneyAI !== 'undefined') await MoneyAI.loadAi();
+  if(typeof MoneyShared !== 'undefined' && !DEMO) MoneyShared.quiet();
+  const linked = DEMO || (HAS_CLOUD && !!Cloud.atsLink());
   draw(et, linked ? 'checking' : null, tv);
   if(!linked) return;
-  const ats = await Cloud.atsHoldings().catch(e => ({err: e}));
+  const ats = DEMO ? await new Promise(r => setTimeout(() => r(DEMO_DATA.ats), 900)) : await Cloud.atsHoldings().catch(e => ({err: e}));
   if(run === RUN) draw(et, ats, tv);
 }
+
 function draw(et, ats, tv){
   const plan = ledger();
   const mk = market();
@@ -421,16 +500,14 @@ function draw(et, ats, tv){
   }
   const sip = real ? [].concat(plan.indiaFunds || [], plan.usFunds || []).reduce((s, f) => s + (Number(f.monthly) || 0), 0) : 0;
   const T = atsOk ? ats.total || {} : {};
-
-  /* allocation ribbon: every asset class, largest first */
   const alloc = {};
   rows.forEach(r => { const k = ASSET[r.asset_type] || String(r.asset_type).replace(/_/g, ' ').toLowerCase(); alloc[k] = (alloc[k] || 0) + (Number(r.current_value) || 0); });
   manual.forEach(m => { if(Number(m.current)) alloc[m.name || 'By hand'] = (alloc[m.name || 'By hand'] || 0) + Number(m.current); });
   const allocList = Object.entries(alloc).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]);
-  const allocTop = allocList.slice(0, 7), rest = allocList.slice(7).reduce((s, [, v]) => s + v, 0);
+  const allocTop = allocList.slice(0, 6), rest = allocList.slice(6).reduce((s, [, v]) => s + v, 0);
   if(rest > 0) allocTop.push(['Other', rest]);
 
-  /* What Ask AI knows: the numbers this page shows, from each app in this browser (nothing else is sent). */
+  /* ----- what Ask knows: the numbers on this page */
   const ctx = [];
   if(real){
     ctx.push(`16-Year Ledger (investment plan): net worth ${cr(netWorth)}; retirement corpus ${cr(corpus)}${tHi ? ` against a target of ₹${tLo ? tLo + '–' : ''}${tHi} Cr` : ''}${yearsLeft !== null ? `; ${yearsLeft.toFixed(1)} years to retirement at ${retire}` : ''}; monthly SIPs ${inr(sip)}.`);
@@ -455,110 +532,103 @@ function draw(et, ats, tv){
     if(trips.length) ctx.push('Trip Vault, upcoming trips: ' + trips.map(x => `${x.t.name} (${[x.t.city, x.t.start && x.t.start + ' to ' + (x.t.end || '?')].filter(Boolean).join(', ')}; ${x.n} documents${x.fl.length ? '; flights ' + x.fl.join(', ') : ''}${x.hotels.length ? '; staying at ' + x.hotels.join(', ') : ''})`).join('; ') + '.');
   }
   const pdocs = personalDocs(tv);
-  if(pdocs.length) ctx.push('Personal documents in Trip Vault (no numbers shown): ' + pdocs.map(d=>(DOC_LABEL[d.type] || d.type) + (d.person ? ' of ' + d.person : '') + (d.fields && d.fields.validUntil ? ', valid until ' + d.fields.validUntil : '') + (d.fields && d.fields.issuedOn ? ', issued ' + d.fields.issuedOn : '')).join('; ') + '.');
+  if(pdocs.length) ctx.push('Personal documents in Trip Vault (no numbers shown): ' + pdocs.map(d => (DOC_LABEL[d.type] || d.type) + (d.person ? ' of ' + d.person : '') + (d.fields && d.fields.validUntil ? ', valid until ' + d.fields.validUntil : '') + (d.fields && d.fields.issuedOn ? ', issued ' + d.fields.issuedOn : '')).join('; ') + '.');
   ASK.ctx = ctx.join('\n');
-  // the same data, as data, for answering from it without AI
   ASK.data = {today: new Date().toISOString().slice(0, 10), txns: (et && et.txns) || [],
     ledger: real ? {netWorth, corpus, targetLow: tLo, targetHigh: tHi, retire, yearsLeft, sip} : null,
     trips: ((tv && tv.trips) || []).map(t => ({name: t.name, city: t.city, start: t.start, end: t.end})).filter(t => t.start),
     docs: ((tv && tv.docs) || []).filter(d => d.fields && d.fields.validUntil).map(d => ({type: d.type, label: DOC_LABEL[d.type] || d.title || d.type, person: d.person, validUntil: d.fields.validUntil}))};
-  // the same, kept in this browser for the AI page (/ai/chat/: its "Your apps" connector) — never leaves the browser by itself
-  try{ localStorage.setItem('money-apps-snapshot', JSON.stringify({at: new Date().toISOString(), ctx: ASK.ctx, data: ASK.data})); }catch(e){}
+  if(!DEMO) try{ localStorage.setItem('money-apps-snapshot', JSON.stringify({at: new Date().toISOString(), ctx: ASK.ctx, data: ASK.data})); }catch(e){}
 
-  const hero = `<header class="hero"><div class="hero-in">
-    <div class="topline"><div class="brand">${logo()}Money Home</div>
-      <div class="chips"><span class="chip ${mk.on ? 'on' : ''}"><i></i>${esc(mk.text)}</span>
-        <span class="chip">${esc(new Date().toLocaleDateString('en-IN', {weekday:'long', day:'numeric', month:'long'}))}</span>
-        <a class="chip" href="/ai/chat/" target="_blank" style="text-decoration:none;font-weight:700" title="Cygnus AI in this browser — works anywhere, even with the Mac off">✦ Cygnus AI ↗</a>
-        <a class="chip" href="https://anils-macbook-air.tail4a1c2d.ts.net:8443/" target="_blank" rel="noopener" style="text-decoration:none;font-weight:700" title="The full Cygnus AI on your Mac, through Tailscale — needs Tailscale on this device and the Mac awake">💻 Cygnus AI on Mac ↗</a>
-        <a class="chip" href="/setup/" style="text-decoration:none">⚙ Setup</a></div></div>
-    <div class="hero-grid"><div>
-      <div class="hello">${hello}. Here is where you stand.</div>
-      ${netWorth ? `<div class="big"><span class="num">${cr(netWorth)}</span></div>
-        <div class="bigsub">Net worth across everything INDmoney sees${manual.length ? ' and what you track by hand' : ''}. Your retirement corpus is <b>${cr(corpus)}</b>${ex.length ? ', leaving out ' + esc(ex.filter(x => x.indexOf('MANUAL:') < 0).map(x => (ASSET[x] || x).toLowerCase()).join(', ')) : ''}.</div>`
-        : `<div class="big" style="font-size:40px">Hello</div><div class="bigsub">Open the Ledger once in this browser to see your net worth here.</div>`}
-      ${atsOk ? `<div class="day">Holdings today <b class="num ${(T.day || 0) >= 0 ? 'up' : 'dn'}">${(T.day || 0) >= 0 ? '+' : ''}${inr(T.day || 0)}</b>${T.day_pct != null ? `<span class="${T.day_pct >= 0 ? 'up' : 'dn'}">${pct(T.day_pct)}</span>` : ''}</div>` : ''}
-    </div>
-    ${tHi ? `<div class="ringbox">${ringSvg(corpus / (tHi * 1e7))}<div class="ringfacts">
-        <div class="rf"><div class="l">Target</div><div class="v">₹${esc(tLo)}–${esc(tHi)} Cr</div></div>
-        <div class="rf"><div class="l">Retire at</div><div class="v">${esc(retire)}${yearsLeft != null ? ` <span style="font-size:13px;color:var(--hero-mut)">· ${yearsLeft.toFixed(1)} yrs</span>` : ''}</div></div>
-        <div class="rf"><div class="l">Monthly SIP</div><div class="v">${inr(sip)}</div></div></div></div>` : ''}
-    </div>
-    ${allocTop.length ? `<div class="ribbon"><div class="ribbar" role="img" aria-label="Where the money is">${allocTop.map(([k, v], i) => `<i style="width:${(v / netWorth * 100).toFixed(2)}%;background:var(${PAL[i % PAL.length]})" title="${esc(k)} ${cr(v)}"></i>`).join('')}</div>
-      <div class="riblegend">${allocTop.map(([k, v], i) => `<span><em style="background:var(${PAL[i % PAL.length]})"></em>${esc(k)} <b>${cr(v)}</b></span>`).join('')}</div></div>` : ''}
-  </div></header>`;
+  /* ----- what each world says, in orbit */
+  const tagNote = {}, G = {};
 
-  /* ----- ATS card */
+  /* ===== ATS */
   let atsBody;
   if(atsOk){
     const movers = (ats.items || []).filter(r => r.pct != null && r.value > 0).sort((a, b) => b.pct - a.pct);
     const lbl = r => String(r.symbol || r.name || '').replace(/\.NS$|\.BO$|-USD$/, '').slice(0, 14) || r.name;
     atsBody = `<div class="kv">
       <div><div class="l">Holdings now</div><div class="v">${cr(T.value || 0)}</div><div class="s">invested ${cr(T.invested || 0)}</div></div>
-      <div><div class="l">Total gain</div><div class="v ${(T.gain || 0) >= 0 ? 'up' : 'dn'}">${(T.gain || 0) >= 0 ? '+' : ''}${cr(T.gain || 0)}</div><div class="s">${T.gain_pct != null ? pct(T.gain_pct) : ''}</div></div></div>
+      <div><div class="l">Total gain</div><div class="v ${(T.gain || 0) >= 0 ? 'up' : 'dn'}">${(T.gain || 0) >= 0 ? '+' : ''}${cr(T.gain || 0)}</div><div class="s">${T.gain_pct != null ? pct(T.gain_pct) : ''}</div></div>
+      <div><div class="l">Today</div><div class="v ${(T.day || 0) >= 0 ? 'up' : 'dn'}">${(T.day || 0) >= 0 ? '+' : ''}${inr(T.day || 0)}</div><div class="s">${T.day_pct != null ? pct(T.day_pct) : ''}</div></div>
+      <div><div class="l">Market</div><div class="v" style="font-size:15px;padding-top:5px">${esc(mk.text)}</div></div></div>
       ${movers.length ? `<div class="movers">${movers.slice(0, 2).map(r => `<span class="mv">▲ ${esc(lbl(r))} <b class="up">${pct(r.pct)}</b></span>`).join('')}${movers.slice(-2).reverse().filter(r => r.pct < 0).map(r => `<span class="mv">▼ ${esc(lbl(r))} <b class="dn">${pct(r.pct)}</b></span>`).join('')}</div>` : ''}
-      <div class="s" style="font-size:12px;color:var(--mut)">Brokers synced ${ats.updated_at ? esc(new Date(ats.updated_at).toLocaleString('en-IN', {day:'numeric', month:'short', hour:'2-digit', minute:'2-digit', hour12:false})) : '—'} · ${esc(ats.source || '')}</div>`;
+      <div class="meta">Brokers synced ${ats.updated_at ? esc(new Date(ats.updated_at).toLocaleString('en-IN', {day:'numeric', month:'short', hour:'2-digit', minute:'2-digit', hour12:false})) : '—'} · ${esc(ats.source || '')}</div>`;
+    G.ats = {v: ((T.day || 0) >= 0 ? '+' : '') + inr(T.day || 0), cls: (T.day || 0) >= 0 ? 'up' : 'dn', s: (T.day_pct != null ? pct(T.day_pct) + ' · ' : '') + 'holdings ' + cr(T.value || 0)};
+    tagNote.ats = (T.day || 0) >= 0 ? '+' + kfmt(T.day || 0) + ' today' : '−' + kfmt(-(T.day || 0)) + ' today';
   } else if(atsChecking){
-    atsBody = `<div class="empty">Asking ATS on this Mac for today’s numbers…</div>`;
+    atsBody = `<div class="empty">Asking ATS on this Mac for today’s numbers…</div>`; tagNote.ats = 'checking…';
   } else {
-    atsBody = `<div class="empty">${!Cloud.atsLink() ? 'Link ATS once from the Ledger (Import portfolio → Link ATS on this Mac) and your holdings show here, live.'
+    atsBody = `<div class="empty">${!(HAS_CLOUD && Cloud.atsLink()) ? 'Link ATS once from the Ledger (Import portfolio → Link ATS on this Mac) and your holdings show here, live.'
       : 'ATS isn’t reachable from this device. It runs on your Mac, which must be on (from your phone: through Tailscale, linked with ATS → Holdings → Link this device).'}${real && plan.atsReadAt ? ` The Ledger last read it ${esc(ago(new Date(plan.atsReadAt).getTime()))}.` : ''}</div>`;
+    tagNote.ats = 'offline';
+  }
+  function atsButtons(){
+    const remote = atsRemote(), local = LINKS.ats;
+    const mac = `<a class="open${MOBILE ? ' alt' : ''}" href="${esc(MOBILE ? local : atsUrl())}" target="_blank" rel="noopener" title="ATS on the Mac it runs on">Open ATS · this Mac <span aria-hidden="true">→</span></a>`;
+    const away = remote
+      ? `<a class="open${MOBILE ? '' : ' alt'}" href="${esc(remote + '/')}" target="_blank" rel="noopener" title="${esc(remote)} - through Tailscale (it must be on, on this device)">Open ATS · Remote <span aria-hidden="true">→</span></a><button class="edit" id="atsRemoteEdit" type="button">change</button>`
+      : `<button class="open alt" id="atsRemoteEdit" type="button" title="Your Mac's Tailscale address, to open ATS from your phone">＋ Remote address</button>`;
+    return `<div class="opens">${MOBILE ? away + mac : mac + away}</div>`;
   }
 
-  /* ----- Expense Tracker card + the month */
+  /* ===== Expense Tracker */
   const txns = et && et.txns || [];
-  let expBody, monthCard = '', lastM = null, A = null;
+  let expBody;
   if(txns.length){
     const lastDate = txns.reduce((m, t) => t.date > m ? t.date : m, '');
-    lastM = lastDate.slice(0, 7); A = month(txns, lastM);
-    const B = month(txns, shiftM(lastM, -1));
+    const lastM = lastDate.slice(0, 7), A = month(txns, lastM), B = month(txns, shiftM(lastM, -1));
     const d = B.spend ? (A.spend / B.spend - 1) * 100 : null;
     const left = A.income - A.spend - A.invested;
+    const tot = Math.max(A.income, A.spend + A.invested + Math.max(0, left)) || 1;
+    const seg = (v, c, t, i) => v > 0 ? `<i style="width:${(v / tot * 100).toFixed(2)}%;background:${c};animation-delay:${.15 * i}s" title="${t} ${inr(v)}">${v / tot > .14 ? kfmt(v) : ''}</i>` : '';
+    const hist = [...Array(6)].map((_, i) => shiftM(lastM, i - 5)).map(m => ({m, ...month(txns, m)}));
+    const max = Math.max(1, ...hist.map(h => h.spend + h.invested));
+    const sipBar = sip ? Math.min(100, A.invested / sip * 100) : null;
     expBody = `<div class="kv">
       <div><div class="l">Spent · ${esc(ymLabel(lastM, 'short'))}</div><div class="v">${inr(A.spend)}</div><div class="s">${d == null ? '&nbsp;' : `<span class="${d > 0 ? 'dn' : 'up'}">${pct(d, 0)}</span> vs ${esc(ymLabel(shiftM(lastM, -1), 'short'))}`}</div></div>
       <div><div class="l">Left over</div><div class="v ${left >= 0 ? 'up' : 'dn'}">${inr(left)}</div><div class="s">after spending and investing</div></div></div>
-      <div class="s" style="font-size:12px;color:var(--mut)">Statements up to ${esc(new Date(lastDate).toLocaleDateString('en-IN', {day:'numeric', month:'short', year:'numeric'}))}</div>`;
-    const tot = Math.max(A.income, A.spend + A.invested + Math.max(0, left)) || 1;
-    const seg = (v, c, t) => v > 0 ? `<i style="width:${(v / tot * 100).toFixed(2)}%;background:${c}" title="${t} ${inr(v)}">${v / tot > .14 ? kfmt(v) : ''}</i>` : '';
-    const months6 = [...Array(6)].map((_, i) => shiftM(lastM, i - 5));
-    const hist = months6.map(m => ({m, ...month(txns, m)}));
-    const max = Math.max(1, ...hist.map(h => h.spend + h.invested));
-    const sipBar = sip ? Math.min(100, A.invested / sip * 100) : null;
-    monthCard = `<section class="card"><h3>${esc(ymLabel(lastM))}</h3><p class="cap">Where the month’s money went, from your bank statements</p>
-      <div class="flow" role="img" aria-label="Income split">${seg(A.spend, 'var(--exp)', 'Spent')}${seg(A.invested, 'var(--led)', 'Invested')}${seg(Math.max(0, left), 'var(--a2)', 'Left over')}</div>
-      <div class="flowkey"><span><em style="background:var(--exp)"></em>Spent <b class="num">${inr(A.spend)}</b></span>
-        <span><em style="background:var(--led)"></em>Invested <b class="num">${inr(A.invested)}</b></span>
-        <span><em style="background:var(--a2)"></em>Left over <b class="num">${inr(Math.max(0, left))}</b></span>
-        <span style="color:var(--mut)">of income <b class="num">${inr(A.income)}</b></span></div>
-      ${sipBar != null ? `<div class="sip"><div style="display:flex;justify-content:space-between;font-size:12.5px"><span>Invested vs the plan’s SIP</span><b class="num">${inr(A.invested)} / ${inr(sip)}</b></div><div class="track"><i style="width:${sipBar.toFixed(1)}%"></i></div></div>` : ''}
-      <div><div style="font-size:12.5px;color:var(--mut);margin-bottom:2px">Last six months · spent and invested</div>
-        <div class="bars">${hist.map(h => `<div class="col" title="${esc(ymLabel(h.m))}: spent ${inr(h.spend)}, invested ${inr(h.invested)}">
-          <div class="stack" style="height:${Math.max(3, (h.spend + h.invested) / max * 118).toFixed(0)}px"><i style="flex:${Math.max(0, h.spend)};background:var(--exp)"></i><i style="flex:${h.invested};background:var(--led)"></i></div>
-          <span class="m">${esc(ymLabel(h.m, 'short'))}</span></div>`).join('')}</div></div></section>`;
+      <div><div class="flow" role="img" aria-label="Income split">${seg(A.spend, 'var(--exp)', 'Spent', 0)}${seg(A.invested, 'var(--led)', 'Invested', 1)}${seg(Math.max(0, left), 'var(--a2)', 'Left over', 2)}</div>
+      <div class="flowkey" style="margin-top:8px"><span><em style="background:var(--exp)"></em>Spent</span><span><em style="background:var(--led)"></em>Invested <b class="num">${inr(A.invested)}</b></span>
+        <span><em style="background:var(--a2)"></em>Left over</span><span style="color:var(--mut)">of income <b class="num">${inr(A.income)}</b></span></div></div>
+      ${sipBar != null ? `<div><div class="sub-h"><span>Invested vs the plan’s SIP</span><b class="num" style="color:var(--ink)">${inr(A.invested)} / ${inr(sip)}</b></div><div class="track"><i style="width:${sipBar.toFixed(1)}%"></i></div></div>` : ''}
+      <div><div class="sub-h"><span>Last six months · spent and invested</span></div>
+        <div class="bars">${hist.map((h, i) => `<div class="col" title="${esc(ymLabel(h.m))}: spent ${inr(h.spend)}, invested ${inr(h.invested)}">
+          <div class="stack" style="height:${Math.max(3, (h.spend + h.invested) / max * 96).toFixed(0)}px;transition-delay:${(i * .07).toFixed(2)}s"><i style="flex:${Math.max(0, h.spend)};background:var(--exp)"></i><i style="flex:${h.invested};background:var(--led)"></i></div>
+          <span class="m">${esc(ymLabel(h.m, 'short'))}</span></div>`).join('')}</div></div>
+      <div class="meta">Statements up to ${esc(new Date(lastDate).toLocaleDateString('en-IN', {day:'numeric', month:'short', year:'numeric'}))}</div>`;
+    G.exp = {l: 'Spent · ' + ymLabel(lastM, 'short'), v: inr(A.spend), s: d == null ? 'this month' : `<span class="${d > 0 ? 'dn' : 'up'}">${pct(d, 0)}</span> vs last month`};
+    tagNote.exp = kfmt(A.spend) + ' spent · ' + ymLabel(lastM, 'short');
   } else {
-    expBody = `<div class="empty">No statements in this browser yet. Import them in the Expense Tracker and this fills in by itself.</div>`;
+    expBody = `<div class="empty">No statements in this browser yet. Import them in the Expense Tracker and this fills in by itself.</div>`; tagNote.exp = 'no statements';
   }
 
-  /* ----- Ledger card + what is next on the plan */
-  let ledBody, nextCard = '';
+  /* ===== 16-Year Ledger */
+  let ledBody;
   if(real){
     const snaps = (plan.snapshots || []).slice().sort((a, b) => a.date < b.date ? -1 : 1);
     const last = snaps[snaps.length - 1], first = snaps[0];
-    ledBody = `<div class="kv">
-      <div><div class="l">Corpus</div><div class="v">${cr(corpus)}</div><div class="s">${tHi ? (corpus / (tHi * 1e7) * 100).toFixed(1) + '% of ₹' + esc(tHi) + ' Cr' : ''}</div></div>
-      <div><div class="l">Since the start</div><div class="v ${last && first && last.value >= first.value ? 'up' : ''}">${last && first ? (last.value >= first.value ? '+' : '') + cr(last.value - first.value) : '—'}</div><div class="s">${first ? 'from ' + esc(new Date(first.date).toLocaleDateString('en-IN', {month:'short', year:'numeric'})) : ''}</div></div></div>
-      <div class="s" style="font-size:12px;color:var(--mut)">${plan.atsReadAt ? 'Holdings read from ATS ' + esc(ago(new Date(plan.atsReadAt).getTime())) : 'Holdings as last imported'}</div>`;
     const PRC = {critical:'var(--dn)', warning:'var(--exp)', good:'var(--up)', gold:'var(--gold)'};
-    const todo = (plan.calendar || []).filter(c => !c.done).sort((a, b) => (a.year - b.year) || (a.age - b.age)).slice(0, 4);
-    nextCard = `<section class="card"><h3>Next on your plan</h3><p class="cap">The action calendar’s open items, soonest first</p>
-      ${todo.length ? `<ul class="todo">${todo.map(c => `<li><span class="when"><b>${esc(c.year)}</b>age ${esc(c.age)}</span>
-          <span class="a"><span class="pr" style="background:${PRC[c.pr] || 'var(--mut)'}"></span>${esc(c.action)}</span><span class="f">${esc(c.fund || '')}${c.why ? (c.fund ? ' — ' : '') + esc(c.why) : ''}</span></li>`).join('')}</ul>`
-        : '<div class="empty">Nothing open on the action calendar.</div>'}</section>`;
+    const todo = (plan.calendar || []).filter(c => !c.done).sort((a, b) => (a.year - b.year) || (a.age - b.age)).slice(0, 3);
+    ledBody = `${tHi ? `<div class="ringrow">${ringSvg(corpus / (tHi * 1e7))}<div class="ringfacts">
+        <div class="rf"><div class="l">Corpus</div><div class="v">${cr(corpus)}</div></div>
+        <div class="rf"><div class="l">Target</div><div class="v">₹${esc(tLo)}–${esc(tHi)} Cr</div></div>
+        <div class="rf"><div class="l">Retire at</div><div class="v">${esc(retire)}${yearsLeft != null ? ` <span style="font-size:12px;color:var(--mut)">· ${yearsLeft.toFixed(1)} yrs</span>` : ''}</div></div></div></div>` : ''}
+      <div class="kv">
+        <div><div class="l">Since the start</div><div class="v ${last && first && last.value >= first.value ? 'up' : ''}">${last && first ? (last.value >= first.value ? '+' : '') + cr(last.value - first.value) : '—'}</div><div class="s">${first ? 'from ' + esc(new Date(first.date).toLocaleDateString('en-IN', {month:'short', year:'numeric'})) : ''}</div></div>
+        <div><div class="l">Monthly SIP</div><div class="v">${inr(sip)}</div><div class="s">${plan.atsReadAt ? 'holdings read ' + esc(ago(new Date(plan.atsReadAt).getTime())) : 'as last imported'}</div></div></div>
+      ${allocTop.length ? `<div><div class="ribbar" role="img" aria-label="Where the money is">${allocTop.map(([k, v], i) => `<i style="width:${(v / netWorth * 100).toFixed(2)}%;background:var(${PAL[i % PAL.length]})" title="${esc(k)} ${cr(v)}"></i>`).join('')}</div>
+        <div class="riblegend">${allocTop.map(([k, v], i) => `<span><em style="background:var(${PAL[i % PAL.length]})"></em>${esc(k)} <b>${cr(v)}</b></span>`).join('')}</div></div>` : ''}
+      ${todo.length ? `<div class="sep"></div><div><div class="sub-h"><span>Next on your plan</span></div><ul class="todo">${todo.map(c => `<li><span class="when"><b>${esc(c.year)}</b>age ${esc(c.age)}</span>
+          <span class="a"><span class="pr" style="background:${PRC[c.pr] || 'var(--mut)'}"></span>${esc(c.action)}</span><span class="f">${esc(c.fund || '')}${c.why ? (c.fund ? ' — ' : '') + esc(c.why) : ''}</span></li>`).join('')}</ul></div>` : ''}`;
+    G.led = tHi ? {v: (corpus / (tHi * 1e7) * 100).toFixed(1) + '%', s: cr(corpus) + ' of ₹' + tHi + ' Cr'} : {v: cr(corpus), s: 'retirement corpus'};
+    tagNote.led = tHi ? (corpus / (tHi * 1e7) * 100).toFixed(1) + '% of target' : cr(corpus);
   } else {
-    ledBody = `<div class="empty">No plan in this browser yet. Open the Ledger and restore or sync your plan.</div>`;
+    ledBody = `<div class="empty">No plan in this browser yet. Open the Ledger and restore or sync your plan.</div>`; tagNote.led = 'no plan yet';
   }
 
-  /* ----- Trip Vault card: the next trip */
+  /* ===== Trip Vault */
   let tripBody;
   const today = new Date().toISOString().slice(0, 10);
   if(tv && (tv.trips || []).length){
@@ -571,43 +641,482 @@ function draw(et, ats, tv){
     if(next){
       const days = next.start ? Math.round((Date.parse(next.start + 'T00:00:00') - Date.parse(today + 'T00:00:00')) / 86400000) : null;
       const docs = (tv.docs || []).filter(d => d.tripId === next.id && isTripDoc(d));
-      const flights = docs.reduce((n, d) => n + ((d.fields || {}).segments || []).length, 0);
-      tripBody = `<div class="kv">
-        <div><div class="l">Next trip</div><div class="v" style="font-size:18px">${esc(next.name)}</div><div class="s">${esc([next.city, fmt(next.start) + (next.end && next.end !== next.start ? ' – ' + fmt(next.end) : '')].filter(Boolean).join(' · '))}</div></div>
-        <div><div class="l">${days === null ? 'Dates' : days > 0 ? 'Starts in' : 'Now'}</div><div class="v">${days === null ? '—' : days > 0 ? days + ' day' + (days === 1 ? '' : 's') : 'on the trip'}</div><div class="s">${docs.length} document${docs.length === 1 ? '' : 's'} · ${flights} flight${flights === 1 ? '' : 's'}</div></div></div>`;
-    } else tripBody = `<div class="empty">No upcoming trips. ${trips.length} past trip${trips.length === 1 ? '' : 's'} in Trip Vault.</div>`;
+      const legs = [].concat(...docs.map(d => ((d.fields || {}).segments || []))).filter(x => x.from && x.to);
+      const hotels = docs.filter(d => d.type === 'hotel').map(d => (d.fields || {}).hotelName || d.title).filter(Boolean);
+      tripBody = `<div><div class="l" style="font-size:10.5px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--mut)">Next trip</div>
+          <div style="font:800 24px/1.2 var(--display);margin-top:3px">${esc(next.name)}</div>
+          <div class="meta" style="color:var(--ink2)">${esc([next.city, fmt(next.start) + (next.end && next.end !== next.start ? ' – ' + fmt(next.end) : '')].filter(Boolean).join(' · '))}</div></div>
+        <div class="countdown">${days === null ? '<span class="meta">No dates yet</span>' : days > 0 ? `<b class="num">${days}</b><span>day${days === 1 ? '' : 's'} to go</span>` : '<b>Now</b><span>on the trip</span>'}</div>
+        ${legs.length ? `<div class="route">${legs.slice(0, 3).map(x => `<div class="leg"><span>${esc(x.from)}</span><span class="path"></span><span>${esc(x.to)}</span><span style="color:var(--mut)">${esc(x.flight || '')} ${esc(fmt(x.date))}</span></div>`).join('')}</div>` : ''}
+        <div class="meta">${docs.length} document${docs.length === 1 ? '' : 's'} · ${legs.length} flight${legs.length === 1 ? '' : 's'}${hotels.length ? ' · ' + esc(hotels[0]) : ''}${pdocs.length ? ` · ${pdocs.length} personal document${pdocs.length === 1 ? '' : 's'} in the vault` : ''}</div>`;
+      G.trip = {v: days === null ? esc(next.name) : days > 0 ? days + ' day' + (days === 1 ? '' : 's') : 'Now', s: esc(next.city || next.name) + (next.start ? ' · ' + fmt(next.start) : '')};
+      tagNote.trip = days === null ? next.name : days > 0 ? next.city + ' in ' + days + 'd' : 'on a trip';
+    } else { tripBody = `<div class="empty">No upcoming trips. ${trips.length} past trip${trips.length === 1 ? '' : 's'} in Trip Vault.</div>`; tagNote.trip = 'no trips ahead'; }
   } else {
-    tripBody = `<div class="empty">Tickets, hotel bookings, itineraries, news and flight status for your trips. Open Trip Vault to add the first one.</div>`;
+    tripBody = `<div class="empty">Tickets, hotel bookings, itineraries, news and flight status for your trips. Open Trip Vault to add the first one.</div>`; tagNote.trip = 'add a trip';
   }
 
-  const card = (k, name, sub, status, body, cta) => `<section class="card" style="--c:var(--${k})">
-    <div class="apphead"><span class="glyph">${ICON[k]}</span><div><h2>${name}</h2><p>${sub}</p></div>${status}</div>${body}
-    ${k === 'ats' ? atsButtons() : `<a class="open" href="${esc(LINKS[k])}">${cta} <span aria-hidden="true">→</span></a>`}</section>`;
-  /* ATS: on this Mac (localhost), and remote (Tailscale) - the remote one first on a phone */
-  function atsButtons(){
-    const remote = atsRemote(), local = LINKS.ats;
-    const mac = `<a class="open${MOBILE ? ' alt' : ''}" href="${esc(MOBILE ? local : atsUrl())}" target="_blank" rel="noopener" title="ATS on the Mac it runs on">Open ATS · this Mac <span aria-hidden="true">→</span></a>`;
-    const away = remote
-      ? `<a class="open${MOBILE ? '' : ' alt'}" href="${esc(remote + '/')}" target="_blank" rel="noopener" title="${esc(remote)} - through Tailscale (it must be on, on this device)">Open ATS · Remote <span aria-hidden="true">→</span></a><button class="edit" id="atsRemoteEdit" type="button">change</button>`
-      : `<button class="open alt" id="atsRemoteEdit" type="button" title="Your Mac's Tailscale address, to open ATS from your phone">＋ Remote address</button>`;
-    return `<div class="opens">${MOBILE ? away + mac : mac + away}</div>`;
-  }
+  const panel = (k, n, name, sub, status, body, cta, wide) => `<section class="scene app" id="s-${k}" data-scene="${k}"><div class="panel${wide ? ' wide' : ''}" style="--c:var(--${k})">
+    <div class="phead"><span class="glyph">${ICON[k]}</span><div><div class="kick">${n} · powered by Cygnus</div><h2>${name}</h2><p>${sub}</p></div>${status}</div>${body}
+    ${k === 'ats' ? atsButtons() : `<div class="opens"><a class="open" href="${esc(LINKS[k])}">${cta} <span aria-hidden="true">→</span></a></div>`}</div></section>`;
 
-  $('app').innerHTML = hero + `<main>
-    <div class="apps">
-      ${card('ats', 'ATS', 'Trading dashboard · your Mac', atsOk ? '<span class="status live">live</span>' : atsChecking ? '<span class="status">checking</span>' : '<span class="status">offline</span>', atsBody, 'Open ATS')}
-      ${card('exp', 'Expense Tracker', 'Spending from your statements', '', expBody, 'Open Expense Tracker')}
-      ${card('led', '16-Year Ledger', 'Investment plan', real && plan.plan && plan.plan.dob ? '' : '', ledBody, 'Open the Ledger')}
-      ${card('trip', 'Trip Vault', 'Trips, tickets and plans', '', tripBody, 'Open Trip Vault')}
-    </div>
-    ${monthCard || nextCard ? `<div class="row2">${monthCard || '<div></div>'}${nextCard}</div>` : ''}
-    <div class="foot"><span>Read in this browser from the Expense Tracker, the Ledger and Trip Vault (with your personal documents)${atsOk ? ', and live from ATS on this Mac' : ''}. Nothing is sent anywhere.</span>
-      <span style="display:flex;gap:8px"><button class="btn" id="re">Refresh</button><button class="btn" id="out">Sign out</button></span></div>
-  </main>`;
+  /* a tile on the first screen: the app's one number; a tap flies to the app */
+  const tile = (k, label, g, none) => `<button type="button" class="tile" data-go="${k}" style="--c:var(--${k})"><div class="l"><i></i>${esc(g && g.l || label)}</div>
+    <div class="v ${g && g.cls || ''}${g ? '' : ' none'}">${g ? g.v : esc(none)}</div><div class="s">${g ? g.s : '&nbsp;'}</div></button>`;
+  const live = [atsOk, txns.length > 0, real, !!(tv && (tv.trips || []).length)].filter(Boolean).length;
+  const first = !document.querySelector('.hero');
+  const rise = d => first ? ` class="rise" style="animation-delay:${CALM ? 0 : SEEN ? (d - 1.6) * .4 : d}s"` : '';
+  $('app').innerHTML = `<header class="top"><div class="brand">${logo()}Money Home</div>
+      <div class="chips"><span class="chip ${mk.on ? 'on' : ''} hide-s"><i></i>${esc(mk.text)}</span>
+        <a class="chip ai" href="/ai/chat/" target="_blank" title="Cygnus AI in this browser — works anywhere, even with the Mac off">✦ Cygnus AI ↗</a>
+        <a class="chip hide-s" href="https://anils-macbook-air.tail4a1c2d.ts.net:8443/" target="_blank" rel="noopener" title="The full Cygnus AI on your Mac, through Tailscale">💻 On Mac ↗</a>
+        <a class="chip" href="/setup/">⚙</a></div></header>
+    <nav class="rail" aria-label="Sections">${[['core', 'Cygnus', 'var(--gold)'], ['ats', 'ATS', 'var(--ats)'], ['exp', 'Expenses', 'var(--exp)'], ['led', 'Ledger', 'var(--led)'], ['trip', 'Trips', 'var(--trip)'], ['ask', 'Ask Cygnus', 'var(--gold2)']]
+      .map(([k, n, c]) => `<a href="#s-${k}" data-k="${k}" style="--c:${c}"><span>${n}</span><b></b></a>`).join('')}</nav>
+    <section class="scene" id="s-core" data-scene="core" style="position:relative"><div class="hero">
+      <div${rise(1.6)}><span class="kick">${esc(hello)} · ${esc(new Date().toLocaleDateString('en-IN', {weekday:'long', day:'numeric', month:'long'}))}</span></div>
+      <h1${rise(1.8)}>One core.<br><em>Every rupee</em> in orbit.</h1>
+      <p class="lead"${rise(2.0)}>Cygnus sits at the centre — your keys, your data, your AI — and powers each app around it. ${live} of 4 are reporting in.</p>
+      <div class="glance"${rise(2.3)}>
+        <button type="button" class="tile big" data-go="led"><div class="l">Net worth</div><div class="v">${netWorth ? cr(netWorth) : '—'}</div><div class="s">${netWorth ? 'corpus ' + cr(corpus) : 'open the Ledger once here'}</div></button>
+        ${tile('ats', 'Today · ATS', G.ats, atsChecking ? 'checking…' : 'offline')}
+        ${tile('exp', 'Spent', G.exp, 'no statements yet')}
+        ${tile('led', 'Of your target', G.led, 'no plan yet')}
+        ${tile('trip', 'Next trip', G.trip, 'none planned')}
+      </div>
+    </div><div class="cue"><span>Scroll to follow the light</span><b></b></div></section>
+    ${panel('ats', '01', 'ATS', 'Trading dashboard · your Mac', atsOk ? '<span class="status live">live</span>' : atsChecking ? '<span class="status">checking</span>' : '<span class="status">offline</span>', atsBody, 'Open ATS')}
+    ${panel('exp', '02', 'Expense Tracker', 'Spending from your statements', '', expBody, 'Open Expense Tracker', true)}
+    ${panel('led', '03', '16-Year Ledger', 'Investment plan', '', ledBody, 'Open the Ledger', true)}
+    ${panel('trip', '04', 'Trip Vault', 'Trips, tickets and plans', '', tripBody, 'Open Trip Vault')}
+    <section class="scene" id="s-ask" data-scene="ask"><div class="panel wide askwrap" style="--c:var(--gold)">
+      <div class="phead"><span class="glyph" style="color:var(--gold)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5L18 18M6 18l2.5-2.5M15.5 8.5L18 6"/></svg></span>
+        <div><div class="kick">The core</div><h2>Ask Cygnus</h2><p>One assistant that sees every app</p></div></div>
+      ${askCard()}</div></section>
+    <div class="foot"><span>Read in this browser from the Expense Tracker, the Ledger and Trip Vault${atsOk ? ', and live from ATS on this Mac' : ''}. Nothing is sent anywhere.</span>
+      <span style="display:flex;gap:8px"><a class="btn" href="/classic/" style="text-decoration:none">Classic view</a><button class="btn" id="re">Refresh</button><button class="btn" id="out">Sign out</button></span></div>
+    ${DEMO ? '<div class="demo">DEMO DATA</div>' : ''}`;
   $('re').onclick = render;
   if($('atsRemoteEdit')) $('atsRemoteEdit').onclick = askAtsRemote;
   $('out').onclick = () => { try{ sessionStorage.removeItem(SESSION); }catch(_){} showLogin(); };
+  bindAsk();
+  watchPanels();
+  document.querySelectorAll('.tile[data-go]').forEach(b => b.onclick = () => STAGE.go(b.dataset.go));
+  document.querySelectorAll('.rail a').forEach(a => a.onclick = e => { e.preventDefault(); STAGE.go(a.dataset.k); });
+  STAGE.setApps({ats: {note: tagNote.ats, on: atsOk}, exp: {note: tagNote.exp, on: txns.length > 0}, led: {note: tagNote.led, on: !!real}, trip: {note: tagNote.trip, on: !!(tv && (tv.trips || []).length)}});
+  STAGE.layout();
 }
+
+/* panels arrive as their world comes into view; the ring fills then */
+let IO = null;
+function watchPanels(){
+  if(IO) IO.disconnect();
+  IO = new IntersectionObserver(es => es.forEach(e => { if(!e.isIntersecting) return; e.target.classList.add('in');
+    e.target.querySelectorAll('.arc[data-full]').forEach(a => a.setAttribute('stroke-dasharray', a.dataset.full)); }), {threshold: .18});
+  document.querySelectorAll('.panel').forEach(p => IO.observe(p));
+}
+
+/* =====================================================================================================
+   THE STAGE: Cygnus at the centre (a living core inside the Northern Cross), four worlds in orbit, and
+   light running along a beam from the core to each one. Scrolling flies the camera from world to world.
+   ===================================================================================================== */
+const STAGE = (() => {
+  const APPS = [
+    {k: 'ats', name: 'ATS', color: 0x8b97ff},
+    {k: 'exp', name: 'Expenses', color: 0xf0a95c},
+    {k: 'led', name: 'Ledger', color: 0x5fb4f2},
+    {k: 'trip', name: 'Trip Vault', color: 0x4fd6c4},
+  ];
+  const SCENES = ['core', 'ats', 'exp', 'led', 'trip', 'ask'];
+  const GOLD = 0xe2b04a;
+  const canvas = $('stage'), tags = $('tags');
+  let renderer;
+  try{ renderer = new THREE.WebGLRenderer({canvas, antialias: true, powerPreference: 'high-performance'}); }
+  catch(e){ document.body.classList.add('no3d'); const noop = () => {}; return {setApps: noop, layout: noop, think: noop, go: k => { const e = $('s-' + k); if(e) e.scrollIntoView({behavior: 'smooth'}); }}; }
+  renderer.setPixelRatio(Math.min(devicePixelRatio || 1, MOBILE ? 1.75 : 2));
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x050d0b);
+  scene.fog = new THREE.FogExp2(0x050d0b, .012);
+  const camera = new THREE.PerspectiveCamera(45, 1, .1, 500);
+
+  /* a soft round glow, drawn once */
+  const glowTex = (() => { const c = document.createElement('canvas'); c.width = c.height = 128; const g = c.getContext('2d');
+    const r = g.createRadialGradient(64, 64, 0, 64, 64, 64); r.addColorStop(0, 'rgba(255,255,255,1)'); r.addColorStop(.18, 'rgba(255,255,255,.55)'); r.addColorStop(.5, 'rgba(255,255,255,.12)'); r.addColorStop(1, 'rgba(255,255,255,0)');
+    g.fillStyle = r; g.fillRect(0, 0, 128, 128); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t; })();
+  const glow = (color, size, opacity = 1) => { const s = new THREE.Sprite(new THREE.SpriteMaterial({map: glowTex, color, transparent: true, opacity, blending: THREE.AdditiveBlending, depthWrite: false}));
+    s.scale.setScalar(size); return s; };
+  /* round, additive points whose size shrinks with distance */
+  const dotMat = (color, size, opacity = 1, vertexColors = false) => new THREE.ShaderMaterial({
+    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, vertexColors,
+    uniforms: {uColor: {value: new THREE.Color(color)}, uSize: {value: size}, uOpacity: {value: opacity}, uPR: {value: renderer.getPixelRatio()}, uTime: {value: 0}},
+    vertexShader: `attribute float aSize; attribute float aPhase; uniform float uSize; uniform float uPR; uniform float uTime; varying float vTw; varying vec3 vCol;
+      void main(){ vec4 mv = modelViewMatrix * vec4(position, 1.0); gl_Position = projectionMatrix * mv;
+        vTw = 0.65 + 0.35 * sin(uTime * 1.7 + aPhase * 6.283);
+        #ifdef USE_COLOR
+          vCol = color;
+        #else
+          vCol = vec3(1.0);
+        #endif
+        gl_PointSize = uSize * aSize * uPR * (60.0 / -mv.z); }`,
+    fragmentShader: `uniform vec3 uColor; uniform float uOpacity; varying float vTw; varying vec3 vCol;
+      void main(){ float d = length(gl_PointCoord - 0.5); float a = smoothstep(0.5, 0.0, d); a *= a; gl_FragColor = vec4(uColor * vCol, a * uOpacity * vTw); }`,
+  });
+
+  /* ---- the sky */
+  const starN = MOBILE ? 1400 : 2600;
+  {
+    const p = new Float32Array(starN * 3), s = new Float32Array(starN), ph = new Float32Array(starN), col = new Float32Array(starN * 3);
+    const tints = [[1, 1, 1], [1, .86, .6], [.7, .95, .9], [.8, .85, 1]];
+    for(let i = 0; i < starN; i++){
+      const r = 70 + Math.random() * 130, u = Math.random() * 2 - 1, a = Math.random() * Math.PI * 2, q = Math.sqrt(1 - u * u);
+      p.set([r * q * Math.cos(a), r * u, r * q * Math.sin(a)], i * 3);
+      s[i] = Math.random() < .03 ? 3.2 : .6 + Math.random() * 1.3; ph[i] = Math.random();
+      col.set(tints[Math.random() < .7 ? 0 : 1 + (Math.random() * 3 | 0)], i * 3);
+    }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(p, 3)); g.setAttribute('aSize', new THREE.BufferAttribute(s, 1));
+    g.setAttribute('aPhase', new THREE.BufferAttribute(ph, 1)); g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+    var sky = new THREE.Points(g, dotMat(0xffffff, 9, .9, true)); scene.add(sky);
+  }
+  /* dust drifting through the system */
+  const dustN = MOBILE ? 260 : 520;
+  const dust = (() => {
+    const p = new Float32Array(dustN * 3), s = new Float32Array(dustN), ph = new Float32Array(dustN);
+    for(let i = 0; i < dustN; i++){ const r = 2.5 + Math.random() * 16, a = Math.random() * Math.PI * 2;
+      p.set([r * Math.cos(a), (Math.random() - .5) * 5, r * Math.sin(a)], i * 3); s[i] = .25 + Math.random() * .7; ph[i] = Math.random(); }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(p, 3)); g.setAttribute('aSize', new THREE.BufferAttribute(s, 1)); g.setAttribute('aPhase', new THREE.BufferAttribute(ph, 1));
+    const pts = new THREE.Points(g, dotMat(0xe2c78a, 4, .5)); scene.add(pts); return pts;
+  })();
+
+  /* ---- the Northern Cross (Cygnus, the swan), behind the core: Sadr at the centre */
+  const cross = new THREE.Group(); cross.position.z = -7; scene.add(cross);
+  const STARS = {deneb: [.6, 9.5], sadr: [0, 0], eta: [-.5, -4.6], albireo: [-1, -10.2], delta: [-7.4, 2.2], gienah: [7.6, -1.9], zeta: [10.4, -5.8], iota: [-10.6, 5.6]};
+  const LINES = [['deneb', 'sadr'], ['sadr', 'eta'], ['eta', 'albireo'], ['iota', 'delta'], ['delta', 'sadr'], ['sadr', 'gienah'], ['gienah', 'zeta']];
+  const crossLines = [];
+  Object.entries(STARS).forEach(([n, [x, y]]) => { if(n === 'sadr') return; const g = glow(n === 'deneb' ? 0xffffff : 0xfff1d0, n === 'deneb' ? 2.6 : 1.5, .9); g.position.set(x, y, 0); g.userData.tw = Math.random() * 6; cross.add(g); });
+  LINES.forEach(([a, b]) => { const g = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(...STARS[a], 0), new THREE.Vector3(...STARS[b], 0)]);
+    const l = new THREE.Line(g, new THREE.LineBasicMaterial({color: GOLD, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false})); cross.add(l); crossLines.push(l); });
+
+  /* ---- Cygnus, the core: a small star — moving plasma on its face, a corona of streamers, a wind of light
+     blowing off it, and three gyroscope rings */
+  const core = new THREE.Group(); scene.add(core);
+  const NOISE = `
+    vec4 perm(vec4 x){ return mod(((x * 34.0) + 1.0) * x, 289.0); }
+    float noise(vec3 p){ vec3 a = floor(p), d = p - a; d = d * d * (3.0 - 2.0 * d);
+      vec4 b = a.xxyy + vec4(0.0, 1.0, 0.0, 1.0), k1 = perm(b.xyxy), k2 = perm(k1.xyxy + b.zzww);
+      vec4 c = k2 + a.zzzz, k3 = perm(c), k4 = perm(c + 1.0);
+      vec4 o1 = fract(k3 * (1.0 / 41.0)), o2 = fract(k4 * (1.0 / 41.0)), o3 = o2 * d.z + o1 * (1.0 - d.z);
+      vec2 o4 = o3.yw * d.x + o3.xz * (1.0 - d.x); return o4.y * d.y + o4.x * (1.0 - d.y); }
+    float fbm(vec3 p){ float v = 0.0, a = .5; for(int i = 0; i < 5; i++){ v += a * noise(p); p *= 2.03; a *= .5; } return v; }`;
+  const heartMat = new THREE.ShaderMaterial({
+    uniforms: {uTime: {value: 0}, uPulse: {value: 0}},
+    vertexShader: `varying vec3 vP; varying vec3 vN; varying vec3 vV;
+      void main(){ vP = position; vec4 mv = modelViewMatrix * vec4(position, 1.0);
+        vN = normalize(normalMatrix * normal); vV = normalize(-mv.xyz); gl_Position = projectionMatrix * mv; }`,
+    fragmentShader: `uniform float uTime; uniform float uPulse; varying vec3 vP; varying vec3 vN; varying vec3 vV; ${NOISE}
+      void main(){
+        vec3 p = normalize(vP) * 2.4;
+        float t = uTime * .12;
+        float warp = fbm(p + vec3(0.0, t, t * .7));                     // slow currents
+        float n = fbm(p * 1.7 + warp * 1.8 + vec3(t * 1.3, -t, 0.0));    // plasma riding them
+        float cells = noise(p * 9.0 + t * 2.0);                            // fine granulation
+        float h = clamp(n * 1.25 + cells * .18 - .12, 0.0, 1.0);
+        vec3 c = mix(vec3(.62, .26, .03), vec3(.98, .66, .2), smoothstep(.15, .55, h));
+        c = mix(c, vec3(1.0, .93, .74), smoothstep(.5, .85, h));
+        float mu = max(dot(vN, vV), 0.0);
+        c *= .55 + .45 * pow(mu, .45);                                     // limb darkening, so it reads as a sphere
+        c += vec3(1.0, .72, .3) * pow(1.0 - mu, 3.0) * .9;                 // and a hot rim where the corona starts
+        gl_FragColor = vec4(c * (1.05 + uPulse * .35), 1.0); }`,
+  });
+  const heart = new THREE.Mesh(new THREE.SphereGeometry(1.05, 96, 64), heartMat); core.add(heart);
+  /* the corona: a camera-facing disc of soft light with streamers that slowly turn and breathe */
+  const coronaMat = new THREE.ShaderMaterial({
+    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+    uniforms: {uTime: {value: 0}, uPulse: {value: 0}, uIgn: {value: 0}},
+    vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+    fragmentShader: `uniform float uTime; uniform float uPulse; uniform float uIgn; varying vec2 vUv; ${NOISE}
+      void main(){
+        vec2 q = vUv - .5; float r = length(q) * 2.0, rs = 1.05 / 4.5;          // rs: the star's edge, in this disc
+        if(r > 1.0) discard;
+        float a = atan(q.y, q.x), e = max(r - rs, 0.0);
+        float rays = fbm(vec3(cos(a) * 2.2, sin(a) * 2.2, uTime * .08 - e * 1.4));
+        rays = pow(rays, 2.2) * 3.2;
+        float glowIn = exp(-e * 9.0), glowOut = exp(-e * 3.2) * .35;
+        float streak = rays * exp(-e * (3.6 - uPulse)) ;
+        float v = (glowIn + glowOut + streak * .55) * smoothstep(1.0, .55, r) * smoothstep(rs * .82, rs, r);
+        vec3 col = mix(vec3(1.0, .62, .18), vec3(1.0, .9, .7), glowIn);
+        gl_FragColor = vec4(col * v * uIgn * (1.0 + uPulse * .5), 1.0); }`,
+  });
+  const corona = new THREE.Mesh(new THREE.PlaneGeometry(9, 9), coronaMat); core.add(corona);
+  /* a wind of light, blowing off the surface */
+  const WIND = MOBILE ? 140 : 260;
+  const windMat = new THREE.ShaderMaterial({
+    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+    uniforms: {uTime: {value: 0}, uPR: {value: renderer.getPixelRatio()}, uSpeed: {value: 1}},
+    vertexShader: `attribute vec3 aDir; attribute float aPhase; uniform float uTime; uniform float uPR; uniform float uSpeed; varying float vA;
+      void main(){ float u = fract(aPhase + uTime * .09 * uSpeed); vec3 p = aDir * (1.08 + u * u * 3.4);
+        vA = (1.0 - u) * smoothstep(0.0, .08, u);
+        vec4 mv = modelViewMatrix * vec4(p, 1.0); gl_Position = projectionMatrix * mv; gl_PointSize = (2.0 + 3.0 * (1.0 - u)) * uPR * (12.0 / -mv.z); }`,
+    fragmentShader: `varying float vA; void main(){ float d = length(gl_PointCoord - .5); float a = smoothstep(.5, 0.0, d);
+      gl_FragColor = vec4(vec3(1.0, .8, .45) * a * a * vA, 1.0); }`,
+  });
+  {
+    const dir = new Float32Array(WIND * 3), ph = new Float32Array(WIND);
+    for(let i = 0; i < WIND; i++){ const u = Math.random() * 2 - 1, a = Math.random() * Math.PI * 2, q = Math.sqrt(1 - u * u); dir.set([q * Math.cos(a), u, q * Math.sin(a)], i * 3); ph[i] = Math.random(); }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(WIND * 3), 3));
+    g.setAttribute('aDir', new THREE.BufferAttribute(dir, 3)); g.setAttribute('aPhase', new THREE.BufferAttribute(ph, 1));
+    var wind = new THREE.Points(g, windMat); wind.frustumCulled = false; core.add(wind);
+  }
+  const rings = [[2.35, .3, 0, GOLD, .55], [2.75, -.9, .6, 0xf6d58a, .32], [3.15, 1.2, -.4, 0x9fe8d6, .22]].map(([r, rx, rz, c, o]) => {
+    const g = new THREE.Group(); g.rotation.set(rx, 0, rz);
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(r, .009, 6, 200), new THREE.MeshBasicMaterial({color: c, transparent: true, opacity: o, blending: THREE.AdditiveBlending, depthWrite: false}));
+    ring.rotation.x = Math.PI / 2; g.add(ring);
+    const bead = glow(c, .55, 1); bead.position.set(r, 0, 0); g.add(bead); g.userData.bead = bead; g.userData.r = r;
+    core.add(g); return g; });
+  const halo = glow(GOLD, 11, .3); core.add(halo);
+  const flare = glow(0xfff6e0, 1, 0); core.add(flare);   // the moment an app is lit
+  const sun = new THREE.PointLight(0xffd68a, 60, 40, 1.6); core.add(sun);
+  scene.add(new THREE.AmbientLight(0x1a3a32, 1.2));
+
+  /* ---- the worlds */
+  const R = () => MOBILE || innerWidth < 820 ? 5.4 : 6.8;
+  const TILT = .32;
+  const geos = {
+    ats: new THREE.OctahedronGeometry(.68, 0),
+    exp: new THREE.TorusGeometry(.48, .18, 20, 60),
+    led: new THREE.BoxGeometry(.78, .98, .24, 1, 1, 1),
+    trip: new THREE.ConeGeometry(.5, 1.05, 4, 1),
+  };
+  const HITS = [];
+  const worlds = APPS.map((a, i) => {
+    const g = new THREE.Group(); scene.add(g);
+    const body = new THREE.Mesh(geos[a.k], new THREE.MeshStandardMaterial({color: a.color, emissive: a.color, emissiveIntensity: .05, metalness: .35, roughness: .3, flatShading: true}));
+    if(a.k === 'trip') body.rotation.z = -Math.PI / 2;
+    g.add(body);
+    const cage = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.IcosahedronGeometry(1.05, 1)), new THREE.LineBasicMaterial({color: a.color, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false}));
+    g.add(cage);
+    const orbit = new THREE.Mesh(new THREE.TorusGeometry(1.35, .008, 4, 90), new THREE.MeshBasicMaterial({color: a.color, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false}));
+    orbit.rotation.set(Math.PI / 2 + .5, .3 * i, 0); g.add(orbit);
+    const moon = glow(a.color, .4, 0); g.add(moon);
+    const aura = glow(a.color, 3.6, 0); g.add(aura);
+    /* the beam from the core, and the light running along it */
+    const N = 64, lineGeo = new THREE.BufferGeometry(); lineGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(N * 3), 3));
+    const line = new THREE.Line(lineGeo, new THREE.LineBasicMaterial({color: a.color, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false})); scene.add(line);
+    const P = MOBILE ? 22 : 34, pp = new Float32Array(P * 3), ps = new Float32Array(P), pph = new Float32Array(P);
+    for(let j = 0; j < P; j++){ ps[j] = .5 + Math.random() * 1.1; pph[j] = j / P + Math.random() * .02; }
+    const pg = new THREE.BufferGeometry(); pg.setAttribute('position', new THREE.BufferAttribute(pp, 3)); pg.setAttribute('aSize', new THREE.BufferAttribute(ps, 1)); pg.setAttribute('aPhase', new THREE.BufferAttribute(pph, 1));
+    const packets = new THREE.Points(pg, dotMat(a.color, 7, 0)); scene.add(packets);
+    const hit = new THREE.Mesh(new THREE.SphereGeometry(1.4, 12, 8), new THREE.MeshBasicMaterial({visible: false})); hit.userData.k = a.k; g.add(hit); HITS.push(hit);
+    const tag = document.createElement('a'); tag.className = 'tag'; tag.href = '#s-' + a.k;
+    tag.onclick = e => { e.preventDefault(); go(a.k); }; tag.style.setProperty('--c', '#' + a.color.toString(16).padStart(6, '0'));
+    tag.innerHTML = `<i>${ICON[a.k]}</i><span>${a.name}</span><small></small>`; tags.appendChild(tag);
+    return {...a, i, g, body, cage, orbit, moon, aura, line, packets, phase: pph, tag, note: tag.querySelector('small'), power: 0, focus: 0, live: true,
+      curve: new THREE.QuadraticBezierCurve3(new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()), pos: new THREE.Vector3()};
+  });
+  const coreTag = document.createElement('a'); coreTag.className = 'tag core'; coreTag.href = '#s-ask'; coreTag.textContent = 'CYGNUS'; tags.appendChild(coreTag);
+  coreTag.onclick = e => { e.preventDefault(); go('ask'); };
+  { const hit = new THREE.Mesh(new THREE.SphereGeometry(1.6, 16, 10), new THREE.MeshBasicMaterial({visible: false})); hit.userData.k = 'ask'; core.add(hit); HITS.push(hit); }
+
+  /* click a world (or the star) to fly there: scrolls to the exact stop where the camera parks on it */
+  function go(k){
+    const i = SCENES.indexOf(k);
+    if(i < 0) return;
+    if(!stops) layout();
+    scrollTo({top: stops ? stops[i] : 0, behavior: CALM ? 'auto' : 'smooth'});
+  }
+  const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
+  let hovered = null;
+  const pick = (x, y) => { ndc.set(x / innerWidth * 2 - 1, -(y / innerHeight) * 2 + 1); ray.setFromCamera(ndc, camera);
+    const h = ray.intersectObjects(HITS, false)[0]; return h ? h.object.userData.k : null; };
+  const busy = t => t.closest && t.closest('a,button,input,textarea,select,label,.panel,.glance,.top,.rail,.gate form,.hero h1,.hero p');
+  addEventListener('pointermove', e => {
+    if(e.pointerType !== 'mouse') return;
+    hovered = busy(e.target) ? null : pick(e.clientX, e.clientY);
+    document.body.style.cursor = hovered ? 'pointer' : '';
+  }, {passive: true});
+  addEventListener('click', e => { if(busy(e.target)) return; const k = pick(e.clientX, e.clientY); if(k){ e.preventDefault(); go(k); } });
+
+  /* ---- where each world is, at time t */
+  let spin = 0;
+  function place(w, t){
+    const a = w.i * Math.PI / 2 + spin + .4, r = R();
+    const x = r * Math.cos(a), z0 = r * Math.sin(a);
+    w.pos.set(x, -Math.sin(TILT) * z0 + Math.sin(t * .7 + w.i * 1.9) * .25, Math.cos(TILT) * z0);
+    w.g.position.copy(w.pos);
+  }
+
+  /* ---- the camera's stops: the whole system, each world, then close to the core */
+  const V = new THREE.Vector3(), V2 = new THREE.Vector3(), UP = new THREE.Vector3(0, 1, 0);
+  const narrow = () => innerWidth < 820;
+  function pose(k, out){
+    const asp = innerWidth / innerHeight, fov = camera.fov * Math.PI / 180;
+    if(k === 'core'){
+      const need = (R() + 1.6) / (Math.tan(fov / 2) * Math.min(asp, 1.6));
+      out.pos.set(0, 3.2, Math.max(15, need) * (narrow() ? .8 : 1.12)); out.look.set(0, 0, 0); out.off.set(narrow() ? 0 : -.19, narrow() ? .24 : 0);
+    } else if(k === 'ask'){
+      out.pos.set(0, 1.4, narrow() ? 12.5 : 10.5); out.look.set(0, 0, 0); out.off.set(narrow() ? 0 : -.2, narrow() ? .2 : 0);
+    } else {
+      const w = worlds[SCENES.indexOf(k) - 1];
+      V.copy(w.pos).setY(0).normalize();                   // out from the core, through the world
+      V2.crossVectors(UP, V).normalize();
+      out.pos.copy(w.pos).addScaledVector(V, narrow() ? 7.6 : 6.4).addScaledVector(V2, 2.4).add(new THREE.Vector3(0, 2.6, 0));
+      out.look.copy(w.pos).lerp(new THREE.Vector3(), .3);
+      out.off.set(narrow() ? 0 : -.21, narrow() ? .22 : 0);
+    }
+    return out;
+  }
+  const mk = () => ({pos: new THREE.Vector3(), look: new THREE.Vector3(), off: new THREE.Vector2()});
+  const A = mk(), B = mk(), cur = mk(), want = mk();
+  let first = true;
+
+  /* ---- scroll: a continuous position through the scenes (0 = core … 5 = ask) */
+  let stops = [0, 1, 2, 3, 4, 5].map(i => i * innerHeight);
+  function layout(){
+    const els = SCENES.map(k => document.querySelector(`[data-scene="${k}"]`));
+    if(els.some(e => !e)){ stops = null; return; }
+    stops = els.map((e, i) => i === 0 ? 0 : Math.max(0, e.offsetTop + e.offsetHeight / 2 - innerHeight / 2));
+    resize();
+  }
+  function scrollPos(){
+    if(!stops) return 0;
+    const y = scrollY;
+    if(y <= stops[0]) return 0;
+    for(let i = 0; i < stops.length - 1; i++) if(y < stops[i + 1]) return i + (y - stops[i]) / Math.max(1, stops[i + 1] - stops[i]);
+    return stops.length - 1;
+  }
+  const ease = x => x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
+  const rail = () => document.querySelectorAll('.rail a');
+
+  /* ---- pointer and tilt: a little parallax */
+  const look = {x: 0, y: 0, tx: 0, ty: 0};
+  addEventListener('pointermove', e => { look.tx = e.clientX / innerWidth - .5; look.ty = e.clientY / innerHeight - .5; }, {passive: true});
+
+  function resize(){
+    const w = innerWidth, h = innerHeight;
+    renderer.setSize(w, h, false);
+    camera.aspect = w / h; camera.fov = w / h < .8 ? 58 : 45; camera.updateProjectionMatrix();
+  }
+  addEventListener('resize', layout);
+  resize();
+
+  /* ---- the opening: the core ignites, the cross draws itself, then a beam reaches out to light each world */
+  const T0 = performance.now();
+  const at = t => CALM ? 1 : t;
+  let thinking = 0, thinkWant = 0, lastActive = -1;
+  const clock = new THREE.Clock();
+
+  function frame(){
+    const dt = Math.min(clock.getDelta(), .05), t = clock.elapsedTime, since = QUICK ? 99 : (performance.now() - T0) / 1000;
+    const s = scrollPos(), i0 = Math.floor(s), i1 = Math.min(SCENES.length - 1, i0 + 1), f = ease(s - i0);
+    const focusIdx = s - i0 < .5 ? i0 : i1;
+    const heroness = Math.max(0, 1 - s);                 // 1 at the top, 0 once you leave the overview
+    spin += dt * (CALM ? 0 : .05 + .05 * heroness) * (1 - .85 * Math.min(1, Math.abs(s - Math.round(s)) < .35 && Math.round(s) > 0 && Math.round(s) < 5 ? 1 : 0));
+    worlds.forEach(w => place(w, t));
+
+    /* camera */
+    pose(SCENES[i0], A); pose(SCENES[i1], B);
+    want.pos.lerpVectors(A.pos, B.pos, f); want.look.lerpVectors(A.look, B.look, f); want.off.lerpVectors(A.off, B.off, f);
+    if(i0 !== i1 && (i0 > 0 && i1 < 5)){                 // between two worlds: swing out a little, so the move reads as a flight
+      const arc = Math.sin(f * Math.PI); want.pos.multiplyScalar(1 + .28 * arc); want.pos.y += 1.8 * arc;
+    }
+    look.x += (look.tx - look.x) * .05; look.y += (look.ty - look.y) * .05;
+    want.pos.x += look.x * 1.2; want.pos.y -= look.y * .8;
+    const k = first ? 1 : 1 - Math.exp(-dt * 3.2); first = false;
+    cur.pos.lerp(want.pos, k); cur.look.lerp(want.look, k); cur.off.lerp(want.off, k);
+    camera.position.copy(cur.pos); camera.lookAt(cur.look);
+    const w = innerWidth, h = innerHeight;
+    camera.setViewOffset(w, h, cur.off.x * w, cur.off.y * h, w, h);
+
+    /* core */
+    const ign = Math.min(1, since / at(1.3)), pop = ign < 1 ? 1 - Math.pow(1 - ign, 3) * Math.cos(ign * 5) : 1;
+    thinking += (thinkWant - thinking) * .06;
+    const beat = Math.pow(Math.max(0, Math.sin(t * 2.2)), 12);
+    heartMat.uniforms.uTime.value = t * (1 + thinking * 2.5); heartMat.uniforms.uPulse.value = beat * .6 + thinking;
+    core.scale.setScalar(Math.max(.001, pop) * (1 + beat * .035 + thinking * .08));
+    heart.rotation.y += dt * (.06 + thinking * .3);
+    corona.quaternion.copy(camera.quaternion);
+    coronaMat.uniforms.uTime.value = t * (1 + thinking * 2); coronaMat.uniforms.uPulse.value = beat * .5 + thinking; coronaMat.uniforms.uIgn.value = ign;
+    windMat.uniforms.uTime.value = t; windMat.uniforms.uSpeed.value = 1 + thinking * 2.5; wind.visible = ign > .5;
+    rings.forEach((g, j) => { g.rotation.y += dt * (.25 + j * .12) * (j % 2 ? -1 : 1) * (1 + thinking * 3);
+      const b = g.userData.bead, a = t * (.8 + j * .3); b.position.set(Math.cos(a) * g.userData.r, 0, Math.sin(a) * g.userData.r); });
+    halo.material.opacity = (.22 + beat * .15 + thinking * .25) * ign; halo.scale.setScalar(12 + beat * 1.5 + thinking * 3);
+    sun.intensity = 60 * ign + beat * 15 + thinking * 40;
+
+    /* the cross */
+    crossLines.forEach((l, j) => { const p = Math.min(1, Math.max(0, (since - at(.7 + j * .14)) / at(.6))); l.material.opacity = .22 * p * (.8 + .2 * Math.sin(t + j)); });
+    cross.children.forEach(c => { if(c.isSprite){ c.material.opacity = Math.min(1, since / at(1.4)) * (.6 + .4 * Math.sin(t * 1.3 + c.userData.tw)); } });
+    cross.rotation.z = Math.sin(t * .05) * .03;
+
+    /* the worlds and their beams */
+    let flareAmt = 0;
+    worlds.forEach(wd => {
+      const start = at(1.5 + wd.i * .45), reach = Math.min(1, Math.max(0, (since - start) / at(.7)));   // the beam travels out
+      const lit = since > start + at(.7);
+      wd.power += ((lit ? (wd.live ? 1 : .45) : 0) - wd.power) * .08;
+      const focused = SCENES[focusIdx] === wd.k ? 1 : hovered === wd.k ? .6 : 0;
+      wd.focus += (focused - wd.focus) * .08;
+      if(lit && since < start + at(1.1)) flareAmt = Math.max(flareAmt, 1 - (since - start - at(.7)) / at(.4));
+      // beam: from the core's surface, up over the plane, down into the world
+      V.copy(wd.pos).normalize().multiplyScalar(1.3);
+      V2.copy(wd.pos).multiplyScalar(.5); V2.y += 1.6 + .4 * Math.sin(t * .4 + wd.i);
+      wd.curve.v0.copy(V); wd.curve.v1.copy(V2); wd.curve.v2.copy(wd.pos).lerp(V, .12);
+      const lp = wd.line.geometry.attributes.position, n = lp.count;
+      for(let j = 0; j < n; j++){ wd.curve.getPoint(j / (n - 1) * reach, V); lp.setXYZ(j, V.x, V.y, V.z); }
+      lp.needsUpdate = true;
+      wd.line.material.opacity = (.16 + .3 * wd.focus + .12 * heroness) * Math.min(1, reach * 2);
+      const pa = wd.packets.geometry.attributes.position, speed = .18 + .3 * wd.focus + thinking * .5;
+      for(let j = 0; j < pa.count; j++){ const u = ((wd.phase[j] + t * speed) % 1) * reach; wd.curve.getPoint(u, V); pa.setXYZ(j, V.x, V.y, V.z); }
+      pa.needsUpdate = true;
+      wd.packets.material.uniforms.uOpacity.value = (.55 + .45 * wd.focus) * Math.min(1, reach * 1.5);
+      wd.packets.material.uniforms.uSize.value = 7 + 4 * wd.focus;
+      wd.packets.material.uniforms.uTime.value = t;
+      // the world itself
+      const pw = wd.power;
+      wd.body.material.emissiveIntensity = .05 + pw * (.45 + .4 * wd.focus) + (wd.k === 'ats' ? beat * .2 * pw : 0);
+      wd.body.rotation.y += dt * (.35 + wd.focus * .4); wd.body.rotation.x = Math.sin(t * .5 + wd.i) * .35;
+      wd.cage.material.opacity = pw * (.12 + .3 * wd.focus); wd.cage.rotation.y -= dt * .2; wd.cage.rotation.z += dt * .07;
+      wd.orbit.material.opacity = pw * (.25 + .4 * wd.focus); wd.orbit.rotation.z += dt * .3;
+      const ma = t * 1.6 + wd.i; wd.moon.position.set(Math.cos(ma) * 1.35, Math.sin(ma) * 1.35 * Math.sin(.5), Math.sin(ma) * 1.35 * Math.cos(.5));
+      wd.moon.material.opacity = pw;
+      wd.aura.material.opacity = pw * (.35 + .4 * wd.focus); wd.aura.scale.setScalar(3.2 + wd.focus * 1.4 + Math.sin(t * 2 + wd.i) * .15);
+      wd.g.scale.setScalar((.001 + .999 * Math.min(1, pw * 1.6)) * (1 + .12 * wd.focus));
+    });
+    flare.material.opacity = Math.max(0, flareAmt) * .8; flare.scale.setScalar(5 + 4 * flareAmt);
+
+    sky.rotation.y += dt * .004; sky.material.uniforms.uTime.value = t;
+    dust.rotation.y += dt * .02; dust.material.uniforms.uTime.value = t;
+
+    renderer.render(scene, camera);
+
+    /* labels, pinned to their worlds; shown in the overview */
+    const tagVis = Math.max(0, 1 - s * 1.6);
+    { const h = tagVis > .02 && document.querySelector('.hero'); heroBox = h ? h.getBoundingClientRect() : null; }
+    worlds.forEach(wd => pin(wd.tag, V.copy(wd.pos).add(new THREE.Vector3(0, 1.25, 0)), tagVis * Math.min(1, wd.power * 1.5)));
+    pin(coreTag, V.set(0, 2.2, 0), Math.min(1, since / at(1.6)) * Math.max(tagVis, s > 4.4 ? Math.min(1, (s - 4.4) * 2) : 0));
+
+    /* the rail */
+    const on = SCENES[Math.round(s)];
+    if(Math.round(s) !== lastActive){ lastActive = Math.round(s); rail().forEach(a => a.classList.toggle('on', a.dataset.k === on)); }
+    requestAnimationFrame(frame);
+  }
+  let heroBox = null;
+  function pin(el, p, o){
+    p.project(camera);
+    const x = (p.x + 1) / 2 * innerWidth, y = (1 - p.y) / 2 * innerHeight;
+    if(heroBox && x > heroBox.left - 70 && x < heroBox.right + 70 && y > heroBox.top - 10 && y < heroBox.bottom + 40) o = 0;   // never over the words or the tiles
+    if(p.z > 1 || o < .02){ el.style.opacity = 0; el.style.pointerEvents = 'none'; return; }
+    el.style.opacity = o.toFixed(3); el.style.pointerEvents = o > .2 ? 'auto' : 'none';
+    el.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px) translate(-50%, -100%)`;
+  }
+  requestAnimationFrame(frame);
+
+  return {
+    setApps(info){ worlds.forEach(w => { const x = info[w.k]; w.live = !x || x.on !== false; w.note.textContent = x && x.note ? x.note : ''; w.tag.style.display = x ? '' : 'none'; }); coreTag.style.display = Object.keys(info).length ? '' : 'none'; },
+    layout(){ requestAnimationFrame(layout); },
+    think(on){ thinkWant = on ? 1 : 0; },
+    go,
+  };
+})();
 
 try{ const t = localStorage.getItem('ledger-theme'); if(t === 'light' || t === 'dark') document.documentElement.dataset.theme = t; }catch(e){}
 if(signedIn()) render(); else showLogin();

@@ -1,0 +1,617 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#0c2620">
+<title>Money Home</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%230c2620'/%3E%3Cpath d='M16 42 L28 28 L36 35 L48 20' stroke='%23e2b04a' stroke-width='6' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap">
+<style>
+:root{
+  color-scheme:light;
+  --page:#eef1ec; --card:#ffffff; --card2:#f6f8f5; --ink:#132019; --ink2:#3b4a42; --mut:#6b7a72; --line:#dfe5df;
+  --hero:#0c2620; --hero2:#12372e; --hero-ink:#f3f1e8; --hero-mut:#a9bcb2; --gold:#e2b04a; --gold-soft:#f6e7c1;
+  --up:#16804a; --dn:#c2412d;
+  --ats:#4453c4; --exp:#c0701a; --led:#1f7fc9; --trip:#0E6BA8;
+  --a1:#1f7fc9; --a2:#2aa37a; --a3:#e2b04a; --a4:#c0701a; --a5:#8a5cc8; --a6:#d1537c; --a7:#5b8c96; --a8:#9aa39e;
+  --shadow:0 1px 2px rgb(15 30 25 / .05), 0 8px 24px -12px rgb(15 30 25 / .14);
+  --display:'Bricolage Grotesque', 'Avenir Next', system-ui, sans-serif;
+  --body:'Plus Jakarta Sans', -apple-system, 'Segoe UI', sans-serif;
+  --mono:'JetBrains Mono', ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){ color-scheme:dark;
+    --page:#0b110f; --card:#131b18; --card2:#18221e; --ink:#e7ede9; --ink2:#c1cdc6; --mut:#8d9c94; --line:#24302b;
+    --hero:#0a1f1a; --hero2:#0f2d25; --up:#4cc38a; --dn:#ef7a66; --ats:#98a4f4; --exp:#f0a95c; --led:#72b4ee; --trip:#5AA9F2;
+    --shadow:none; }
+}
+:root[data-theme="dark"]{ color-scheme:dark;
+  --page:#0b110f; --card:#131b18; --card2:#18221e; --ink:#e7ede9; --ink2:#c1cdc6; --mut:#8d9c94; --line:#24302b;
+  --hero:#0a1f1a; --hero2:#0f2d25; --up:#4cc38a; --dn:#ef7a66; --ats:#98a4f4; --exp:#f0a95c; --led:#72b4ee; --trip:#5AA9F2; --shadow:none; }
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--page);color:var(--ink);font:15px/1.5 var(--body);-webkit-font-smoothing:antialiased}
+.num{font-family:var(--mono);font-variant-numeric:tabular-nums;letter-spacing:-.01em}
+a{color:inherit}
+
+/* ---------- hero: a night-green ledger page ---------- */
+.hero{background:
+    linear-gradient(180deg, transparent 0 calc(100% - 1px), rgb(255 255 255 / .05) 0) 0 0 / 100% 32px,
+    radial-gradient(1200px 400px at 85% -10%, rgb(226 176 74 / .18), transparent 60%),
+    linear-gradient(160deg, var(--hero2), var(--hero));
+  color:var(--hero-ink);padding-top:env(safe-area-inset-top,0px)}
+.hero-in{max-width:1120px;margin:0 auto;padding-inline:20px;padding-block:22px 34px}
+.topline{display:flex;flex-wrap:wrap;align-items:center;gap:10px;justify-content:space-between}
+.brand{display:flex;align-items:center;gap:10px;font:700 15px var(--display);letter-spacing:.01em}
+.brand svg{width:28px;height:28px}
+.chips{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.chip{display:inline-flex;align-items:center;gap:7px;padding:6px 11px;border-radius:999px;background:rgb(255 255 255 / .07);border:1px solid rgb(255 255 255 / .12);font-size:12.5px;color:var(--hero-ink)}
+.chip i{width:7px;height:7px;border-radius:50%;background:var(--hero-mut)}
+.chip.on i{background:#5fe0a0;box-shadow:0 0 0 3px rgb(95 224 160 / .2)}
+.chip button{all:unset;cursor:pointer}
+.hero-grid{display:grid;grid-template-columns:1.35fr 1fr;gap:28px;align-items:center;margin-top:26px}
+@media (max-width:820px){.hero-grid{grid-template-columns:1fr}}
+.hello{font:500 15px var(--body);color:var(--hero-mut)}
+.big{font:800 clamp(40px,7vw,68px)/1 var(--display);letter-spacing:-.03em;margin:8px 0 6px}
+.big .num{font-family:var(--display);letter-spacing:-.03em}
+.bigsub{color:var(--hero-mut);font-size:14px;max-width:52ch}
+.bigsub b{color:var(--hero-ink);font-weight:600}
+.day{display:inline-flex;gap:8px;align-items:center;margin-top:14px;padding:7px 12px;border-radius:10px;background:rgb(255 255 255 / .06);font-size:13.5px}
+.day .up{color:#6fe0a8} .day .dn{color:#ff9a86}
+.ringbox{display:flex;align-items:center;gap:20px;justify-self:end}
+@media (max-width:820px){.ringbox{justify-self:start}}
+.ring{width:168px;height:168px;flex:none}
+.ring text{fill:var(--hero-ink)}
+.ringfacts{display:flex;flex-direction:column;gap:12px}
+.rf .l{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--hero-mut)}
+.rf .v{font:600 18px var(--mono);color:var(--hero-ink)}
+.ribbon{margin-top:28px}
+.ribbar{display:flex;height:12px;border-radius:7px;overflow:hidden;background:rgb(255 255 255 / .08)}
+.ribbar i{display:block;height:100%}
+.ribbar i + i{border-left:2px solid var(--hero)}
+.riblegend{display:flex;flex-wrap:wrap;gap:6px 16px;margin-top:10px;font-size:12.5px;color:var(--hero-mut)}
+.riblegend span{display:inline-flex;align-items:center;gap:6px}
+.riblegend b{color:var(--hero-ink);font:500 12.5px var(--mono)}
+.riblegend em{width:9px;height:9px;border-radius:3px;display:inline-block}
+
+/* ---------- body ---------- */
+main{max-width:1120px;margin:0 auto;padding-inline:20px;padding-block:0 60px}
+.apps{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px;margin-top:-18px}
+@media (max-width:1180px){.apps{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:900px){.apps{grid-template-columns:1fr}}
+.card{background:var(--card);border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow);padding:20px;display:flex;flex-direction:column;gap:14px;min-width:0}
+.apphead{display:flex;align-items:center;gap:12px}
+.glyph{width:40px;height:40px;border-radius:12px;display:grid;place-items:center;background:color-mix(in srgb,var(--c) 14%,var(--card));color:var(--c);flex:none}
+.glyph svg{width:22px;height:22px}
+.apphead h2{margin:0;font:700 18px/1.2 var(--display)}
+.apphead p{margin:1px 0 0;font-size:12.5px;color:var(--mut)}
+.status{margin-left:auto;font-size:11.5px;font-weight:600;padding:4px 9px;border-radius:999px;background:var(--card2);color:var(--mut);white-space:nowrap}
+.status.live{background:color-mix(in srgb,var(--up) 14%,var(--card));color:var(--up)}
+.kv{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px 12px}
+.kv .l{font-size:11px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--mut)}
+.kv .v{font:600 20px/1.25 var(--mono);font-variant-numeric:tabular-nums;margin-top:2px}
+.kv .s{font-size:12px;color:var(--ink2)}
+.up{color:var(--up)} .dn{color:var(--dn)}
+.movers{display:flex;flex-wrap:wrap;gap:6px}
+.mv{font-size:12px;padding:5px 9px;border-radius:8px;background:var(--card2);color:var(--ink2)}
+.mv b{font-family:var(--mono);font-weight:600}
+.empty{font-size:13px;color:var(--ink2);background:var(--card2);border-radius:12px;padding:12px 14px;line-height:1.45}
+.open{margin-top:auto;display:inline-flex;align-items:center;gap:8px;align-self:flex-start;padding:9px 15px;border-radius:11px;background:var(--c);color:#fff;text-decoration:none;font-weight:600;font-size:13.5px;transition:transform .15s}
+.open:hover{transform:translateY(-1px)}
+.opens{margin-top:auto;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.opens .open{margin-top:0}
+.open.alt{background:transparent;color:var(--c);box-shadow:inset 0 0 0 1.5px var(--c)}
+.opens .edit{background:none;border:0;color:var(--ink2);font:inherit;font-size:12.5px;text-decoration:underline;cursor:pointer;padding:4px}
+.open:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
+
+.row2{display:grid;grid-template-columns:1.5fr 1fr;gap:16px;margin-top:16px}
+@media (max-width:900px){.row2{grid-template-columns:1fr}}
+.card h3{margin:0;font:700 17px var(--display)}
+.card .cap{margin:-8px 0 0;font-size:12.5px;color:var(--mut)}
+.flow{display:flex;height:34px;border-radius:10px;overflow:hidden;background:var(--card2)}
+.flow i{display:flex;align-items:center;padding-inline:10px;color:#fff;font:600 12px var(--mono);white-space:nowrap;overflow:hidden;min-width:0}
+.flowkey{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:12.5px;color:var(--ink2)}
+.flowkey span{display:inline-flex;gap:6px;align-items:center}
+.flowkey em{width:9px;height:9px;border-radius:3px}
+.bars{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;align-items:end;height:150px;padding-top:8px}
+.bars .col{display:flex;flex-direction:column;align-items:center;gap:6px;justify-content:flex-end}
+.bars .stack{width:100%;max-width:44px;display:flex;flex-direction:column-reverse;border-radius:7px 7px 3px 3px;overflow:hidden}
+.bars .stack i{display:block}
+.bars .m{font-size:11px;color:var(--mut)}
+.sip{display:flex;flex-direction:column;gap:6px}
+.track{height:10px;border-radius:6px;background:var(--card2);overflow:hidden}
+.track i{display:block;height:100%;border-radius:6px;background:linear-gradient(90deg,var(--led),color-mix(in srgb,var(--led) 60%,#7fd3b5))}
+.todo{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.todo li{display:grid;grid-template-columns:auto 1fr;gap:3px 12px;padding:11px 0;border-top:1px solid var(--line)}
+.todo li:first-child{border-top:0;padding-top:2px}
+.when{grid-row:span 2;font:600 11.5px/1.2 var(--mono);color:var(--mut);background:var(--card2);border-radius:8px;padding:6px 8px;text-align:center;min-width:58px}
+.when b{display:block;font-size:15px;color:var(--ink)}
+.todo .a{font-weight:600;font-size:14px}
+.todo .f{font-size:12.5px;color:var(--mut)}
+.pr{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:6px;vertical-align:1px}
+.foot{margin-top:24px;display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;font-size:12.5px;color:var(--mut)}
+.btn{font:600 12.5px var(--body);border:1px solid var(--line);background:var(--card);color:var(--ink2);border-radius:9px;padding:7px 12px;cursor:pointer}
+.btn:hover{color:var(--ink)}
+
+/* ---------- sign-in ---------- */
+.gate{min-height:100vh;display:grid;place-items:center;padding:24px 16px;background:linear-gradient(160deg,var(--hero2),var(--hero))}
+.gate form{width:min(380px,100%);background:var(--card);border-radius:20px;padding:28px 26px;display:flex;flex-direction:column;gap:8px;box-shadow:0 30px 60px -20px rgb(0 0 0 / .5)}
+.gate h1{font:800 28px/1.1 var(--display);margin:6px 0 4px;letter-spacing:-.02em}
+.gate .sub{color:var(--mut);font-size:13.5px;margin:0 0 10px}
+.gate label{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--mut);font-weight:600;margin-top:6px}
+.gate input{padding:11px 13px;border:1px solid var(--line);border-radius:11px;background:var(--card2);color:var(--ink);font:15px var(--body)}
+.gate input:focus{outline:none;border-color:var(--ats)}
+.gate button{margin-top:12px;padding:12px;border:0;border-radius:11px;background:var(--hero);color:var(--gold);font:700 14.5px var(--body);cursor:pointer}
+.gate .err{color:var(--dn);font-size:13px}
+.skel{opacity:.55}
+/* ---------- Ask AI ---------- */
+.ask{margin-top:16px}
+.ask .top{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.ask .top h3{margin-right:auto}
+.ask .hub{font-size:12.5px;color:var(--mut);text-decoration:none;border:1px solid var(--line);border-radius:999px;padding:4px 10px}
+.ask .hub:hover{color:var(--ink)}
+.ask form{display:flex;gap:8px}
+.ask textarea{flex:1;min-width:0;resize:vertical;min-height:46px;font:14.5px/1.45 var(--body);color:var(--ink);background:var(--card2);border:1px solid var(--line);border-radius:12px;padding:11px 13px}
+.ask textarea:focus{outline:2px solid var(--gold);outline-offset:1px}
+.ask button.go{border:0;border-radius:12px;background:var(--hero);color:var(--gold);font:700 14px var(--body);padding:0 18px;cursor:pointer}
+.ask button.go:disabled{opacity:.6}
+.sugg{display:flex;flex-wrap:wrap;gap:6px}
+.sugg button{font:500 12.5px var(--body);border:1px solid var(--line);background:var(--card);color:var(--ink2);border-radius:999px;padding:5px 11px;cursor:pointer}
+.sugg button:hover{color:var(--ink);border-color:var(--gold)}
+.convo{display:flex;flex-direction:column;gap:10px}
+.convo .q{align-self:flex-end;background:var(--card2);border-radius:14px 14px 4px 14px;padding:8px 12px;max-width:85%;font-weight:600;font-size:14px}
+.convo .a{background:color-mix(in srgb,var(--gold) 9%,var(--card));border:1px solid var(--line);border-radius:14px 14px 14px 4px;padding:10px 13px;font-size:14px;white-space:pre-wrap;overflow-wrap:anywhere}
+.convo .by{display:block;margin-top:6px;font-size:11.5px;color:var(--mut)}
+.convo .srcs{display:flex;flex-wrap:wrap;gap:4px 10px;margin-top:6px;font-size:12px}
+.convo .srcs a{color:inherit;opacity:.8}
+.convo .a{white-space:pre-line}
+.convo .err{color:var(--dn)}
+@media (max-width:600px){.ask form{flex-direction:column}.ask button.go{padding:12px}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script src="/ai/ai.js"></script>
+<script src="/ai/brain.js"></script>
+<script src="/ai/ask.js"></script>
+<script src="/ai/web.js"></script>
+<script src="/InvestmentPlan/cloud.js"></script>
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const inr = n => (n < 0 ? '−' : '') + '₹' + Math.round(Math.abs(n)).toLocaleString('en-IN');
+const cr = n => { const a = Math.abs(n), s = n < 0 ? '−' : ''; return a >= 1e7 ? s + '₹' + (a / 1e7).toFixed(2) + ' Cr' : a >= 1e5 ? s + '₹' + (a / 1e5).toFixed(2) + ' L' : inr(n); };
+const kfmt = n => { const a = Math.abs(n); return a >= 1e5 ? (n / 1e5).toFixed(1) + 'L' : a >= 1e3 ? Math.round(n / 1e3) + 'K' : Math.round(n) + ''; };
+const pct = (n, d = 2) => (n >= 0 ? '+' : '−') + Math.abs(n).toFixed(d) + '%';
+const ym = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+const ymLabel = (m, style = 'long') => new Date(+m.slice(0, 4), +m.slice(5, 7) - 1, 1).toLocaleDateString('en-IN', {month: style, year: style === 'long' ? 'numeric' : undefined});
+const ago = ms => { const s = (Date.now() - ms) / 1000; return s < 90 ? 'just now' : s < 3600 ? Math.round(s / 60) + ' min ago' : s < 86400 ? Math.round(s / 3600) + ' h ago' : Math.round(s / 86400) + ' d ago'; };
+/* ATS's address on this device: the one it was linked from (your Mac's Tailscale address on the phone), else this Mac */
+/* ATS away from the Mac: its Tailscale address, set once (here, or by linking a device through it) and carried,
+   encrypted, to your other devices with the settings - never written into this public page */
+const MOBILE = /iPhone|iPad|Android/i.test(navigator.userAgent);
+const atsRemote = () => { try{ const r = MoneyShared.atsRemote && MoneyShared.atsRemote(); if(r) return r.url;
+  const l = typeof Cloud !== 'undefined' && Cloud.atsLink(); if(l && /^https:\/\//.test(l.url || '')){ MoneyShared.setAtsRemote(l.url); return l.url.replace(/\/+$/, ''); } }catch(e){} return ''; };
+function askAtsRemote(){
+  const cur = atsRemote();
+  const v = prompt('ATS address for your other devices - your Mac\'s Tailscale address (https://…ts.net).\nLeave empty to remove it.', cur || 'https://');
+  if(v === null) return;
+  try{ MoneyShared.setAtsRemote(v === 'https://' ? '' : v); }catch(e){ alert(e.message); return; }
+  try{ if(MoneyShared.status().setup) MoneyShared.sync().catch(()=>{}); }catch(e){}       // on to your other devices now
+  render();
+}
+const atsUrl = () => { const l = typeof Cloud !== 'undefined' && Cloud.atsLink(); return l && /^https?:\/\//.test(l.url || '') ? l.url.replace(/\/+$/, '') + '/' : LINKS.ats; };
+const LINKS = {ats:'http://localhost:8765/', exp:'/expenseTracker/', led:'/InvestmentPlan/', trip:'/tripManangement/'};
+/* Trip Vault's personal documents (its Document Vault): everything that is not a travel paper */
+const TRAVEL_DOC = ['boarding-pass', 'flight', 'hotel', 'train', 'bus', 'visa', 'car', 'activity'];
+const DOC_LABEL = {passport: 'Passport', aadhaar: 'Aadhaar', pan: 'PAN card', licence: 'Driving licence', 'voter-id': 'Voter ID', tax: 'Tax papers', bank: 'Bank statement',
+  investment: 'Investment statement', insurance: 'Insurance', property: 'Property / rent', vehicle: 'Vehicle papers', medical: 'Medical', education: 'Education', employment: 'Employment', bill: 'Bill / warranty', other: 'Other'};
+function personalDocs(tv){ return ((tv && tv.docs) || []).filter(d=>TRAVEL_DOC.indexOf(d.type) < 0); }
+/* a trip's own documents, as Trip Vault counts them: travel papers, or a passport / travel insurance / unsorted one
+   attached to it - never Aadhaar, PAN, bank and the other personal ones, even when attached to a trip */
+const isTripDoc = d => !!d && (TRAVEL_DOC.indexOf(d.type) >= 0 || (!!d.tripId && ['passport', 'insurance', 'other'].indexOf(d.type) >= 0));
+const SESSION = 'money-home-session';
+const ICON = {
+  ats:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19V9M10 19V5M16 19v-7M22 19H2"/></svg>',
+  exp:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="M3 10h18M7 15h4"/></svg>',
+  trip:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 15l18-7-18-7 3.5 7z" transform="translate(0 4)"/></svg>',
+  led:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h11l3 3v13H5z"/><path d="M9 10h6M9 14h6M9 18h3"/></svg>',
+};
+const ASSET = {EPF:'EPF', ESOPS_RSUS:'ESOPs & RSUs', STOCK:'Indian stocks & ETFs', IND_STOCK:'Indian stocks & ETFs', MF:'Mutual funds', US_STOCK:'US stocks',
+  US_STOCK_WALLET:'US cash', NPS:'NPS', GOLD:'Gold', PHYSICAL_GOLD:'Physical gold', VEHICLE:'Vehicle', CRYPTO:'Crypto', FD:'FDs', PPF:'PPF', BOND:'Bonds'};
+const PAL = ['--a1','--a2','--a3','--a4','--a5','--a6','--a7','--a8'];
+
+const signedIn = () => { try{ return sessionStorage.getItem(SESSION) === 'yes'; }catch(e){ return false; } };
+function ledger(){ try{ return JSON.parse(localStorage.getItem('ledger-draft-v2') || localStorage.getItem('ledger-state-v2') || 'null'); }catch(e){ return null; } }
+
+/* ---------- Ask AI: one assistant for all the apps, through the site's central AI (the AI hub, /ai/) */
+const ASK = {turns: [], busy: false, ctl: null, ctx: '', data: null};
+const hasAsk = () => typeof MoneyAsk !== 'undefined';
+const hasAi = () => typeof MoneyAI !== 'undefined' && MoneyAI.aiAvailable();
+function askCard(){
+  const conv = ASK.turns.map(t => t.role === 'user' ? `<div class="q">${esc(t.content)}</div>`
+    : `<div class="a ${t.error ? 'err' : ''}">${esc(t.content)}${(t.sources || []).length ? `<span class="srcs">${t.sources.map((x, i) => `<a href="${esc(x.url)}" target="_blank" rel="noopener">[${i + 1}] ${esc(x.title)}</a>`).join(' ')}</span>` : ''}${t.by ? `<span class="by">${esc(t.by)}</span>` : ''}</div>`).join('');
+  const sugg = ['How much did I spend last month, and on what?', 'Am I on track for my retirement target?', 'EMI for 50 lakh at 8.5% for 20 years', '100 USD to INR', 'Weather in Dubai this week', 'What is a mutual fund?'];
+  return `<section class="card ask"><div class="top"><h3>Ask</h3><a class="hub" href="/setup/#ai">AI · ${hasAi() ? esc(MoneyAI.aiNames()[0]) + ' first' : 'add a key'}</a></div>
+    <p class="cap">Your plan, spending, trips and documents${ASK.ctx && /ATS/.test(ASK.ctx) ? ', ATS holdings' : ''} are answered from your own data; money sums (EMI, SIP, CAGR, GST), exchange rates, weather, meanings and facts are looked up on the web — with the sources shown.</p>
+    ${conv ? `<div class="convo" id="convo">${conv}</div>` : ''}
+    ${hasAi() || hasAsk() ? `<form id="askf"><textarea id="askq" rows="1" placeholder="Ask about your money, plan or trips…"></textarea><button class="go" id="askgo">${ASK.busy ? 'Stop' : 'Ask'}</button></form>
+      ${ASK.turns.length ? '' : `<div class="sugg">${sugg.map(q => `<button type="button" data-q="${esc(q)}">${esc(q)}</button>`).join('')}</div>`}`
+    : `<div class="empty">Add a free AI key in <a href="/setup/#ai">Setup</a> (Google Gemini is the most useful) — every app then uses it.</div>`}</section>`;
+}
+function bindAsk(){
+  const f = $('askf');
+  if(!f) return;
+  const q = $('askq');
+  q.onkeydown = e => { if(e.key === 'Enter' && !e.shiftKey){ e.preventDefault(); f.requestSubmit(); } };
+  document.querySelectorAll('.sugg [data-q]').forEach(b => b.onclick = () => { q.value = b.dataset.q; f.requestSubmit(); });
+  f.onsubmit = async e => {
+    e.preventDefault();
+    if(ASK.busy){ if(ASK.ctl) ASK.ctl.abort(); return; }
+    const text = q.value.trim();
+    if(!text) return;
+    ASK.turns.push({role: 'user', content: text});
+    ASK.busy = true; ASK.ctl = new AbortController();
+    render();
+    // your own data first: spending, income, savings, trips, documents and the plan are answered exactly, without AI
+    const own = hasAsk() && ASK.data ? MoneyAsk.answer(text, ASK.data) : null;
+    if(own){
+      ASK.turns.push({role: 'assistant', content: own.text, by: own.by});
+      ASK.busy = false; ASK.ctl = null; render();
+      setTimeout(() => { const c = $('convo'); if(c) c.lastElementChild.scrollIntoView({block: 'nearest'}); const i = $('askq'); if(i) i.focus(); }, 50);
+      return;
+    }
+    // beyond the apps: calculators, live facts, and reading the web — then, with an AI, a plain answer held to what was read
+    let web = null;
+    if(typeof MoneyWeb !== 'undefined'){
+      try{ web = await MoneyWeb.answer(text); }catch(e){ web = null; }
+      // a question for the whole web: your relay searches and reads, an AI thinks it through (sources shown)
+      const relay = MoneyWeb.relay((MoneyAI.aiLocal() || {}).relay);
+      if(relay && (!web || web.kind === 'read' || web.kind === 'not-found')){
+        try{
+          const chat = hasAi() ? (sys, turns, o) => MoneyAI.chat(sys, turns, o, ASK.ctl && ASK.ctl.signal) : null;
+          const out = await MoneyWeb.deep(text, {search: relay.search, read: relay.read, chat, onStep: t => { const e = document.querySelector('.convo'); if(e) e.dataset.step = t; }});
+          ASK.turns.push({role: 'assistant', content: out.text, sources: out.sources, by: out.by || ('Searched the web via ' + (out.provider || 'your relay'))});
+          ASK.busy = false; ASK.ctl = null; render();
+          setTimeout(() => { const c = $('convo'); if(c) c.lastElementChild.scrollIntoView({block: 'nearest'}); const i = $('askq'); if(i) i.focus(); }, 50);
+          return;
+        }catch(e){ if(e.code === 'cancelled'){ ASK.busy = false; render(); return; } /* the relay failed: carry on without it */ }
+      }
+      if(web && web.kind !== 'not-found'){
+        let out = web, by = 'Money Brain · ' + ({calculator: 'worked out exactly', currency: 'live rate', weather: 'live forecast', time: 'world clock', definition: 'dictionary', fact: 'Wikidata'}[web.kind] || 'read from the web') + ' (no AI)';
+        if(web.passages && hasAi()){
+          try{ out = await MoneyWeb.rephrase(text, web, (sys, turns, o) => MoneyAI.chat(sys, turns, o, ASK.ctl && ASK.ctl.signal)); if(out.by) by = 'Read from the web, put in words by ' + out.by; }catch(e){ out = web; }
+        }
+        ASK.turns.push({role: 'assistant', content: out.text + (out.note ? '\n\n' + out.note : ''), sources: out.sources, by});
+        ASK.busy = false; ASK.ctl = null; render();
+        setTimeout(() => { const c = $('convo'); if(c) c.lastElementChild.scrollIntoView({block: 'nearest'}); const i = $('askq'); if(i) i.focus(); }, 50);
+        return;
+      }
+    }
+    if(!hasAi()){
+      ASK.turns.push({role: 'assistant', content: web && web.kind === 'not-found' ? web.text + ' An AI key (free, in Setup) would let me answer from general knowledge.' : 'I answer from your own data (spending, trips, documents, plan) and look things up on the web (sums, rates, weather, facts). For anything else, add a free AI key in Setup.', error: true});
+      ASK.busy = false; ASK.ctl = null; render(); return;
+    }
+    const system = `You are the assistant on "Money Home", the start page of the owner's personal apps: the 16-Year Ledger (investment plan), the Expense Tracker (bank statements), Trip Vault (trips) and ATS (trading dashboard). Answer in plain, short sentences (Indian rupees, ₹, lakh/crore), using only the figures below; say so when something is not in them, and which app to open to see it. You explain and help plan; you do not give licensed investment advice or tell them to buy or sell a specific security.
+Today is ${new Date().toISOString().slice(0, 10)}.
+${ASK.ctx || 'No data from the apps in this browser yet.'}`;
+    try{
+      const r = await MoneyAI.chat(system, ASK.turns.filter(t => !t.error).map(t => ({role: t.role, content: t.content})).slice(-10), {}, ASK.ctl.signal);
+      // the AI's figures checked against your data: one it made up is pointed out
+      const made = hasAsk() ? MoneyAsk.checkFigures(r.text, ASK.ctx) : [];
+      ASK.turns.push({role: 'assistant', content: r.text.trim() + (made.length ? '\n\n⚠ Not in your data: ' + made.join(', ') + ' — check before relying on ' + (made.length === 1 ? 'it' : 'them') + '.' : ''), by: r.provider + ' · ' + r.model + ' — from its own knowledge, not checked against the web'});
+    }catch(err){
+      if(err.code !== 'cancelled') ASK.turns.push({role: 'assistant', content: err.message, error: true});
+    }finally{ ASK.busy = false; ASK.ctl = null; render(); setTimeout(() => { const c = $('convo'); if(c) c.lastElementChild.scrollIntoView({block: 'nearest'}); const i = $('askq'); if(i) i.focus(); }, 50); }
+  };
+}
+
+/* ---------- Trip Vault's trips, as that app keeps them in this browser (read only; a missing database is not created) */
+async function tripVault(){
+  try{
+    if(!window.indexedDB) return null;
+    if(indexedDB.databases && !(await indexedDB.databases()).some(d => d.name === 'trip-vault')) return null;
+    const db = await new Promise((res, rej) => { const r = indexedDB.open('trip-vault'); r.onupgradeneeded = () => { try{ r.transaction.abort(); }catch(e){} }; r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
+    try{
+      if(!db.objectStoreNames.contains('kv')) return null;
+      return await new Promise((res, rej) => { const r = db.transaction('kv').objectStore('kv').get('state'); r.onsuccess = () => res(r.result || null); r.onerror = () => rej(r.error); });
+    } finally { db.close(); }
+  }catch(e){ return null; }
+}
+
+/* ---------- sign-in: the Expense Tracker's (else the Ledger's own, else admin / admin) */
+async function checkLogin(u, p){
+  if(typeof MoneyShared !== 'undefined') return MoneyShared.checkLogin(u, p);     // one sign-in for every app (Setup)
+  const et = await Cloud.checkExpenseTrackerLogin(u, p);
+  if(et !== null) return et;
+  const plan = ledger();
+  if(plan && plan.auth && plan.auth.hash) return u.trim().toLowerCase() === String(plan.auth.user).toLowerCase() && await Cloud.sha256(u.trim().toLowerCase() + ':' + p) === plan.auth.hash;
+  return u.trim().toLowerCase() === 'admin' && p === 'admin';
+}
+function showLogin(){
+  $('app').innerHTML = `<div class="gate"><form id="lf">
+    <div class="brand" style="color:var(--ink)">${logo()}Money Home</div>
+    <h1>Welcome back</h1><p class="sub">Your trading, spending and investment plan in one place.</p>
+    <label for="u">Username</label><input id="u" autocomplete="username" autocapitalize="none" spellcheck="false" required>
+    <label for="p">Password</label><input id="p" type="password" autocomplete="current-password" required>
+    <p class="err" id="e" hidden>That username or password is wrong.</p>
+    <button>Sign in</button>
+    <p class="sub" style="margin:8px 0 0;font-size:12px">The same sign-in as the Expense Tracker, the Ledger and Trip Vault.</p></form></div>`;
+  $('u').focus();
+  $('lf').onsubmit = async e => { e.preventDefault();
+    if(!(await checkLogin($('u').value, $('p').value))){ $('e').hidden = false; $('p').select(); return; }
+    try{ sessionStorage.setItem(SESSION, 'yes'); }catch(_){}
+    render(); };
+}
+const logo = () => `<svg viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="16" fill="#0c2620"/><path d="M16 42 L28 28 L36 35 L48 20" stroke="#e2b04a" stroke-width="6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+
+/* ---------- the Expense Tracker's own month totals (its plans.ts) */
+function month(txns, m){
+  const a = {spend:0, refunds:0, invested:0, redeemed:0, income:0};
+  txns.forEach(t => { if(!t.date.startsWith(m) || t.excluded || t.kind === 'ignore') return; const out = t.direction === 'debit';
+    if(t.kind === 'spend'){ if(out) a.spend += t.amount; else a.refunds += t.amount; }
+    else if(t.kind === 'investment'){ if(out) a.invested += t.amount; else a.redeemed += t.amount; }
+    else if(t.kind === 'cc_bill'){ if(out && !t.paired) a.spend += t.amount; }   // paired: the card's own purchases are counted
+    else if(t.kind === 'income' && !out) a.income += t.amount; });
+  a.spend -= a.refunds;
+  return a;
+}
+const shiftM = (m, k) => ym(new Date(+m.slice(0, 4), +m.slice(5, 7) - 1 + k, 1));
+
+/* NSE by the clock (09:15-15:30 IST, Mon-Fri; holidays not known here) */
+function market(){
+  const ist = new Date(Date.now() + (330 + new Date().getTimezoneOffset()) * 60000);
+  const d = ist.getDay(), mins = ist.getHours() * 60 + ist.getMinutes();
+  if(d === 0 || d === 6) return {on:false, text:'NSE closed · weekend'};
+  if(mins < 555) return {on:false, text:'NSE opens 09:15'};
+  if(mins < 930) return {on:true, text:'NSE open · closes 15:30'};
+  return {on:false, text:'NSE closed · opens 09:15'};
+}
+
+function ringSvg(p){
+  const r = 70, c = 2 * Math.PI * r, f = Math.max(0, Math.min(1, p));
+  return `<svg class="ring" viewBox="0 0 168 168" role="img" aria-label="${(f * 100).toFixed(1)}% of the target">
+    <circle cx="84" cy="84" r="${r}" fill="none" stroke="rgb(255 255 255 / .1)" stroke-width="12"/>
+    <circle cx="84" cy="84" r="${r}" fill="none" stroke="var(--gold)" stroke-width="12" stroke-linecap="round"
+      stroke-dasharray="${(c * f).toFixed(1)} ${c.toFixed(1)}" transform="rotate(-90 84 84)"/>
+    <text x="84" y="82" text-anchor="middle" style="font:800 30px var(--display)">${(f * 100).toFixed(1)}%</text>
+    <text x="84" y="104" text-anchor="middle" style="font:500 11.5px var(--body);fill:var(--hero-mut)">of the target</text></svg>`;
+}
+
+/* draws straight away from this browser, then again when ATS answers (it can take a few seconds) */
+let RUN = 0;
+async function render(){
+  const run = ++RUN;
+  const et = await Cloud.expenseTracker(true);
+  const tv = await tripVault();
+  if(typeof MoneyAI !== 'undefined') await MoneyAI.loadAi();      // keys kept in the Expense Tracker count too
+  if(typeof MoneyShared !== 'undefined') MoneyShared.quiet();       // settings changed on your other device (every 10 min at most)
+  const linked = !!Cloud.atsLink();
+  draw(et, linked ? 'checking' : null, tv);
+  if(!linked) return;
+  const ats = await Cloud.atsHoldings().catch(e => ({err: e}));
+  if(run === RUN) draw(et, ats, tv);
+}
+function draw(et, ats, tv){
+  const plan = ledger();
+  const mk = market();
+  const atsOk = !!(ats && ats.ok), atsChecking = ats === 'checking';
+  const hr = new Date().getHours(), hello = hr < 5 ? 'Up late' : hr < 12 ? 'Good morning' : hr < 17 ? 'Good afternoon' : 'Good evening';
+  const real = plan && !(plan.plan && plan.plan.starter);
+
+  /* ----- net worth, corpus, target */
+  const rows = real ? ((plan.importedSnapshot || {}).rows || []) : [];
+  const ex = real && Array.isArray(plan.corpusExclude) ? plan.corpusExclude : ['VEHICLE'];
+  const manual = real ? (plan.manualAssets || []) : [];
+  const netWorth = rows.reduce((s, r) => s + (Number(r.current_value) || 0), 0) + manual.reduce((s, m) => s + (Number(m.current) || 0), 0);
+  const corpus = rows.reduce((s, r) => s + (ex.indexOf(r.asset_type) < 0 ? Number(r.current_value) || 0 : 0), 0)
+    + manual.reduce((s, m) => s + (ex.indexOf('MANUAL:' + m.id) < 0 ? Number(m.current) || 0 : 0), 0);
+  const tHi = real ? Number(plan.targetHighCr) || 0 : 0, tLo = real ? Number(plan.targetLowCr) || 0 : 0;
+  const retire = real ? Number(plan.retireAge) || 0 : 0;
+  let yearsLeft = null;
+  if(real && plan.plan && plan.plan.dob && retire){
+    const [y, m, d] = plan.plan.dob.split('-').map(Number), age = (Date.now() - new Date(y, m - 1, d)) / (365.25 * 864e5);
+    yearsLeft = Math.max(0, retire - age);
+  }
+  const sip = real ? [].concat(plan.indiaFunds || [], plan.usFunds || []).reduce((s, f) => s + (Number(f.monthly) || 0), 0) : 0;
+  const T = atsOk ? ats.total || {} : {};
+
+  /* allocation ribbon: every asset class, largest first */
+  const alloc = {};
+  rows.forEach(r => { const k = ASSET[r.asset_type] || String(r.asset_type).replace(/_/g, ' ').toLowerCase(); alloc[k] = (alloc[k] || 0) + (Number(r.current_value) || 0); });
+  manual.forEach(m => { if(Number(m.current)) alloc[m.name || 'By hand'] = (alloc[m.name || 'By hand'] || 0) + Number(m.current); });
+  const allocList = Object.entries(alloc).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]);
+  const allocTop = allocList.slice(0, 7), rest = allocList.slice(7).reduce((s, [, v]) => s + v, 0);
+  if(rest > 0) allocTop.push(['Other', rest]);
+
+  /* What Ask AI knows: the numbers this page shows, from each app in this browser (nothing else is sent). */
+  const ctx = [];
+  if(real){
+    ctx.push(`16-Year Ledger (investment plan): net worth ${cr(netWorth)}; retirement corpus ${cr(corpus)}${tHi ? ` against a target of ₹${tLo ? tLo + '–' : ''}${tHi} Cr` : ''}${yearsLeft !== null ? `; ${yearsLeft.toFixed(1)} years to retirement at ${retire}` : ''}; monthly SIPs ${inr(sip)}.`);
+    if(allocList.length) ctx.push('Holdings by type: ' + allocList.slice(0, 10).map(([k, v]) => k + ' ' + cr(v)).join(', ') + '.');
+    const open = (plan.calendar || []).filter(c => !c.done).sort((a, b) => (a.year - b.year) || (a.age - b.age)).slice(0, 5);
+    if(open.length) ctx.push('Next on the plan: ' + open.map(c => c.year + ': ' + c.action + (c.fund ? ' (' + c.fund + ')' : '')).join('; ') + '.');
+  }
+  if(atsOk) ctx.push(`ATS live holdings: ${Object.entries(T).filter(([, v]) => typeof v === 'number').map(([k, v]) => k.replace(/_/g, ' ') + ' ' + (Math.abs(v) > 1000 ? cr(v) : v)).join(', ')}.`);
+  if(et && et.txns && et.txns.length){
+    const last = et.txns.map(t => t.date).sort().slice(-1)[0].slice(0, 7);
+    ctx.push('Expense Tracker, by month (spent / income / invested): ' + [0, -1, -2, -3, -4, -5].map(k => { const m = shiftM(last, k), A = month(et.txns, m); return ymLabel(m, 'short') + ' ' + inr(A.spend) + ' / ' + inr(A.income) + ' / ' + inr(A.invested); }).join('; ') + '.');
+    const byCat = {}; et.txns.forEach(t => { if(t.date.startsWith(last) && t.kind === 'spend' && t.direction === 'debit' && !t.excluded) byCat[t.category || 'Other'] = (byCat[t.category || 'Other'] || 0) + t.amount; });
+    const top = Object.entries(byCat).sort((a, b) => b[1] - a[1]).slice(0, 8);
+    if(top.length) ctx.push('Spending by category in ' + ymLabel(last, 'short') + ': ' + top.map(([k, v]) => k + ' ' + inr(v)).join(', ') + '.');
+  }
+  if(tv && (tv.trips || []).length){
+    const today = new Date().toISOString().slice(0, 10);
+    const trips = tv.trips.map(t => { const docs = (tv.docs || []).filter(d => d.tripId === t.id && isTripDoc(d));
+      const fl = [].concat(...docs.map(d => ((d.fields || {}).segments || []))).filter(x => x.flight).map(x => `${x.flight} ${x.from}→${x.to} ${x.date || ''} ${x.dep || ''}`.trim());
+      const hotels = docs.filter(d => d.type === 'hotel').map(d => (d.fields || {}).hotelName || d.title);
+      return {t, fl, hotels, n: docs.length}; }).filter(x => !x.t.end || x.t.end >= today).slice(0, 4);
+    if(trips.length) ctx.push('Trip Vault, upcoming trips: ' + trips.map(x => `${x.t.name} (${[x.t.city, x.t.start && x.t.start + ' to ' + (x.t.end || '?')].filter(Boolean).join(', ')}; ${x.n} documents${x.fl.length ? '; flights ' + x.fl.join(', ') : ''}${x.hotels.length ? '; staying at ' + x.hotels.join(', ') : ''})`).join('; ') + '.');
+  }
+  const pdocs = personalDocs(tv);
+  if(pdocs.length) ctx.push('Personal documents in Trip Vault (no numbers shown): ' + pdocs.map(d=>(DOC_LABEL[d.type] || d.type) + (d.person ? ' of ' + d.person : '') + (d.fields && d.fields.validUntil ? ', valid until ' + d.fields.validUntil : '') + (d.fields && d.fields.issuedOn ? ', issued ' + d.fields.issuedOn : '')).join('; ') + '.');
+  ASK.ctx = ctx.join('\n');
+  // the same data, as data, for answering from it without AI
+  ASK.data = {today: new Date().toISOString().slice(0, 10), txns: (et && et.txns) || [],
+    ledger: real ? {netWorth, corpus, targetLow: tLo, targetHigh: tHi, retire, yearsLeft, sip} : null,
+    trips: ((tv && tv.trips) || []).map(t => ({name: t.name, city: t.city, start: t.start, end: t.end})).filter(t => t.start),
+    docs: ((tv && tv.docs) || []).filter(d => d.fields && d.fields.validUntil).map(d => ({type: d.type, label: DOC_LABEL[d.type] || d.title || d.type, person: d.person, validUntil: d.fields.validUntil}))};
+  // the same, kept in this browser for the AI page (/ai/chat/: its "Your apps" connector) — never leaves the browser by itself
+  try{ localStorage.setItem('money-apps-snapshot', JSON.stringify({at: new Date().toISOString(), ctx: ASK.ctx, data: ASK.data})); }catch(e){}
+
+  const hero = `<header class="hero"><div class="hero-in">
+    <div class="topline"><div class="brand">${logo()}Money Home</div>
+      <div class="chips"><span class="chip ${mk.on ? 'on' : ''}"><i></i>${esc(mk.text)}</span>
+        <span class="chip">${esc(new Date().toLocaleDateString('en-IN', {weekday:'long', day:'numeric', month:'long'}))}</span>
+        <a class="chip" href="/ai/chat/" target="_blank" style="text-decoration:none;font-weight:700" title="Cygnus AI in this browser — works anywhere, even with the Mac off">✦ Cygnus AI ↗</a>
+        <a class="chip" href="https://anils-macbook-air.tail4a1c2d.ts.net:8443/" target="_blank" rel="noopener" style="text-decoration:none;font-weight:700" title="The full Cygnus AI on your Mac, through Tailscale — needs Tailscale on this device and the Mac awake">💻 Cygnus AI on Mac ↗</a>
+        <a class="chip" href="/setup/" style="text-decoration:none">⚙ Setup</a></div></div>
+    <div class="hero-grid"><div>
+      <div class="hello">${hello}. Here is where you stand.</div>
+      ${netWorth ? `<div class="big"><span class="num">${cr(netWorth)}</span></div>
+        <div class="bigsub">Net worth across everything INDmoney sees${manual.length ? ' and what you track by hand' : ''}. Your retirement corpus is <b>${cr(corpus)}</b>${ex.length ? ', leaving out ' + esc(ex.filter(x => x.indexOf('MANUAL:') < 0).map(x => (ASSET[x] || x).toLowerCase()).join(', ')) : ''}.</div>`
+        : `<div class="big" style="font-size:40px">Hello</div><div class="bigsub">Open the Ledger once in this browser to see your net worth here.</div>`}
+      ${atsOk ? `<div class="day">Holdings today <b class="num ${(T.day || 0) >= 0 ? 'up' : 'dn'}">${(T.day || 0) >= 0 ? '+' : ''}${inr(T.day || 0)}</b>${T.day_pct != null ? `<span class="${T.day_pct >= 0 ? 'up' : 'dn'}">${pct(T.day_pct)}</span>` : ''}</div>` : ''}
+    </div>
+    ${tHi ? `<div class="ringbox">${ringSvg(corpus / (tHi * 1e7))}<div class="ringfacts">
+        <div class="rf"><div class="l">Target</div><div class="v">₹${esc(tLo)}–${esc(tHi)} Cr</div></div>
+        <div class="rf"><div class="l">Retire at</div><div class="v">${esc(retire)}${yearsLeft != null ? ` <span style="font-size:13px;color:var(--hero-mut)">· ${yearsLeft.toFixed(1)} yrs</span>` : ''}</div></div>
+        <div class="rf"><div class="l">Monthly SIP</div><div class="v">${inr(sip)}</div></div></div></div>` : ''}
+    </div>
+    ${allocTop.length ? `<div class="ribbon"><div class="ribbar" role="img" aria-label="Where the money is">${allocTop.map(([k, v], i) => `<i style="width:${(v / netWorth * 100).toFixed(2)}%;background:var(${PAL[i % PAL.length]})" title="${esc(k)} ${cr(v)}"></i>`).join('')}</div>
+      <div class="riblegend">${allocTop.map(([k, v], i) => `<span><em style="background:var(${PAL[i % PAL.length]})"></em>${esc(k)} <b>${cr(v)}</b></span>`).join('')}</div></div>` : ''}
+  </div></header>`;
+
+  /* ----- ATS card */
+  let atsBody;
+  if(atsOk){
+    const movers = (ats.items || []).filter(r => r.pct != null && r.value > 0).sort((a, b) => b.pct - a.pct);
+    const lbl = r => String(r.symbol || r.name || '').replace(/\.NS$|\.BO$|-USD$/, '').slice(0, 14) || r.name;
+    atsBody = `<div class="kv">
+      <div><div class="l">Holdings now</div><div class="v">${cr(T.value || 0)}</div><div class="s">invested ${cr(T.invested || 0)}</div></div>
+      <div><div class="l">Total gain</div><div class="v ${(T.gain || 0) >= 0 ? 'up' : 'dn'}">${(T.gain || 0) >= 0 ? '+' : ''}${cr(T.gain || 0)}</div><div class="s">${T.gain_pct != null ? pct(T.gain_pct) : ''}</div></div></div>
+      ${movers.length ? `<div class="movers">${movers.slice(0, 2).map(r => `<span class="mv">▲ ${esc(lbl(r))} <b class="up">${pct(r.pct)}</b></span>`).join('')}${movers.slice(-2).reverse().filter(r => r.pct < 0).map(r => `<span class="mv">▼ ${esc(lbl(r))} <b class="dn">${pct(r.pct)}</b></span>`).join('')}</div>` : ''}
+      <div class="s" style="font-size:12px;color:var(--mut)">Brokers synced ${ats.updated_at ? esc(new Date(ats.updated_at).toLocaleString('en-IN', {day:'numeric', month:'short', hour:'2-digit', minute:'2-digit', hour12:false})) : '—'} · ${esc(ats.source || '')}</div>`;
+  } else if(atsChecking){
+    atsBody = `<div class="empty">Asking ATS on this Mac for today’s numbers…</div>`;
+  } else {
+    atsBody = `<div class="empty">${!Cloud.atsLink() ? 'Link ATS once from the Ledger (Import portfolio → Link ATS on this Mac) and your holdings show here, live.'
+      : 'ATS isn’t reachable from this device. It runs on your Mac, which must be on (from your phone: through Tailscale, linked with ATS → Holdings → Link this device).'}${real && plan.atsReadAt ? ` The Ledger last read it ${esc(ago(new Date(plan.atsReadAt).getTime()))}.` : ''}</div>`;
+  }
+
+  /* ----- Expense Tracker card + the month */
+  const txns = et && et.txns || [];
+  let expBody, monthCard = '', lastM = null, A = null;
+  if(txns.length){
+    const lastDate = txns.reduce((m, t) => t.date > m ? t.date : m, '');
+    lastM = lastDate.slice(0, 7); A = month(txns, lastM);
+    const B = month(txns, shiftM(lastM, -1));
+    const d = B.spend ? (A.spend / B.spend - 1) * 100 : null;
+    const left = A.income - A.spend - A.invested;
+    expBody = `<div class="kv">
+      <div><div class="l">Spent · ${esc(ymLabel(lastM, 'short'))}</div><div class="v">${inr(A.spend)}</div><div class="s">${d == null ? '&nbsp;' : `<span class="${d > 0 ? 'dn' : 'up'}">${pct(d, 0)}</span> vs ${esc(ymLabel(shiftM(lastM, -1), 'short'))}`}</div></div>
+      <div><div class="l">Left over</div><div class="v ${left >= 0 ? 'up' : 'dn'}">${inr(left)}</div><div class="s">after spending and investing</div></div></div>
+      <div class="s" style="font-size:12px;color:var(--mut)">Statements up to ${esc(new Date(lastDate).toLocaleDateString('en-IN', {day:'numeric', month:'short', year:'numeric'}))}</div>`;
+    const tot = Math.max(A.income, A.spend + A.invested + Math.max(0, left)) || 1;
+    const seg = (v, c, t) => v > 0 ? `<i style="width:${(v / tot * 100).toFixed(2)}%;background:${c}" title="${t} ${inr(v)}">${v / tot > .14 ? kfmt(v) : ''}</i>` : '';
+    const months6 = [...Array(6)].map((_, i) => shiftM(lastM, i - 5));
+    const hist = months6.map(m => ({m, ...month(txns, m)}));
+    const max = Math.max(1, ...hist.map(h => h.spend + h.invested));
+    const sipBar = sip ? Math.min(100, A.invested / sip * 100) : null;
+    monthCard = `<section class="card"><h3>${esc(ymLabel(lastM))}</h3><p class="cap">Where the month’s money went, from your bank statements</p>
+      <div class="flow" role="img" aria-label="Income split">${seg(A.spend, 'var(--exp)', 'Spent')}${seg(A.invested, 'var(--led)', 'Invested')}${seg(Math.max(0, left), 'var(--a2)', 'Left over')}</div>
+      <div class="flowkey"><span><em style="background:var(--exp)"></em>Spent <b class="num">${inr(A.spend)}</b></span>
+        <span><em style="background:var(--led)"></em>Invested <b class="num">${inr(A.invested)}</b></span>
+        <span><em style="background:var(--a2)"></em>Left over <b class="num">${inr(Math.max(0, left))}</b></span>
+        <span style="color:var(--mut)">of income <b class="num">${inr(A.income)}</b></span></div>
+      ${sipBar != null ? `<div class="sip"><div style="display:flex;justify-content:space-between;font-size:12.5px"><span>Invested vs the plan’s SIP</span><b class="num">${inr(A.invested)} / ${inr(sip)}</b></div><div class="track"><i style="width:${sipBar.toFixed(1)}%"></i></div></div>` : ''}
+      <div><div style="font-size:12.5px;color:var(--mut);margin-bottom:2px">Last six months · spent and invested</div>
+        <div class="bars">${hist.map(h => `<div class="col" title="${esc(ymLabel(h.m))}: spent ${inr(h.spend)}, invested ${inr(h.invested)}">
+          <div class="stack" style="height:${Math.max(3, (h.spend + h.invested) / max * 118).toFixed(0)}px"><i style="flex:${Math.max(0, h.spend)};background:var(--exp)"></i><i style="flex:${h.invested};background:var(--led)"></i></div>
+          <span class="m">${esc(ymLabel(h.m, 'short'))}</span></div>`).join('')}</div></div></section>`;
+  } else {
+    expBody = `<div class="empty">No statements in this browser yet. Import them in the Expense Tracker and this fills in by itself.</div>`;
+  }
+
+  /* ----- Ledger card + what is next on the plan */
+  let ledBody, nextCard = '';
+  if(real){
+    const snaps = (plan.snapshots || []).slice().sort((a, b) => a.date < b.date ? -1 : 1);
+    const last = snaps[snaps.length - 1], first = snaps[0];
+    ledBody = `<div class="kv">
+      <div><div class="l">Corpus</div><div class="v">${cr(corpus)}</div><div class="s">${tHi ? (corpus / (tHi * 1e7) * 100).toFixed(1) + '% of ₹' + esc(tHi) + ' Cr' : ''}</div></div>
+      <div><div class="l">Since the start</div><div class="v ${last && first && last.value >= first.value ? 'up' : ''}">${last && first ? (last.value >= first.value ? '+' : '') + cr(last.value - first.value) : '—'}</div><div class="s">${first ? 'from ' + esc(new Date(first.date).toLocaleDateString('en-IN', {month:'short', year:'numeric'})) : ''}</div></div></div>
+      <div class="s" style="font-size:12px;color:var(--mut)">${plan.atsReadAt ? 'Holdings read from ATS ' + esc(ago(new Date(plan.atsReadAt).getTime())) : 'Holdings as last imported'}</div>`;
+    const PRC = {critical:'var(--dn)', warning:'var(--exp)', good:'var(--up)', gold:'var(--gold)'};
+    const todo = (plan.calendar || []).filter(c => !c.done).sort((a, b) => (a.year - b.year) || (a.age - b.age)).slice(0, 4);
+    nextCard = `<section class="card"><h3>Next on your plan</h3><p class="cap">The action calendar’s open items, soonest first</p>
+      ${todo.length ? `<ul class="todo">${todo.map(c => `<li><span class="when"><b>${esc(c.year)}</b>age ${esc(c.age)}</span>
+          <span class="a"><span class="pr" style="background:${PRC[c.pr] || 'var(--mut)'}"></span>${esc(c.action)}</span><span class="f">${esc(c.fund || '')}${c.why ? (c.fund ? ' — ' : '') + esc(c.why) : ''}</span></li>`).join('')}</ul>`
+        : '<div class="empty">Nothing open on the action calendar.</div>'}</section>`;
+  } else {
+    ledBody = `<div class="empty">No plan in this browser yet. Open the Ledger and restore or sync your plan.</div>`;
+  }
+
+  /* ----- Trip Vault card: the next trip */
+  let tripBody;
+  const today = new Date().toISOString().slice(0, 10);
+  if(tv && (tv.trips || []).length){
+    const span = t => { const ds = []; (tv.docs || []).filter(d => d.tripId === t.id && isTripDoc(d)).forEach(d => { const f = d.fields || {};
+      (f.segments || []).forEach(x => x.date && ds.push(x.date)); ['checkIn', 'checkOut', 'date'].forEach(k => /^\d{4}-\d{2}-\d{2}$/.test(f[k] || '') && ds.push(f[k])); });
+      ds.sort(); return {start: t.start || ds[0] || '', end: t.end || ds[ds.length - 1] || ''}; };
+    const trips = tv.trips.map(t => Object.assign({}, t, span(t)));
+    const next = trips.filter(t => !t.end || t.end >= today).sort((a, b) => String(a.start || '9').localeCompare(String(b.start || '9')))[0];
+    const fmt = d => d ? new Date(d + 'T00:00:00').toLocaleDateString('en-IN', {day: 'numeric', month: 'short'}) : '';
+    if(next){
+      const days = next.start ? Math.round((Date.parse(next.start + 'T00:00:00') - Date.parse(today + 'T00:00:00')) / 86400000) : null;
+      const docs = (tv.docs || []).filter(d => d.tripId === next.id && isTripDoc(d));
+      const flights = docs.reduce((n, d) => n + ((d.fields || {}).segments || []).length, 0);
+      tripBody = `<div class="kv">
+        <div><div class="l">Next trip</div><div class="v" style="font-size:18px">${esc(next.name)}</div><div class="s">${esc([next.city, fmt(next.start) + (next.end && next.end !== next.start ? ' – ' + fmt(next.end) : '')].filter(Boolean).join(' · '))}</div></div>
+        <div><div class="l">${days === null ? 'Dates' : days > 0 ? 'Starts in' : 'Now'}</div><div class="v">${days === null ? '—' : days > 0 ? days + ' day' + (days === 1 ? '' : 's') : 'on the trip'}</div><div class="s">${docs.length} document${docs.length === 1 ? '' : 's'} · ${flights} flight${flights === 1 ? '' : 's'}</div></div></div>`;
+    } else tripBody = `<div class="empty">No upcoming trips. ${trips.length} past trip${trips.length === 1 ? '' : 's'} in Trip Vault.</div>`;
+  } else {
+    tripBody = `<div class="empty">Tickets, hotel bookings, itineraries, news and flight status for your trips. Open Trip Vault to add the first one.</div>`;
+  }
+
+  const card = (k, name, sub, status, body, cta) => `<section class="card" style="--c:var(--${k})">
+    <div class="apphead"><span class="glyph">${ICON[k]}</span><div><h2>${name}</h2><p>${sub}</p></div>${status}</div>${body}
+    ${k === 'ats' ? atsButtons() : `<a class="open" href="${esc(LINKS[k])}">${cta} <span aria-hidden="true">→</span></a>`}</section>`;
+  /* ATS: on this Mac (localhost), and remote (Tailscale) - the remote one first on a phone */
+  function atsButtons(){
+    const remote = atsRemote(), local = LINKS.ats;
+    const mac = `<a class="open${MOBILE ? ' alt' : ''}" href="${esc(MOBILE ? local : atsUrl())}" target="_blank" rel="noopener" title="ATS on the Mac it runs on">Open ATS · this Mac <span aria-hidden="true">→</span></a>`;
+    const away = remote
+      ? `<a class="open${MOBILE ? '' : ' alt'}" href="${esc(remote + '/')}" target="_blank" rel="noopener" title="${esc(remote)} - through Tailscale (it must be on, on this device)">Open ATS · Remote <span aria-hidden="true">→</span></a><button class="edit" id="atsRemoteEdit" type="button">change</button>`
+      : `<button class="open alt" id="atsRemoteEdit" type="button" title="Your Mac's Tailscale address, to open ATS from your phone">＋ Remote address</button>`;
+    return `<div class="opens">${MOBILE ? away + mac : mac + away}</div>`;
+  }
+
+  $('app').innerHTML = hero + `<main>
+    <div class="apps">
+      ${card('ats', 'ATS', 'Trading dashboard · your Mac', atsOk ? '<span class="status live">live</span>' : atsChecking ? '<span class="status">checking</span>' : '<span class="status">offline</span>', atsBody, 'Open ATS')}
+      ${card('exp', 'Expense Tracker', 'Spending from your statements', '', expBody, 'Open Expense Tracker')}
+      ${card('led', '16-Year Ledger', 'Investment plan', real && plan.plan && plan.plan.dob ? '' : '', ledBody, 'Open the Ledger')}
+      ${card('trip', 'Trip Vault', 'Trips, tickets and plans', '', tripBody, 'Open Trip Vault')}
+    </div>
+    ${monthCard || nextCard ? `<div class="row2">${monthCard || '<div></div>'}${nextCard}</div>` : ''}
+    <div class="foot"><span>Read in this browser from the Expense Tracker, the Ledger and Trip Vault (with your personal documents)${atsOk ? ', and live from ATS on this Mac' : ''}. Nothing is sent anywhere.</span>
+      <span style="display:flex;gap:8px"><a class="btn" href="/" style="text-decoration:none">3D view</a><button class="btn" id="re">Refresh</button><button class="btn" id="out">Sign out</button></span></div>
+  </main>`;
+  $('re').onclick = render;
+  if($('atsRemoteEdit')) $('atsRemoteEdit').onclick = askAtsRemote;
+  $('out').onclick = () => { try{ sessionStorage.removeItem(SESSION); }catch(_){} showLogin(); };
+}
+
+try{ const t = localStorage.getItem('ledger-theme'); if(t === 'light' || t === 'dark') document.documentElement.dataset.theme = t; }catch(e){}
+if(signedIn()) render(); else showLogin();
+document.addEventListener('visibilitychange', () => { if(document.visibilityState === 'visible' && signedIn() && !$('lf')) render(); });
+</script>
+</body>
+</html>
