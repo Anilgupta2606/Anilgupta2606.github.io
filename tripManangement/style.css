@@ -747,3 +747,8 @@ body.pin-locked .doc-thumb{ overflow: hidden; }
 @media (prefers-reduced-motion: reduce){ #hz-bg .hz-ph, .hz-city span, .hz-count .u.flip b, .hz-pass .path::after, .hz-kick i{ animation: none !important; } .hz-city span{ opacity: 1; transform: none; } }
 :root[data-look="new"] .trip-card.has-photo .when{ background: rgb(4 22 28 / .55); color: #FDE68A; padding: 3px 10px; border-radius: 999px; border: 1px solid rgb(255 255 255 / .18); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
 :root[data-look="new"] body.hz-on .btn.soft{ background: rgb(255 255 255 / .12); color: #F3FBFB; }
+/* over the photo, the soft tints are glass too (notices, errors, badges), and a notice keeps a sand edge */
+:root[data-look="new"] body.hz-on{ --sun-soft: rgb(253 230 138 / .14); --bad-soft: rgb(255 122 133 / .18); --good-soft: rgb(76 208 142 / .16); --warn-soft: rgb(245 185 77 / .16); --good: #6EE7B7; --warn: #FCD34D; --bad: #FDA4AF; }
+:root[data-look="new"] body.hz-on .card.notice, :root[data-look="new"] body.hz-on .card.error{ background: rgb(6 34 42 / .62); border: 1px solid rgb(255 255 255 / .16); border-left: 4px solid #FDE68A; }
+:root[data-look="new"] body.hz-on .card.error{ border-left-color: #FDA4AF; }
+:root[data-look="new"] body.hz-on .btn.ghost{ color: #F3FBFB; border-color: rgb(255 255 255 / .28); }
