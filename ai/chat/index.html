@@ -9,6 +9,22 @@
 <meta name="theme-color" content="#f4f6ff">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@500;600;700&family=Figtree:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap">
+<script type="importmap">{"imports":{"three":"https://cdnjs.cloudflare.com/ajax/libs/three.js/0.169.0/three.module.min.js"}}</script>
+<script>
+/* The look, before the first paint: the new one ("Pearl", with its light) unless Classic was picked; its theme is
+   Auto (Navy at night, Day by day - the device decides), Black, Navy or Day. Classic keeps its own Light / Dark. */
+(function(){
+  var get = function(k, d){ try{ var v = JSON.parse(localStorage.getItem(k)); return v == null ? d : v; }catch(e){ return d; } };
+  var r = document.documentElement, look = get('ai.look', 'new') === 'classic' ? 'classic' : 'new';
+  r.dataset.look = look;
+  if(look === 'new'){
+    var p = get('ai.pearl', 'auto'), dark = matchMedia('(prefers-color-scheme: dark)').matches;
+    var t = p === 'auto' ? (dark ? 'navy' : 'day') : p;
+    r.dataset.pearl = t; r.dataset.theme = t === 'day' ? 'light' : 'dark';
+  }
+})();
+</script>
 <style>
 /* Each kind of step has its colour, and the orb is made of all of them:
    blue = searching · mint = reading · sunflower = calculating · coral = checking its rules · violet = thinking */
@@ -568,8 +584,76 @@ button, a, summary, label{touch-action:manipulation}
 <script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.19.0/katex.min.js" integrity="sha384-QFFtAGzvvj+bfgCGxXJlNZZR1nXEZgvG8tDLCCY1F19xl20WlfTYgguB4VcNdxYk" crossorigin="anonymous"></script>
 <script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.19.0/contrib/auto-render.min.js" integrity="sha384-bjyGPfbij8/NDKJhSGZNP/khQVgtHUE5exjm4Ydllo42FwIgYsdLO2lXGmRBf5Mz" crossorigin="anonymous"></script>
 <script defer src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.2/highlight.min.js" integrity="sha384-pZ4gLQJIEk/VKnGk59xUSQK8Ne/erZQR9cpnPXPLB9iN1tXsVkRVfHYGdFYrSkv1" crossorigin="anonymous"></script>
+<style>
+/* ================================================================ the new look: "Pearl"
+   Obsidian (or navy) with pearl white, ice blue and a soft iridescent shimmer; by day, pearl-white paper. Behind it all,
+   ~6,000 points of light that are an orb at rest, a swan when it greets you, a galaxy while it works and a ripple while
+   it answers. Only with data-look="new" on <html>; Classic is everything above, unchanged. */
+.pearlseg{display:none}
+.lookchip{display:inline-flex}
+:root[data-look="new"] .pearlseg{display:inline-flex}
+:root[data-look="new"] #themeSeg, :root[data-look="new"] #themeLabel{display:none}
+:root[data-look="classic"] #pearlMenu, :root[data-look="classic"] #pearlLabel{display:none}
+#pearlSky{display:none}
+:root[data-look="new"] #pearlSky{display:block; position:fixed; inset:0; width:100%; height:100%; z-index:-1; pointer-events:none}
+:root[data-look="new"]{
+  --display:'Bricolage Grotesque','Avenir Next',system-ui,sans-serif; --body:'Plus Jakarta Sans',-apple-system,'Segoe UI',sans-serif;
+  --pearl:linear-gradient(110deg,#e8f1ff 0%,#c9b6ff 30%,#8ec5ff 55%,#ffc4e1 78%,#e8f1ff 100%); --pearl-ink:#05070d;
+  --glassbg:rgb(12 16 30 / .62); --accent:#e8f1ff;
+}
+:root[data-look="new"][data-pearl="black"], :root[data-look="new"][data-pearl="navy"]{
+  --page:#05070d; --page2:#0a0e18; --card:#10141f; --ink:#eef3fb; --ink2:#b8c3d6; --mut:#7e8aa1; --line:#1d2333;
+  --search:#8ec5ff; --think:#c9b6ff; --think-bg:rgb(201 182 255 / .12); --search-bg:rgb(142 197 255 / .12);
+}
+:root[data-look="new"][data-pearl="navy"]{ --page:#0b1020; --page2:#111830; --card:#121a33; --line:#212a48; --glassbg:rgb(16 22 44 / .62) }
+:root[data-look="new"][data-pearl="day"]{
+  --page:#f5f7fb; --page2:#eef1f8; --card:#ffffff; --ink:#0d1424; --ink2:#3b4558; --mut:#6b7489; --line:#e1e6f0;
+  --search:#2f6fdc; --think:#7b5cd6; --think-bg:#efeafd; --search-bg:#e6eefc;
+  --pearl:linear-gradient(110deg,#2f6fdc 0%,#7b5cd6 35%,#d94f8c 65%,#2f6fdc 100%); --pearl-ink:#ffffff; --glassbg:rgb(255 255 255 / .72); --accent:#0d1424;
+}
+:root[data-look="new"]{ background:var(--page) }
+:root[data-look="new"] body{ background:transparent }
+@keyframes pearlSheen{to{background-position:200% 0}}
+:root[data-look="new"] .sidebar{ background:var(--glassbg); backdrop-filter:blur(22px) saturate(1.2); -webkit-backdrop-filter:blur(22px) saturate(1.2) }
+:root[data-look="new"] header.topbar{ background:transparent; border-bottom-color:transparent; backdrop-filter:none; -webkit-backdrop-filter:none }   /* the light shows through the bar */
+:root[data-look="new"] .brand{ font-family:var(--display); font-weight:800 }
+:root[data-look="new"] .login{ background:transparent; padding-top:min(26vh, 230px) }
+:root[data-look="new"] body:has(#login:not([hidden])) > :not(#login):not(#pearlSky):not(script){ visibility:hidden }   /* only the door, and the swan above it */
+:root[data-look="new"] .lcard{ background:var(--glassbg); backdrop-filter:blur(20px); -webkit-backdrop-filter:blur(20px) }
+:root[data-look="new"] .lcard .orb{ visibility:hidden; height:0; margin:0 }
+:root[data-look="new"] .newchat{ position:relative; background:var(--glassbg); border-color:transparent; box-shadow:none }
+:root[data-look="new"] .newchat::before{ content:""; position:absolute; inset:-1px; border-radius:13px; padding:1px; background:var(--pearl); background-size:200% 100%; animation:pearlSheen 6s linear infinite;
+  -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0); -webkit-mask-composite:xor; mask-composite:exclude; pointer-events:none }
+/* welcome: the light takes the old orb's place, above the greeting */
+:root[data-look="new"] .hello .orb{ visibility:hidden; height:0; margin:0 }
+:root[data-look="new"] .hello{ padding-top:min(34vh, 300px) }
+:root[data-look="new"] .hello h1{ font-family:var(--display); font-weight:800; letter-spacing:-.035em }
+:root[data-look="new"] .hello h1 span{ background:var(--pearl); background-size:200% 100%; -webkit-background-clip:text; background-clip:text; color:transparent; animation:pearlSheen 6s linear infinite }
+:root[data-look="new"] .tries button{ background:var(--glassbg); backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px); box-shadow:none }
+:root[data-look="new"] .tries button:hover{ transform:translateY(-2px); border-color:var(--think) }
+/* the conversation and the box */
+:root[data-look="new"] .q div{ background:var(--glassbg) !important; color:var(--ink) !important; border:1px solid var(--line) }
+:root[data-look="new"] .composer{ background:linear-gradient(transparent, var(--page) 45%) }
+:root[data-look="new"] .box{ background:var(--glassbg); backdrop-filter:blur(20px); -webkit-backdrop-filter:blur(20px) }
+:root[data-look="new"] body.pearl-busy .box::after{ content:""; position:absolute; inset:-1px; border-radius:inherit; padding:1px; pointer-events:none;
+  background:conic-gradient(from var(--pa,0deg),#8ec5ff,#c9b6ff,#ffc4e1,#e8f1ff,#8ec5ff); animation:pearlSpin 2.4s linear infinite;
+  -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0); -webkit-mask-composite:xor; mask-composite:exclude }
+@property --pa{syntax:'<angle>'; inherits:false; initial-value:0deg}
+@keyframes pearlSpin{to{--pa:360deg}}
+:root[data-look="new"] .send:not(.stop){ background:var(--pearl); background-size:200% 100%; animation:pearlSheen 5s linear infinite; color:var(--pearl-ink); box-shadow:0 8px 24px -8px rgb(142 197 255 / .7) }
+:root[data-look="new"] .mchip{ background:var(--glassbg) }
+:root[data-look="new"] .mchip.on{ background:var(--pearl); color:var(--pearl-ink) }
+/* the header: the theme and the way back to Classic */
+.pearlseg{ padding:3px; border-radius:999px; background:var(--glassbg); border:1px solid var(--line); gap:0 }
+.pearlseg button{ border:0; background:none; color:var(--ink2); padding:3px 9px; border-radius:999px; font:inherit; font-size:12px; font-weight:600; cursor:pointer }
+.pearlseg button[aria-checked="true"]{ background:var(--pearl); color:var(--pearl-ink) }
+.lookchip{ cursor:pointer; font:inherit; font-size:12.5px; font-weight:600 }
+@media (max-width:760px){ .where .pearlseg{ display:none !important } .lookchip span{ display:none } }
+@media (prefers-reduced-motion:reduce){ :root[data-look="new"] *{ animation:none !important } }
+</style>
 </head>
 <body>
+<canvas id="pearlSky" aria-hidden="true"></canvas>
 <aside class="sidebar" id="sidebar" aria-label="Chats and settings">
   <div class="sbtop"><div class="brand"><div class="orb" id="orb"></div>Cygnus AI</div><button class="iconbtn sbx" id="sbClose" type="button" aria-label="Close the menu">×</button></div>
   <div class="modeswitch" role="tablist" aria-label="Chat or code">
@@ -595,7 +679,11 @@ button, a, summary, label{touch-action:manipulation}
       <div class="who">Signed in as <b id="whoName2">Anil</b></div>
       <label class="mlabel" for="meName">Your name</label>
       <input class="mname" id="meName" maxlength="40" autocomplete="name">
-      <div class="mlabel">Theme</div>
+      <div class="mlabel">Design</div>
+      <div class="seg" id="lookSeg" role="radiogroup" aria-label="Design"><button data-l="new" role="radio">New</button><button data-l="classic" role="radio">Classic</button></div>
+      <div class="mlabel" id="pearlLabel">Theme</div>
+      <div class="seg" id="pearlMenu" role="radiogroup" aria-label="Theme"><button data-p="auto" role="radio">Auto</button><button data-p="black" role="radio">Black</button><button data-p="navy" role="radio">Navy</button><button data-p="day" role="radio">Day</button></div>
+      <div class="mlabel" id="themeLabel">Theme</div>
       <div class="seg" id="themeSeg" role="radiogroup" aria-label="Theme"><button data-t="auto" role="radio">Auto</button><button data-t="light" role="radio">Light</button><button data-t="dark" role="radio">Dark</button></div>
       <label class="tog"><input type="checkbox" id="cloudTog"><span><b>Cloud AI for hard questions</b><small>Long code, deep analysis, or when its checks fail twice: a bigger free model (your keys in Setup) writes the answer from what was found here. Off: everything stays on this Mac.</small></span></label>
       <button class="ghost wide" id="openKeys" type="button" hidden>🔑 Your AI keys</button>
@@ -608,7 +696,7 @@ button, a, summary, label{touch-action:manipulation}
   <button class="iconbtn menuBtn" id="sbOpen" type="button" aria-label="Open chats"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
   <div class="ctitle" id="chatTitle">New chat</div>
   <button class="iconbtn" id="exportChat" type="button" title="Export this chat (Markdown)" aria-label="Export this chat" hidden><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg></button>
-  <div class="where"><span class="pill" id="stWhere"><i></i>Starting</span><span class="pill" id="stSearch" hidden></span><span class="pickwrap"><button class="pill model" id="stModel" type="button" hidden aria-haspopup="true" title="Choose which AI answers"></button><div class="picker" id="picker" hidden role="menu"></div></span></div>
+  <div class="where"><span class="seg pearlseg" id="pearlTop" role="radiogroup" aria-label="Theme"><button data-p="auto" role="radio">Auto</button><button data-p="black" role="radio">Black</button><button data-p="navy" role="radio">Navy</button><button data-p="day" role="radio">Day</button></span><button class="pill lookchip" id="lookChip" type="button" title="Switch to the classic look">◐ <span>Classic view</span></button><span class="pill" id="stWhere"><i></i>Starting</span><span class="pill" id="stSearch" hidden></span><span class="pickwrap"><button class="pill model" id="stModel" type="button" hidden aria-haspopup="true" title="Choose which AI answers"></button><div class="picker" id="picker" hidden role="menu"></div></span></div>
 </header>
 <section class="login" id="login" hidden>
   <form class="lcard" id="loginForm" autocomplete="on">
@@ -1740,7 +1828,7 @@ function sendState(on){ const b = $('#ask'); b.classList.toggle('stop', on); b.i
 function syncRequestUI(){
   const request = activeRequests.get(sessionId);
   busy = !!request; ctl = request ? request.controller : null;
-  sendState(busy); $('#orb').classList.toggle('busy', busy);
+  sendState(busy); $('#orb').classList.toggle('busy', busy); document.body.classList.toggle('pearl-busy', busy);
 }
 $('#ask').addEventListener('click', e=>{ if(busy){ e.preventDefault(); e.stopImmediatePropagation(); if(ctl) ctl.abort(); } }, true);
 // this chat as a Markdown file
@@ -2610,8 +2698,38 @@ const COLORS = {blue: '#3b6cf6', green: '#1f9d55', orange: '#e8710a', red: '#d93
 const colorOf = a => { a = String(a || '').trim().toLowerCase(); if(!a || a === 'reset' || a === 'default' || a === 'auto') return ''; if(COLORS[a]) return COLORS[a]; return /^#[0-9a-f]{3}([0-9a-f]{3})?$/.test(a) ? a : null; };
 const applyColor = v => { if(v) document.documentElement.style.setProperty('--accent', v); else document.documentElement.style.removeProperty('--accent'); };
 applyColor(store.get('ai.color', ''));
-const applyTheme = t => { if(t === 'light' || t === 'dark') document.documentElement.dataset.theme = t; else delete document.documentElement.dataset.theme;
+const applyTheme = t => { if(document.documentElement.dataset.look === 'new') return applyPearl();     // the new look sets its own
+  if(t === 'light' || t === 'dark') document.documentElement.dataset.theme = t; else delete document.documentElement.dataset.theme;
   document.querySelectorAll('#themeSeg button').forEach(b=>b.setAttribute('aria-checked', String(b.dataset.t === (t || 'auto')))); };
+/* the new look ("Pearl") or Classic, and the new look's theme: Auto (Navy at night, Day by day), Black, Navy or Day */
+const darkQuery = matchMedia('(prefers-color-scheme: dark)');
+function applyPearl(){
+  const r = document.documentElement, p = store.get('ai.pearl', 'auto'), t = p === 'auto' ? (darkQuery.matches ? 'navy' : 'day') : p;
+  r.dataset.pearl = t; r.dataset.theme = t === 'day' ? 'light' : 'dark';
+  document.querySelectorAll('#pearlTop button, #pearlMenu button').forEach(b=>b.setAttribute('aria-checked', String(b.dataset.p === p)));
+  if(window.PearlLight) window.PearlLight.theme(t);
+}
+function applyLook(l){
+  const r = document.documentElement;
+  r.dataset.look = l;
+  document.querySelectorAll('#lookSeg button').forEach(b=>b.setAttribute('aria-checked', String(b.dataset.l === l)));
+  const chip = $('#lookChip'); chip.innerHTML = l === 'new' ? '◐ <span>Classic view</span>' : '✦ <span>New design</span>'; chip.title = l === 'new' ? 'Switch to the classic look' : 'Switch to the new look';
+  if(l === 'new'){ applyPearl(); loadPearl(); } else { delete r.dataset.pearl; applyTheme(store.get('ai.theme', 'auto')); }
+  if(window.PearlLight) window.PearlLight.active(l === 'new');
+}
+/* the light (three.js) loads only for the new look */
+function loadPearl(){
+  if(window.PearlLight || window.__pearlLoading) return;
+  const code = $('#pearlCode');
+  if(!code){ document.addEventListener('DOMContentLoaded', loadPearl, {once: true}); return; }     // further down the page: once it is read
+  window.__pearlLoading = true;
+  const s = document.createElement('script'); s.type = 'module'; s.textContent = code.textContent; document.body.appendChild(s);
+}
+darkQuery.addEventListener('change', () => { if(document.documentElement.dataset.look === 'new') applyPearl(); });
+document.querySelectorAll('#pearlTop button, #pearlMenu button').forEach(b=>b.onclick = () => { store.set('ai.pearl', b.dataset.p); applyPearl(); });
+document.querySelectorAll('#lookSeg button').forEach(b=>b.onclick = () => { store.set('ai.look', b.dataset.l); applyLook(b.dataset.l); });
+$('#lookChip').onclick = () => { const l = document.documentElement.dataset.look === 'new' ? 'classic' : 'new'; store.set('ai.look', l); applyLook(l); };
+applyLook(store.get('ai.look', 'new') === 'classic' ? 'classic' : 'new');
 applyTheme(store.get('ai.theme', 'auto'));
 document.querySelectorAll('#themeSeg button').forEach(b=>b.onclick = () => { store.set('ai.theme', b.dataset.t); applyTheme(b.dataset.t); });
 $('#cloudTog').checked = !!store.get('ai.cloud', false);
@@ -2655,6 +2773,121 @@ function start(){
   if(qs && qs.trim()){ try{ history.length && newChat(true); }catch(e){} ask(qs.trim()); try{ window.history.replaceState(null, '', location.pathname); }catch(e){} }
 }
 if(signedIn()) start(); else { $('#login').hidden = false; $('#lu').focus(); }
+</script>
+
+<!-- The new look's light (three.js): started by loadPearl() only in the new look; Classic never loads it.
+     It is an orb at rest, a swan when it greets you, a galaxy while an answer is being worked on, a ripple when it
+     arrives; it sits above the greeting, then shrinks into the bar, and fills the screen in voice mode. -->
+<script type="text/plain" id="pearlCode">
+import * as THREE from 'three';
+const CALM = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const canvas = document.getElementById('pearlSky');
+let R;
+try{ R = new THREE.WebGLRenderer({canvas, antialias: true, alpha: false}); }catch(e){ R = null; }
+if(!R){ window.PearlLight = {theme(){}, active(){}}; }
+else {
+  R.setPixelRatio(Math.min(devicePixelRatio, 2));
+  const scene = new THREE.Scene(), cam = new THREE.PerspectiveCamera(42, 1, .1, 200);
+  cam.position.set(0, 0, 7.5);
+  const N = matchMedia('(max-width: 760px)').matches ? 3800 : 6200;
+  // three shapes in one set of points: an orb, a swan (drawn from the emoji), a galaxy
+  const orb = new Float32Array(N * 3), swan = new Float32Array(N * 3), gal = new Float32Array(N * 3), seed = new Float32Array(N);
+  for(let i = 0; i < N; i++){ const y = 1 - (i / (N - 1)) * 2, r = Math.sqrt(1 - y * y), th = i * 2.399963; orb.set([Math.cos(th) * r, y, Math.sin(th) * r], i * 3); seed[i] = Math.random(); }
+  (() => {
+    const c = document.createElement('canvas'); c.width = c.height = 220; const g = c.getContext('2d');
+    g.font = '190px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('🦢', 110, 120);
+    const d = g.getImageData(0, 0, 220, 220).data, px = [];
+    for(let y = 0; y < 220; y++) for(let x = 0; x < 220; x++) if(d[(y * 220 + x) * 4 + 3] > 120) px.push([x, y]);
+    if(px.length > 400) for(let i = 0; i < N; i++){ const p = px[(Math.random() * px.length) | 0]; swan.set([((p[0] + Math.random() - 110) / 110) * 1.9, (-(p[1] + Math.random() - 112) / 110) * 1.9, (Math.random() - .5) * .35], i * 3); }
+    else swan.set(orb);                                  // no emoji font: the orb stays an orb
+  })();
+  for(let i = 0; i < N; i++){ const r = Math.pow(Math.random(), .6) * 2.3, a = (i % 3) * 2.094 + r * 2.2 + (Math.random() - .5) * .5; gal.set([Math.cos(a) * r, (Math.random() - .5) * .18 * (2.4 - r), Math.sin(a) * r], i * 3); }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(orb, 3)); geo.setAttribute('aSwan', new THREE.BufferAttribute(swan, 3));
+  geo.setAttribute('aGal', new THREE.BufferAttribute(gal, 3)); geo.setAttribute('aSeed', new THREE.BufferAttribute(seed, 1));
+  const U = {uT: {value: 0}, uSwan: {value: 0}, uGal: {value: 0}, uSpeak: {value: 0}, uPR: {value: R.getPixelRatio()}, uScale: {value: 1}, uDay: {value: 0}};
+  const mat = new THREE.ShaderMaterial({transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, uniforms: U,
+    vertexShader: `attribute vec3 aSwan; attribute vec3 aGal; attribute float aSeed;
+      uniform float uT, uSwan, uGal, uSpeak, uPR, uScale; varying vec3 vC; varying float vA;
+      vec3 rotY(vec3 p, float a){ float c = cos(a), s = sin(a); return vec3(c * p.x + s * p.z, p.y, -s * p.x + c * p.z); }
+      void main(){
+        vec3 o = position; float w = sin(o.y * 7.0 - uT * 3.0) * sin(o.x * 5.0 + uT * 2.0);
+        o *= 1.0 + .035 * sin(uT * 1.3 + aSeed * 6.28) + uSpeak * .12 * w; o = rotY(o, uT * .12);
+        vec3 g = aGal; float r = length(g.xz); g = rotY(g, uT * (1.4 - r * .35)); g = vec3(g.x, g.y * .9 + g.z * .38, g.z * .9 - g.y * .38);
+        vec3 s = aSwan + vec3(0.0, sin(uT * 1.2 + aSwan.x) * .03, sin(uT + aSeed * 6.28) * .05);
+        vec3 p = mix(mix(o, s, uSwan), g, uGal);
+        vec4 mv = modelViewMatrix * vec4(p * uScale, 1.0); gl_Position = projectionMatrix * mv;
+        float small = clamp(uScale, .15, 1.0);
+        gl_PointSize = (1.2 + 1.8 * aSeed) * uPR * (11.0 / -mv.z) * (.55 + .45 * small);
+        float h = sin(p.x * 1.7 + uT * .6) * .5 + .5, k = sin(p.y * 2.1 - uT * .4 + aSeed * 3.0) * .5 + .5;
+        vC = mix(mix(vec3(.56, .77, 1.0), vec3(.79, .71, 1.0), h), vec3(1.0, .77, .88), k * .45);
+        vC = mix(vC, vec3(.95, .97, 1.0), .35 + .25 * sin(uT * 2.0 + aSeed * 40.0));
+        vA = (.55 + .45 * aSeed) * (.45 + .55 * smoothstep(.12, 1.0, uScale));
+      }`,
+    fragmentShader: `uniform float uDay; varying vec3 vC; varying float vA;
+      void main(){ float d = length(gl_PointCoord - .5); float a = smoothstep(.5, .0, d);
+        if(uDay > .5){ vec3 deep = mix(vC * vec3(.35, .45, .85), vec3(.18, .22, .55), .35); gl_FragColor = vec4(deep, a * vA * .85); }
+        else gl_FragColor = vec4(vC * a * a * vA, 1.0); }`});
+  const pts = new THREE.Points(geo, mat); pts.frustumCulled = false; scene.add(pts);
+  const SN = 1400, sp = new Float32Array(SN * 3);
+  for(let i = 0; i < SN; i++){ const r = 30 + Math.random() * 60, u = Math.random() * 2 - 1, a = Math.random() * 6.283, q = Math.sqrt(1 - u * u); sp.set([r * q * Math.cos(a), r * u, r * q * Math.sin(a)], i * 3); }
+  const sg = new THREE.BufferGeometry(); sg.setAttribute('position', new THREE.BufferAttribute(sp, 3));
+  const stars = new THREE.Points(sg, new THREE.PointsMaterial({color: 0xcfe0ff, size: .12, transparent: true, opacity: .6, depthWrite: false})); scene.add(stars);
+  function theme(t){
+    const day = t === 'day';
+    R.setClearColor(day ? 0xf5f7fb : t === 'navy' ? 0x0b1020 : 0x05070d, 1);
+    U.uDay.value = day ? 1 : 0; mat.blending = day ? THREE.NormalBlending : THREE.AdditiveBlending; mat.needsUpdate = true;
+    stars.material.color.set(day ? 0x9aa8c8 : 0xcfe0ff); stars.material.opacity = day ? .35 : .6;
+  }
+  theme(document.documentElement.dataset.pearl || 'navy');
+  let on = document.documentElement.dataset.look === 'new';
+
+  /* what the page is doing decides the shape and the place */
+  const $ = s => document.querySelector(s);
+  const cur = {swan: 0, gal: 0, speak: 0, x: 0, y: 0, r: 0}, want = {swan: 0, gal: 0, speak: 0, x: 0, y: 0, r: 0};
+  let greetUntil = 0, speakUntil = 0, wasBusy = false, first = true;
+  if($('#hello') && !$('#hello').hidden) greetUntil = performance.now() + (CALM ? 0 : 4500);
+  function read(){
+    const W = innerWidth, H = innerHeight, now = performance.now();
+    const busy = document.body.classList.contains('pearl-busy');
+    if(wasBusy && !busy) speakUntil = now + 2600;          // the answer has arrived
+    wasBusy = busy;
+    const vb = $('#voicebar'), voice = vb && !vb.hidden, hello = $('#hello'), welcome = hello && !hello.hidden && !voice;
+    const m = ($('#main') || document.body).getBoundingClientRect(), mx = m.left + m.width / 2;
+    const login = $('#login'), signin = login && !login.hidden;
+    if(signin){ const c = ($('#loginForm') || login).getBoundingClientRect(); want.r = Math.max(56, Math.min(H * .11, 100)); want.x = c.left + c.width / 2; want.y = Math.max(want.r + 20, c.top - want.r - 28); want.swan = 1; want.gal = 0; want.speak = 0; return; }   // greeting you at the door
+    if(voice){ want.x = W / 2; want.y = H * .4; want.r = Math.min(W * .28, 170); }
+    else if(welcome){ const g = ($('#greet') || hello).getBoundingClientRect(); want.r = Math.max(64, Math.min(H * .13, 125)); want.x = mx; want.y = Math.max(want.r + 70, g.top - want.r - 34); }
+    else { const t = ($('header.topbar') || document.body).getBoundingClientRect(); want.x = mx; want.y = t.top + Math.max(24, t.height / 2); want.r = busy ? 30 : 13; }   // in the bar; bigger while it works
+    const vs = voice ? vb.className : '';
+    const galaxy = busy || /thinking/.test(vs), speaking = now < speakUntil || /speaking/.test(vs);
+    want.swan = !galaxy && !voice && welcome && now < greetUntil ? 1 : 0;
+    want.gal = galaxy ? 1 : 0;
+    want.speak = !galaxy && speaking ? 1 : 0;
+  }
+  const resize = () => { const w = innerWidth, h = innerHeight; R.setSize(w, h, false); cam.aspect = w / h; cam.fov = w / h < .8 ? 58 : 42; cam.updateProjectionMatrix(); };
+  addEventListener('resize', resize); resize();
+  let px = 0, py = 0, tx = 0, ty = 0;
+  addEventListener('pointermove', e => { tx = e.clientX / innerWidth - .5; ty = e.clientY / innerHeight - .5; }, {passive: true});
+  const clock = new THREE.Clock();
+  (function frame(){
+    requestAnimationFrame(frame);
+    if(!on || document.hidden) return;
+    const dt = Math.min(clock.getDelta(), .05), t = clock.elapsedTime;
+    read();
+    const k = first || CALM ? 1 : 1 - Math.exp(-dt * 2.4); first = false;
+    for(const n in want) cur[n] += (want[n] - cur[n]) * k;
+    // from the page's pixels to the scene: the place, and the size as a radius
+    const W = innerWidth, H = innerHeight, half = Math.tan(cam.fov * Math.PI / 360) * cam.position.z;
+    pts.position.set((cur.x / W * 2 - 1) * half * cam.aspect, (1 - cur.y / H * 2) * half, 0);
+    U.uScale.value = Math.max(.05, cur.r / (H / 2) * half);
+    U.uT.value = t; U.uSwan.value = cur.swan; U.uGal.value = cur.gal; U.uSpeak.value = cur.speak;
+    px += (tx - px) * .04; py += (ty - py) * .04; pts.rotation.x = py * .3; pts.rotation.y = px * .5;
+    stars.rotation.y += dt * .01;
+    R.render(scene, cam);
+  })();
+  window.PearlLight = {theme, active(v){ on = v; }};
+}
 </script>
 </body>
 </html>

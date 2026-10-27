@@ -655,7 +655,9 @@ const MoneyAI = (function(){
       if(!names) return mine;
       const same = (m, n) => n === m || n.indexOf(m + '-') === 0;                 // Cohere: north-mini-code is north-mini-code-1-0
       const kept = mine.filter(m=>names.some(n=>same(m, n))), fresh = names.filter(n=>FAMILY[id].test(n) && !mine.some(m=>same(m, n)));
-      const all = familyOrder(id, kept.concat(fresh));
+      // (never Bolt as NVIDIA's fallback: the small model wrote real-bug fixes when Ultra was busy, 27 Oct - it is used only
+      // where it is named, through its alias 'bolt': Checks and Titles)
+      const all = familyOrder(id, kept.concat(fresh)).filter(m=>!/-bolt-/.test(m));
       return all.length ? all : mine;
     }
     const names = await liveNames(id, key);
