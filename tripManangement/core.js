@@ -422,14 +422,22 @@ const TABS = [
 ];
 const VIEWS = {};
 let tab = 'trips';
+/* A trip whose last day has passed. */
+function tripOver(t){ const s = t ? tripSpan(t) : {}; return !!(s.end && s.end < todayISO()); }
+/* The past trip opened by hand in this visit: it stays open; any other finished trip gives way. */
+let pastOpened = (()=>{ try{ return sessionStorage.getItem('tv-past') || ''; }catch(e){ return ''; } })();
 function currentTrip(){
   let t = tripById(S.settings.lastTrip);
-  if(!t){
+  // a finished trip is not kept as the current one: the next trip takes over (or, with none, the last trip,
+  // which the Trips page then shows as a past trip under "Where to next?")
+  if(!t || (tripOver(t) && pastOpened !== t.id)){
     const up = S.trips.map(x=>Object.assign({}, x, tripSpan(x))).filter(x=>!x.end || x.end >= todayISO()).sort((a, b)=>String(a.start).localeCompare(String(b.start)))[0];
-    t = up ? tripById(up.id) : S.trips[S.trips.length - 1];
+    t = up ? tripById(up.id) : t || S.trips.slice().sort((a, b)=>String(tripSpan(a).end).localeCompare(String(tripSpan(b).end))).slice(-1)[0];
   }
   return t || null;
 }
+/* The Trips page rests on "Where to next?" when every trip is over and none was opened by hand. */
+function betweenTrips(cur){ return !!cur && tripOver(cur) && pastOpened !== cur.id; }
 /* The address says where to open: #plan, #docs, #docs/personal (also #vault, #personal) … */
 function route(){
   let [t, sub] = location.hash.slice(1).split('/');
@@ -440,7 +448,12 @@ function route(){
   if(t === 'docs' && typeof docFilter !== 'undefined' && sub) docFilter.kind = sub === 'personal' ? 'personal' : 'travel';
   return true;
 }
-function setTrip(id){ S.settings.lastTrip = id; save({quiet: true, noSync: true}); render(); }
+function setTrip(id){
+  S.settings.lastTrip = id;
+  pastOpened = tripOver(tripById(id)) ? id : '';
+  try{ if(pastOpened) sessionStorage.setItem('tv-past', id); else sessionStorage.removeItem('tv-past'); }catch(e){ /* this visit only */ }
+  save({quiet: true, noSync: true}); render();
+}
 
 function shell(){
   document.body.innerHTML = `
@@ -557,7 +570,7 @@ function render(){
   $('look-btn').innerHTML = isNew ? '<span aria-hidden="true">◐</span><span>Classic view</span>' : '<span aria-hidden="true">✦</span><span>New design</span>';
   $('look-btn').title = isNew ? 'Switch to the classic design' : 'Switch to the new design';
   // the city's photos are the backdrop of the Trips tab only
-  document.body.classList.toggle('hz-on', isNew && tab === 'trips' && !!cur);
+  document.body.classList.toggle('hz-on', isNew && tab === 'trips' && !!cur && !betweenTrips(cur));
   const main = $('main');
   try{ VIEWS[tab](main, cur); }
   catch(e){ console.error(e); main.innerHTML = `<div class="card error">Something went wrong drawing this tab: ${esc(e.message)}</div>`; }

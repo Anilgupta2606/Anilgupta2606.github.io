@@ -85,7 +85,18 @@ VIEWS.trips = function(main, cur){
     </article>`;
   };
   let html = '';
-  if(cur){
+  const resting = betweenTrips(cur);
+  if(resting){
+    // the last trip is over and nothing is booked: the default page, with that trip a tap away
+    const t = Object.assign({}, cur, tripSpan(cur)), pics = S.memories.filter(m=>m.tripId === t.id).length;
+    html += `<section class="pass"><div class="pass-main">${passSky()}
+        <p class="pass-when">Between trips</p>
+        <h1>Where to next?</h1>
+        <p class="pass-lead">Your trip <b>${esc(t.name)}</b> ended on ${esc(fmtDate(t.end))}. Upload the tickets for the next one, or create it, and it shows here.</p>
+        <div class="row"><button class="btn primary" id="go-up">${icon('upload')} Upload a ticket or booking</button><button class="btn soft" id="new-trip-2">${icon('plus')} Create a trip</button><button class="btn ghost" data-trip="${esc(t.id)}">${icon('photo')} Open ${esc(t.name)}${pics ? ' · ' + pics + ' photo' + (pics === 1 ? '' : 's') : ''}</button></div>
+      </div><div class="pass-stub"><span class="stub-big">✓</span><span class="stub-small">last trip done</span></div></section>`;
+  }
+  else if(cur){
     const t = Object.assign({}, cur, tripSpan(cur));
     const n = t.start ? daysUntil(t.start) : null;
     const first = flightsOf(t.id)[0];
@@ -119,7 +130,8 @@ VIEWS.trips = function(main, cur){
   if(past.length) html += `<section><h2>Past trips</h2><div class="trip-grid">${past.map(tripCard).join('')}</div></section>`;
   if(tvLook() === 'new') html += placesHTML();
   main.innerHTML = html;
-  if(tvLook() === 'new') horizonBind(main, cur, trips);
+  if(tvLook() === 'new') horizonBind(main, resting ? null : cur, trips);
+  if($('new-trip-2')) $('new-trip-2').onclick = ()=>VIEWS.newTrip();
   main.querySelectorAll('[data-trip]').forEach(el=>{ el.onclick = e=>{ if(e.target.closest('[data-edit-trip]')) return; setTrip(el.dataset.trip); window.scrollTo(0, 0); }; el.onkeydown = e=>{ if(e.key === 'Enter') el.click(); }; });
   main.querySelectorAll('[data-edit-trip]').forEach(b=>b.onclick = ()=>VIEWS.newTrip(tripById(b.dataset.editTrip)));
   if($('new-trip')) $('new-trip').onclick = ()=>VIEWS.newTrip();
