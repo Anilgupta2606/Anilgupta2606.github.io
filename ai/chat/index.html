@@ -2309,7 +2309,7 @@ function drawChats(){
     store.set('ai.sessions', {}); history = []; store.set('moneyai.history', []); newChat(true); await loadChats(); toast('All chats deleted');
   };
   box.querySelectorAll('.chat').forEach(el=>el.onclick = e => { if(e.target.closest('.del') || e.target.closest('.cpin')) return; openChat(el.dataset.id); });
-  box.querySelectorAll('[data-cpin]').forEach(b=>b.onclick = async e => { e.stopPropagation(); const c = chatCache.find(x=>x.id === b.dataset.cpin) || {}; const r = await post('/memory', {pinChat: {chatId: b.dataset.cpin, title: c.title || ''}}).catch(()=>null); if(!r) return toast('Could not pin it'); if(r.pin) pinnedChatIds.add(b.dataset.cpin); else pinnedChatIds.delete(b.dataset.cpin); toast(r.pin ? 'Chat pinned — every chat can use it' : 'Chat unpinned'); drawChats(); if($('#panel') && $('#panel').classList.contains('open')) loadLearned(); });
+  box.querySelectorAll('[data-cpin]').forEach(b=>b.onclick = async e => { e.stopPropagation(); const c = chatCache.find(x=>x.id === b.dataset.cpin) || {}; const r = await post('/memory', {pinChat: {chatId: b.dataset.cpin, title: c.title || ''}}).catch(()=>null); if(!r) return toast('Could not pin it'); if(r.pin) pinnedChatIds.add(b.dataset.cpin); else pinnedChatIds.delete(b.dataset.cpin); toast(r.pin ? 'Chat pinned — every chat can use it' : 'Chat unpinned'); await loadChats(); loadLearned(); });
   box.querySelectorAll('[data-del]').forEach(b=>b.onclick = async e => {
     e.stopPropagation();
     const id = b.dataset.del;
