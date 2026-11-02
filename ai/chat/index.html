@@ -834,7 +834,7 @@ button, a, summary, label{touch-action:manipulation}
   <button class="ghost close" id="closeKeys">Close</button>
   <h2>Your AI keys</h2>
   <p class="sub">All your keys live here, on your Mac — Money Home and every app use them through your own AI. 🟢 working · 🟡 resting or being checked · 🔴 needs a key.</p>
-  <p class="sub"><button class="linky" type="button" id="keysToSeq">🧭 Which model answers what, in which order → Who answers</button></p>
+  <p class="sub" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px"><button class="linky" type="button" id="keysToSeq">🧭 Which model answers what, in which order → Who answers</button><button class="ghost" type="button" id="refreshAllKeys">🔄 Test all keys</button></p>
   <div id="keysList"><p class="sub">Loading…</p></div>
 </aside>
 <aside class="panel" id="projectPanel" aria-label="Coding projects">
@@ -1411,7 +1411,7 @@ async function loadLearned(){
   $('#learned').querySelectorAll('[data-id]').forEach(b=>b.onclick = async () => { await api.forget(b.dataset.id); loadLearned(); });
   $('#learned').querySelectorAll('[data-mforget]').forEach(b=>b.onclick = async () => { await post('/memory', {memory: 'forget ' + b.dataset.mforget}).catch(()=>null); loadLearned(); });
   const ma = $('#memAuto'); if(ma) ma.onchange = async () => { await post('/memory', {memory: ma.checked ? 'on' : 'off'}).catch(()=>null); toast(ma.checked ? 'Automatic memory on' : 'Automatic memory off'); };
-  $('#learned').querySelectorAll('[data-unpin]').forEach(b=>b.onclick = async () => { await post('/memory', {unpin: b.dataset.unpin}).catch(()=>null); loadLearned(); });
+  $('#learned').querySelectorAll('[data-unpin]').forEach(b=>b.onclick = async () => { await post('/memory', {unpin: b.dataset.unpin}).catch(()=>null); await loadChats(); loadLearned(); });
 }
 const pill = (id, text, cls) => { const p = $(id); p.hidden = false; p.className = 'pill ' + (cls || ''); p.innerHTML = (/model/.test(cls || '') ? '✦ ' : '<i></i>') + esc(text);
   $('#sbStatus').textContent = [$('#stWhere').textContent, $('#stModel').hidden ? '' : $('#stModel').textContent.replace('✦ ', '').replace(/\s*▾\s*$/, '')].filter(Boolean).join(' · '); };
@@ -2309,7 +2309,7 @@ function drawChats(){
     store.set('ai.sessions', {}); history = []; store.set('moneyai.history', []); newChat(true); await loadChats(); toast('All chats deleted');
   };
   box.querySelectorAll('.chat').forEach(el=>el.onclick = e => { if(e.target.closest('.del') || e.target.closest('.cpin')) return; openChat(el.dataset.id); });
-  box.querySelectorAll('[data-cpin]').forEach(b=>b.onclick = async e => { e.stopPropagation(); const c = chatCache.find(x=>x.id === b.dataset.cpin) || {}; const r = await post('/memory', {pinChat: {chatId: b.dataset.cpin, title: c.title || ''}}).catch(()=>null); if(!r) return toast('Could not pin it'); if(r.pin) pinnedChatIds.add(b.dataset.cpin); else pinnedChatIds.delete(b.dataset.cpin); toast(r.pin ? 'Chat pinned — every chat can use it' : 'Chat unpinned'); drawChats(); });
+  box.querySelectorAll('[data-cpin]').forEach(b=>b.onclick = async e => { e.stopPropagation(); const c = chatCache.find(x=>x.id === b.dataset.cpin) || {}; const r = await post('/memory', {pinChat: {chatId: b.dataset.cpin, title: c.title || ''}}).catch(()=>null); if(!r) return toast('Could not pin it'); if(r.pin) pinnedChatIds.add(b.dataset.cpin); else pinnedChatIds.delete(b.dataset.cpin); toast(r.pin ? 'Chat pinned — every chat can use it' : 'Chat unpinned'); drawChats(); if($('#panel') && $('#panel').classList.contains('open')) loadLearned(); });
   box.querySelectorAll('[data-del]').forEach(b=>b.onclick = async e => {
     e.stopPropagation();
     const id = b.dataset.del;
@@ -2578,7 +2578,8 @@ $('#openSeq').onclick = () => openSeq(true);
 $('#closeSeq').onclick = () => openSeq(false);
 async function loadKeys(){
   const box = $('#keysList');
-  let st = null; try{ st = await fetch(HELPER + '/keys/status').then(r=>r.json()); }catch(e){}
+  let st = null;
+  try{ st = await fetch(HELPER + '/keys/status').then(x=>x.json()); }catch(e){}
   if(!st || !st.services){ box.innerHTML = '<p class="sub">Your Mac\'s AI is not answering — is the helper running?</p>'; return; }
   const row = x => `<div class="krow" data-k="${esc(x.id)}"><div class="khead"><span class="kdot ${esc(x.light)}" title="${esc(x.light)}"></span><b>${esc(x.name)}</b>${x.ending ? `<small>${esc(x.ending)}</small>` : ''}${(st.backup || []).includes(x.id) ? '<small title="Kept by Money Home for when your Mac is off">backup</small>' : ''}</div><small>${esc(x.why)}</small>`
     + (x.kind === 'cloud' && x.count >= 1 ? `<div class="kmore"><small>${x.count === 1 ? '1 key — add another account\'s key and it takes over when this one hits its limit:' : x.count + ' keys — when the one in use hits its limit, the next takes over:'}</small>` + [{ending: x.ending, now: true}].concat(x.spare || []).map(k=>`<div class="kkey"><small>${esc(k.ending)} · ${k.now ? 'in use' : k.restingUntil ? 'resting — back at ' + new Date(k.restingUntil).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'}) : 'ready, next in turn'}</small><span><button class="ghost" data-act="test" data-end="${esc(k.ending)}" type="button">Test</button> <button class="ghost" data-act="remove1" data-end="${esc(k.ending)}" type="button">Remove</button></span></div>`).join('') + '</div>' : '')
@@ -2597,6 +2598,22 @@ async function loadKeys(){
   });
 }
 $('#keysToSeq').onclick = () => { openKeys(false); openSeq(true); };
+$('#refreshAllKeys').onclick = async () => {
+  const btn = $('#refreshAllKeys');
+  btn.disabled = true;
+  btn.textContent = 'Testing all…';
+  try{
+    const j = await post('/keys/refresh', {});
+    const t = j.tested || [], bad = t.filter(x=>!x.ok);
+    toast('Tested ' + t.length + ' key' + (t.length === 1 ? '' : 's') + (bad.length ? ' — ' + bad.length + ' not working: ' + bad.map(x=>x.id + ' …' + String(x.key).slice(-4)).join(', ') : ' — all working ✓'));
+  }catch(e){
+    toast('Test failed: ' + e.message);
+  }finally{
+    btn.disabled = false;
+    btn.textContent = '🔄 Test all keys';
+    loadKeys();
+  }
+};
 const openKeys = on => { $('#keysPanel').classList.toggle('open', on); $('#scrim').classList.toggle('open', on); if(on){ menuOpen(false); loadKeys(); } };
 $('#openKeys').onclick = () => openKeys(true);
 $('#closeKeys').onclick = () => openKeys(false);

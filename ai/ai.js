@@ -175,12 +175,17 @@ const MoneyAI = (function(){
     const reset = Number(h('x-ratelimit-reset'));                                                                  // OpenRouter: when, in ms
     if(reset > now && reset < now + 2 * 86400000) wait = Math.max(wait, reset - now);
     const daily = /per.?day|perday|daily|\bRPD\b|\bTPD\b|free-models-per-day/i.test(body);
+    // a MONTHLY quota (Cohere's trial key: "limited to 1000 API calls / month") rests to the 1st of next month (UTC) - it
+    // was taken as 15 minutes and asked again all month (31 Oct)
+    if(/per.?month|\/\s*month|monthly/i.test(body)){ const d = new Date(now); return {until: Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 1), daily: false, monthly: true}; }
     // a daily quota lasts to the reset (Gemini's own "retry in 20s" is wrong for those); a per-minute one just a while
     if(daily && (id === 'gemini' || !wait)) wait = toMidnight(id === 'gemini' ? 'America/Los_Angeles' : 'UTC');
     return {until: now + Math.min(26 * 3600000, Math.max(60000, wait || 15 * 60000)), daily};
   }
 
-  const backAt = t => { const d = new Date(t); return (d.toDateString() === new Date().toDateString() ? 'at ' : 'tomorrow at ') + d.toTimeString().slice(0, 5); };
+  const backAt = t => { const d = new Date(t), tm = new Date(Date.now() + 86400000);
+    if(d.toDateString() !== new Date().toDateString() && d.toDateString() !== tm.toDateString()) return 'on ' + d.getDate() + ' ' + d.toLocaleString('en-GB', {month: 'short'});      // a monthly limit: the day it resets
+    return (d.toDateString() === new Date().toDateString() ? 'at ' : 'tomorrow at ') + d.toTimeString().slice(0, 5); };
   function Unavailable(message, status, limit){ const e = new Error(message); e.unavailable = true; e.status = status; e.limit = !!limit; return e; }
   async function post(url, headers, body, signal, wait){
     const ctl = new AbortController(), timer = setTimeout(()=>ctl.abort(), wait || 120000), stop = ()=>ctl.abort();
@@ -206,7 +211,7 @@ const MoneyAI = (function(){
       const e = Unavailable(name + ' is busy right now (overloaded).', 503, true); e.until = Date.now() + 60000; e.perModel = true; throw e;
     }
     if(res.status === 429 || /quota|rate.?limit|exhausted|too many/i.test(body)){
-      const end = limitEnd(id, res, body), e = Unavailable(name + ': free ' + (end.daily ? 'daily ' : '') + 'limit reached' + (end.daily ? ' — back ' + backAt(end.until) : ' for now') + '.', 429, true);
+      const end = limitEnd(id, res, body), e = Unavailable(name + ': free ' + (end.monthly ? 'monthly ' : end.daily ? 'daily ' : '') + 'limit reached' + (end.daily || end.monthly ? ' — back ' + backAt(end.until) : ' for now') + '.', 429, true);
       // Gemini, Groq and OpenRouter count each model on its own: the next model of the same service may still answer
       e.until = end.until; e.perModel = ['gemini', 'groq', 'openrouter'].indexOf(id) >= 0;      // OpenRouter: each free model has its own (upstream) limit — one at its limit benched the whole service for 15 minutes
       throw e;
@@ -508,7 +513,8 @@ const MoneyAI = (function(){
       const body = {systemInstruction:{parts:[{text:system}]}, contents, generationConfig:{temperature: temp(opts), maxOutputTokens:8192}};
       if(opts.search) body.tools = [{google_search:{}}];
       else if(opts.schema) Object.assign(body.generationConfig, {responseMimeType: 'application/json', responseSchema: opts.schema});
-      const res = await post('https://generativelanguage.googleapis.com/v1beta/models/' + encodeURIComponent(model) + ':generateContent?key=' + encodeURIComponent(key), {}, body, signal);
+      // (the key in a header, never in the address: an address is written to logs and proxies, a header is not - 31 Oct)
+      const res = await post('https://generativelanguage.googleapis.com/v1beta/models/' + encodeURIComponent(model) + ':generateContent', {'x-goog-api-key': key}, body, signal);
       if(!res.ok) await failure(name, res, id);
       const d = await res.json();
       const cand = (d.candidates || [])[0] || {};
@@ -602,7 +608,7 @@ const MoneyAI = (function(){
     if(id === 'webllm') return [key];              // the one you chose in Setup
     if(id === 'mac'){ const d = await (await macFetch('/models')).json(); lsSet(MAC_KEY, Object.assign({}, lsGet(MAC_KEY, {}), {info: {apple: d.apple, cloud: d.cloud, local: (d.local || []).map(m=>({name: m.name}))}})); return macModels(d).map(x=>x[0]); }
     let res;
-    if(id === 'gemini') res = await fetch('https://generativelanguage.googleapis.com/v1beta/models?pageSize=200&key=' + encodeURIComponent(key));
+    if(id === 'gemini') res = await fetch('https://generativelanguage.googleapis.com/v1beta/models?pageSize=200', {headers: {'x-goog-api-key': key}});
     else if(id === 'ollama') res = await fetch(key.replace(/\/+$/, '') + '/api/tags');
     else res = await fetch(OPENAI_BASE[id] + '/models', {headers:{Authorization:'Bearer ' + key}});
     if(!res.ok) throw new Error('HTTP ' + res.status);
@@ -740,7 +746,7 @@ const MoneyAI = (function(){
     }
     if(!order.length) throw new Error(opts.search ? 'Web search needs a Google Gemini key (free) — add one in Settings → AI.'
       : opts.images ? 'Reading a picture needs a Gemini or Claude key.' : 'Add a free AI key in Settings → AI (or in the Expense Tracker).');
-    const skipped = []; let lastError = null;
+    const skipped = [], busyIds = []; let lastError = null;
     const working = lsGet(WORKING_KEY, {});
     for(const id0 of order){
       const alias = MODEL_ALIAS[id0], id = alias ? alias.id : id0;
@@ -766,6 +772,7 @@ const MoneyAI = (function(){
           if(e.code === 'cancelled') throw e;
           lastError = e;
           if(e.unavailable) tell(e.message + ' — trying the next');
+          if(e.unavailable && (e.status >= 500 || /busy right now/.test(e.message))) busyIds.push(id + '|' + model);
           if(!e.unavailable){ skipped.push(e.message); tell(e.message + ' — trying the next'); break; }        // the key itself was refused
           if(e.status === 404) markBad(id, model, e.retired ? 30 * 86400000 : 0);       // this key cannot use that model (retired: a month)
           if(e.limit && e.perModel){ rest(id + '|' + model, e.message, e.until); if(free.every(m=>resting(id + '|' + m))){ restAll(id, free); break; } continue; }
@@ -787,6 +794,14 @@ const MoneyAI = (function(){
         await new Promise(res=>{ const t = setTimeout(res, Math.max(0, wait) + 1000); if(signal) signal.addEventListener('abort', ()=>{ clearTimeout(t); res(); }); });
         if(!(signal && signal.aborted)){ wake(id); const b = restMap(); Object.keys(b).forEach(k=>{ if(k.indexOf(id + '|') === 0) delete b[k]; }); lsSet(REST_KEY, b); return chat(system, turns, Object.assign({}, opts, {waited: true}), signal); }
       }
+    }
+    // EVERY SERVICE FAILED and some only because they were busy (a 5xx, "overloaded" - not a daily or monthly limit): a pause of
+    // 5 s, their short "busy" rests dropped, and all asked once more - not given up at once (2 Nov, asked for: "give a pause of
+    // five seconds then do another try", any model)
+    if(busyIds.length && !opts.waited && !opts.busyRetried && !(signal && signal.aborted)){
+      tell('Every AI was busy or at a limit — asking again in 5 s');
+      await new Promise(res=>{ const t = setTimeout(res, opts.busyWait != null ? opts.busyWait : 5000); if(signal) signal.addEventListener('abort', ()=>{ clearTimeout(t); res(); }); });
+      if(!(signal && signal.aborted)){ const b = restMap(); busyIds.forEach(k=>{ if(b[k] && /busy right now/.test(b[k].why || '')) delete b[k]; }); lsSet(REST_KEY, b); return chat(system, turns, Object.assign({}, opts, {busyRetried: true}), signal); }
     }
     const why = skipped.concat(lastError && lastError.unavailable ? [lastError.message] : []);
     throw new Error('No AI service could answer' + (why.length ? ': ' + why.join('; ').replace(/\.$/, '') : '') + '. Try again later or add another free key.');
