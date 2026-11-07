@@ -9,14 +9,15 @@
 <meta name="theme-color" content="#f4f6ff">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@500;600;700&family=Figtree:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600&display=swap">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap">
 <script type="importmap">{"imports":{"three":"https://cdnjs.cloudflare.com/ajax/libs/three.js/0.169.0/three.module.min.js"}}</script>
 <script>
-/* The look, before the first paint: the new one ("Pearl", with its light) unless Classic was picked; its theme is
+/* The look, before the first paint: Daylight (7 Nov) unless New ("Pearl", with its light) or Classic was picked; its theme is
    Auto (Navy from 7 pm to 6 am or when the device is dark, else Day), Black, Navy or Day. Classic keeps its own Light / Dark. */
 (function(){
   var get = function(k, d){ try{ var v = JSON.parse(localStorage.getItem(k)); return v == null ? d : v; }catch(e){ return d; } };
-  var r = document.documentElement, look = get('ai.look', 'new') === 'classic' ? 'classic' : 'new';
+  var r = document.documentElement, lk = get('ai.look', 'daylight'), look = lk === 'classic' || lk === 'new' ? lk : 'daylight';
   r.dataset.look = look;
   if(look === 'new'){
     var p = get('ai.pearl', 'auto'), h = new Date().getHours(), night = matchMedia('(prefers-color-scheme: dark)').matches || h >= 19 || h < 6;
@@ -594,7 +595,7 @@ button, a, summary, label{touch-action:manipulation}
 .lookchip{display:inline-flex}
 :root[data-look="new"] .pearlseg{display:inline-flex}
 :root[data-look="new"] #themeSeg, :root[data-look="new"] #themeLabel{display:none}
-:root[data-look="classic"] #pearlMenu, :root[data-look="classic"] #pearlLabel{display:none}
+:root[data-look="classic"] #pearlMenu, :root[data-look="classic"] #pearlLabel, :root[data-look="daylight"] #pearlMenu, :root[data-look="daylight"] #pearlLabel{display:none}
 #pearlSky{display:none}
 :root[data-look="new"] #pearlSky{display:block; position:fixed; inset:0; width:100%; height:100%; z-index:-1; pointer-events:none}
 /* the light on its own layer, over a fade under the header: text scrolling up goes under the fade, the light stays seen */
@@ -686,6 +687,63 @@ button, a, summary, label{touch-action:manipulation}
 @media (max-width:760px){ .where .pearlseg{ display:none !important } .lookchip span{ display:none } }
 @media (prefers-reduced-motion:reduce){ :root[data-look="new"] *{ animation:none !important } }
 </style>
+<style>
+/* DAYLIGHT (7 Nov, the default): a clean light assistant - warm off-white, one blue accent, Inter with Space Grotesk
+   headings, flat surfaces with soft borders; its dark side follows Light / Dark / Auto like Classic. Only colours, type
+   and surfaces change here: the page's structure and ids stay the same for every look */
+:root[data-look="daylight"]{
+  --page:#f7f7f5; --page2:#f7f7f5; --card:#ffffff; --ink:#111827; --ink2:#374151; --mut:#6b7280; --line:#e7e7e2;
+  --search:#2f5bea; --think:#2448c7; --think-bg:#eef2fd; --search-bg:#eef2fd; --accent-ink:#ffffff;
+  --qbg:#e9edf8; --hover:#ecece8; --accent:#2f5bea; --ring:#2f5bea;
+  --code-bg:#fafaf8; --code-head:#f1f1ed; --code-line:#e7e7e2; --code-ink:#1f2937; --code-mut:#6b7280; --code-btn:#d6d6cf;
+  --shadow:0 1px 2px rgb(17 24 39 / .04), 0 8px 24px rgb(17 24 39 / .06);
+  --display:'Space Grotesk', 'Avenir Next', system-ui, sans-serif;
+  --body:'Inter', -apple-system, 'Segoe UI', sans-serif;
+}
+@media (prefers-color-scheme: dark){ :root[data-look="daylight"]:not([data-theme="light"]){
+  --page:#141416; --page2:#141416; --card:#1c1c1f; --ink:#f3f4f6; --ink2:#d1d5db; --mut:#9ca3af; --line:#2c2c31;
+  --search:#8aa4ff; --think:#a9bcff; --think-bg:#1f2747; --search-bg:#1f2747; --accent-ink:#0b1020;
+  --qbg:#262d45; --hover:#24242a; --accent:#8aa4ff; --ring:#8aa4ff; --code-bg:#17171a; --code-head:#202024; --code-line:#2c2c31; --code-ink:#e5e7eb; --code-mut:#9ca3af; --code-btn:#3a3a40; --shadow:0 8px 24px rgb(0 0 0 / .35); } }
+:root[data-look="daylight"][data-theme="dark"]{
+  --page:#141416; --page2:#141416; --card:#1c1c1f; --ink:#f3f4f6; --ink2:#d1d5db; --mut:#9ca3af; --line:#2c2c31;
+  --search:#8aa4ff; --think:#a9bcff; --think-bg:#1f2747; --search-bg:#1f2747; --accent-ink:#0b1020;
+  --qbg:#262d45; --hover:#24242a; --accent:#8aa4ff; --ring:#8aa4ff; --code-bg:#17171a; --code-head:#202024; --code-line:#2c2c31; --code-ink:#e5e7eb; --code-mut:#9ca3af; --code-btn:#3a3a40; --shadow:0 8px 24px rgb(0 0 0 / .35); }
+:root[data-look="daylight"] body{background:var(--page); font-family:var(--body); font-size:15.5px; letter-spacing:-.003em}
+:root[data-look="daylight"] :focus-visible{outline:2px solid var(--ring)}
+:root[data-look="daylight"] .sidebar{background:var(--page); border-right:1px solid var(--line)}
+:root[data-look="daylight"] header.topbar{background:color-mix(in srgb, var(--page) 88%, transparent); border-bottom-color:var(--line)}
+:root[data-look="daylight"] .brand{font-family:var(--display); font-weight:600; letter-spacing:-.01em}
+:root[data-look="daylight"] .newchat{background:var(--card); border:1px solid var(--line); box-shadow:none; border-radius:12px; min-height:42px; font-weight:500}
+:root[data-look="daylight"] .newchat:hover{border-color:color-mix(in srgb, var(--ink) 22%, var(--line))}
+:root[data-look="daylight"] .navbtn{border-radius:10px; color:var(--ink2)}
+:root[data-look="daylight"] .navbtn:hover, :root[data-look="daylight"] .chat:hover, :root[data-look="daylight"] .acctrow:hover{background:var(--hover); color:var(--ink)}
+:root[data-look="daylight"] .chat.cur{background:var(--hover); color:var(--ink); font-weight:500}
+:root[data-look="daylight"] .chatlist h6{font-weight:500; color:var(--mut)}
+/* the conversation: your words in a soft blue bubble, the answer as plain text on the page */
+:root[data-look="daylight"] .q div{background:var(--qbg); color:var(--ink); border-radius:18px; font-weight:400}
+:root[data-look="daylight"] .a{background:transparent; border:0; box-shadow:none; border-radius:0; padding:4px 0}
+:root[data-look="daylight"] .hello h1{font-family:var(--display); font-weight:600; letter-spacing:-.03em}
+:root[data-look="daylight"] .tries button{box-shadow:none; border-radius:14px}
+:root[data-look="daylight"] .tries button:hover{transform:none; border-color:color-mix(in srgb, var(--accent) 45%, var(--line))}
+/* the box you type in: one soft border, the accent when it has focus (not the orb's rainbow) */
+:root[data-look="daylight"] .box{border:1px solid var(--line); background:var(--card); background-image:none; border-radius:22px; box-shadow:var(--shadow)}
+:root[data-look="daylight"] .box:focus-within{background-image:none; border-color:color-mix(in srgb, var(--accent) 55%, var(--line))}
+:root[data-look="daylight"] .send, :root[data-look="daylight"] .btn{background:var(--accent); color:var(--accent-ink)}
+:root[data-look="daylight"] .send:hover{transform:none; filter:brightness(1.08)}
+:root[data-look="daylight"] .mchip{background:var(--card); border-color:var(--line); color:var(--ink2); font-weight:500}
+:root[data-look="daylight"] .mchip:hover{border-color:color-mix(in srgb, var(--ink) 25%, var(--line)); color:var(--ink)}
+:root[data-look="daylight"] .mchip.on{background:var(--think-bg); color:var(--think)}
+:root[data-look="daylight"] .mchip.run{border-color:var(--accent); color:var(--think)}
+/* side panels, Who answers and the menus */
+:root[data-look="daylight"] .panel h2{font-family:var(--display); font-weight:600}
+:root[data-look="daylight"] .seg{background:color-mix(in srgb, var(--ink) 6%, var(--page))}
+:root[data-look="daylight"] .seg button[aria-checked="true"], :root[data-look="daylight"] .modeswitch button[aria-selected="true"]{background:var(--card); color:var(--ink); box-shadow:0 1px 2px rgb(17 24 39 / .08)}
+:root[data-look="daylight"] .lane{border-radius:14px; border-color:var(--line)}
+:root[data-look="daylight"] .flow li{background:var(--card); border-radius:12px}
+:root[data-look="daylight"] .flow .num{background:var(--accent); color:var(--accent-ink)}
+:root[data-look="daylight"] .picker{border-radius:14px}
+:root[data-look="daylight"] .pill.model{background:var(--think-bg); color:var(--think)}
+</style>
 </head>
 <body>
 <canvas id="pearlSky" aria-hidden="true"></canvas>
@@ -715,7 +773,7 @@ button, a, summary, label{touch-action:manipulation}
       <label class="mlabel" for="meName">Your name</label>
       <input class="mname" id="meName" maxlength="40" autocomplete="name">
       <div class="mlabel">Design</div>
-      <div class="seg" id="lookSeg" role="radiogroup" aria-label="Design"><button data-l="new" role="radio">New</button><button data-l="classic" role="radio">Classic</button></div>
+      <div class="seg" id="lookSeg" role="radiogroup" aria-label="Design"><button data-l="daylight" role="radio">Daylight</button><button data-l="new" role="radio">New</button><button data-l="classic" role="radio">Classic</button></div>
       <div class="mlabel" id="pearlLabel">Theme</div>
       <div class="seg" id="pearlMenu" role="radiogroup" aria-label="Theme"><button data-p="auto" role="radio">Auto</button><button data-p="black" role="radio">Black</button><button data-p="navy" role="radio">Navy</button><button data-p="day" role="radio">Day</button></div>
       <div class="mlabel" id="themeLabel">Theme</div>
@@ -2790,7 +2848,7 @@ function applyLook(l){
   const r = document.documentElement;
   r.dataset.look = l;
   document.querySelectorAll('#lookSeg button').forEach(b=>b.setAttribute('aria-checked', String(b.dataset.l === l)));
-  const chip = $('#lookChip'); chip.innerHTML = l === 'new' ? '◐ <span>Classic view</span>' : '✦ <span>New design</span>'; chip.title = l === 'new' ? 'Switch to the classic look' : 'Switch to the new look';
+  const chip = $('#lookChip'); chip.innerHTML = l === 'daylight' ? '◐ <span>Classic view</span>' : '✦ <span>Daylight</span>'; chip.title = l === 'daylight' ? 'Switch to the classic look' : 'Switch to the Daylight look';
   // the new look keeps the chips inside the box, as its bottom row; Classic has them under it
   const box = $('#form'), modes = $('#modes');
   if(box && modes){ if(l === 'new'){ if(modes.parentNode !== box) box.appendChild(modes); } else if(modes.parentNode === box) box.after(modes); }
@@ -2808,8 +2866,9 @@ function loadPearl(){
 darkQuery.addEventListener('change', () => { if(document.documentElement.dataset.look === 'new') applyPearl(); });
 document.querySelectorAll('#pearlTop button, #pearlMenu button').forEach(b=>b.onclick = () => { store.set('ai.pearl', b.dataset.p); applyPearl(); });
 document.querySelectorAll('#lookSeg button').forEach(b=>b.onclick = () => { store.set('ai.look', b.dataset.l); applyLook(b.dataset.l); });
-$('#lookChip').onclick = () => { const l = document.documentElement.dataset.look === 'new' ? 'classic' : 'new'; store.set('ai.look', l); applyLook(l); };
-applyLook(store.get('ai.look', 'new') === 'classic' ? 'classic' : 'new');
+$('#lookChip').onclick = () => { const l = document.documentElement.dataset.look === 'daylight' ? 'classic' : 'daylight'; store.set('ai.look', l); applyLook(l); };
+const lookOf = v => v === 'classic' || v === 'new' ? v : 'daylight';
+applyLook(lookOf(store.get('ai.look', 'daylight')));
 applyTheme(store.get('ai.theme', 'auto'));
 document.querySelectorAll('#themeSeg button').forEach(b=>b.onclick = () => { store.set('ai.theme', b.dataset.t); applyTheme(b.dataset.t); });
 $('#cloudTog').checked = !!store.get('ai.cloud', false);
