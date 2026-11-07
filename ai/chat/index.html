@@ -1812,6 +1812,11 @@ const MODES = {image: '🎨 Create image', video: '🎞 Make a video', deep: '�
 const SKILLS = [
   {c: '/rea', i: '🔬', n: 'REA — look inside software', d: 'An app, a file or an https link: what it is, how it works, with evidence', words: 'An app, a file path or an https link…'},
   {c: '/blueprint', i: '🗺', n: 'Blueprint', d: 'Reverse-engineer a site or app into a plan to build your own', words: 'A site or app to reverse-engineer…'},
+  {c: '/audit', i: '🩺', n: 'Audit a project', d: 'A full check: code map, bug hunt with each finding proved, security pass - then fix <n>', words: 'A project or folder (or blank for the open one)…'},
+  {c: '/makevideo', i: '🎬', n: 'Make a video', d: 'Topic → research → a script you review → the video (explainer or motion graphics)', words: 'A topic…'},
+  {c: '/report', i: '📊', n: 'Write a report', d: 'A sourced report with diagrams - from the web, or your files (kept private)', words: 'A topic, or files on this Mac…'},
+  {c: '/explain', i: '🗺', n: 'Explain a project', d: 'How a codebase works: its parts, flows and where to start, with diagrams', words: 'A project or folder (or blank for the open one)…'},
+  {c: '/learn', i: '🎓', n: 'Learn from a video', d: 'Notes from a YouTube link or a recording, and a notebook so /nb answers from it', words: 'A YouTube link, or an audio/video file…'},
   {c: '/createapp', i: '🚀', n: 'Create an app', d: 'Research, design and build an app - your review after each step (next · change · status)', words: 'An app to learn from, or your idea…'},
   {c: '/researchApps', i: '🔬', n: 'Research an app', d: 'Blueprint + rea: how an app is built, a full-copy plan (feature parity) and the parts you can reuse, with evidence', words: 'An app or site, then focus: what you want from it…'},
   {c: '/design', i: '🎨', n: 'Design', d: 'Screens for an app: design system, Hallmark direction, Stitch screens, a preview page — or a logo, banner, slides, brand', words: 'The app or screen (or: logo / banner / slides / brand …)'},
@@ -2191,6 +2196,11 @@ const COMMANDS = [
   {c: '/upskill', a: 'generate <task> · eval <skill> · list', d: 'A strong model writes a skill; measured with and without it on the models on your Mac'},
   {c: '/upstream', a: 'run · apply n · drop n', d: 'What changed in the repos our skills came from — suggestions to apply (SoGPT, with tests)'},
   {c: '/blueprint', a: 'a site or an app', d: 'Reverse-engineer it: how it is built and what it does, then a plan to build your own (say “build it” after)'},
+  {c: '/audit', a: '[project or folder] [focus: …] · fix <n|all> · change <what> · status', d: 'Code map → bug hunt (each finding proved against the code) → security pass, on a report page you review; /audit fix 1 hands a finding to the coding pipeline (a failing test first)'},
+  {c: '/makevideo', a: '<topic> [style: motion] · next [motion] · change <what> · status', d: 'Research, then a script (narration and scenes, humanized) on a page you review; /makevideo next makes the video from that script (explainer with clips and voice, or HyperFrames motion graphics)'},
+  {c: '/report', a: '<topic or files> · change <what> · status', d: 'A report page with sources, tables and a diagram: a topic researched on the web, or files read on this Mac (MarkItDown) and written privately'},
+  {c: '/explain', a: '[project or folder] [focus: …] · change <what> · status', d: 'Code map + code graph + README → how the project works, with mermaid diagrams, on a page (a private project is written on this Mac)'},
+  {c: '/learn', a: '<YouTube link or file> · change <what> · status', d: 'The transcript (captions, else heard on this Mac) → notes on a page, and a notebook with the transcript so /nb answers from the video'},
   {c: '/createapp', a: 'an app or an idea [focus: …] · next · change <what> · skip design · status', d: 'Research (as /researchApps), then its screens (as /design, from the research), then one project built from both - the spec first, then go; you review each step on its page and fix it with /createapp change'},
   {c: '/researchApps', a: 'a site or app [recording.har] [focus: …]', d: 'Deep research to build the same app or reuse parts: the blueprint plus rea\'s exact evidence, a full-copy (feature parity) plan, “Parts you can reuse”, and with a HAR an agent environment'},
   {c: '/review', a: '[security | performance | tests]', d: 'Review the coding project\'s uncommitted changes for bugs — or as a security, performance or test reviewer (nothing is changed)'},
@@ -2314,7 +2324,8 @@ async function runCommand(line){
   else if(c === '/rea'){ if(!arg) return toast('/rea /Applications/Slack.app · /rea https://zerodha.com · /rea ~/bin/tool explain main — or a .har or .sqlite file'); ask('/rea ' + arg); }
   else if(c === '/upstream') ask('/upstream' + (arg ? ' ' + arg : ''));
   else if(c === '/upskill') ask('/upskill' + (arg ? ' ' + arg : ''));
-  else if(/^\/createapp$/i.test(c)){ ask('/createapp' + (arg ? ' ' + arg : '')); }
+  else if(c === '/audit' || c === '/makevideo' || c === '/report' || c === '/explain' || c === '/learn'){ ask(c + (arg ? ' ' + arg : '')); }
+  else if(c === '/createapp' || /^\/createapp$/i.test(c)){ ask('/createapp' + (arg ? ' ' + arg : '')); }
   else if(/^\/researchapps$/i.test(c)){ if(!arg) return toast('/researchApps notion.so focus: the editor — or an app on your Mac, or add ~/Downloads/app.har'); ask('/researchApps ' + arg); }
   else if(c === '/blueprint'){ if(!arg) return toast('/blueprint notion.so — or an app on your Mac'); ask('/blueprint ' + arg); }
   else if(c === '/memory' || c === '/tune' || c === '/config'){ if(mode !== 'mac') return toast('That is kept on your Mac — open this page there (or over Tailscale)');
