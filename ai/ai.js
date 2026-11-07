@@ -76,6 +76,10 @@ const MoneyAI = (function(){
   ];
   /* MODEL ALIASES: one model of a service, picked by its own name in Who answers - no key of its own (it uses the service's).
      bolt: NVIDIA Nemotron 3.5 Bolt E4B (23 Oct 2026), about a second an answer: first for checks, titles and follow-ups */
+  // the newest Bolt on the NVIDIA key, as the Mac's daily model refresh found it (setAliasModel); the one
+  // written here when none was found
+  const aliasModel = {};
+  function setAliasModel(id, model){ if(MODEL_ALIAS[id] && typeof model === 'string' && model) aliasModel[id] = model; }
   const MODEL_ALIAS = {bolt: {id: 'nvidia', model: 'nvidia/nemotron-3.5-bolt-e4b', name: 'NVIDIA Bolt (fast)'}};
   const OPENAI_BASE = {ollamacloud:'http://127.0.0.1:11434/v1', groq:'https://api.groq.com/openai/v1', nvidia:'https://integrate.api.nvidia.com/v1', zai:'https://api.z.ai/api/paas/v4', cohere:'https://api.cohere.ai/compatibility/v1', llm7:'https://api.llm7.io/v1', openrouter:'https://openrouter.ai/api/v1'};
   const DEVICE_ONLY = {ollama: true, webllm: true, mac: true};         // this computer's own: not shared with your other devices
@@ -758,7 +762,7 @@ const MoneyAI = (function(){
       const last = id === 'ollama' || id === 'mac' ? null : (working[id] || {})[tier];     // on this computer: always the light model first, not the one that last answered
       // your own AI: the model you chose, then its Auto (which itself falls back across the Mac's models) — not five tries
       // (nothing chosen: ChatGPT first when the Mac has it — fast and good for an app's request — then its Auto)
-      const models = alias ? [alias.model] : id === 'mac' ? Array.from(new Set(pinned.concat(pinned.length || ((lsGet(MAC_KEY, {}).info || {}).apple || {chatgpt: true}).chatgpt === false ? [] : ['chatgpt'], ['auto']))) : Array.from(new Set(pinned.concat(last ? [last] : [], await bestModels(id, key, tier), PROVIDERS.find(p=>p.id === id).models)))
+      const models = alias ? [aliasModel[id0] || alias.model] : id === 'mac' ? Array.from(new Set(pinned.concat(pinned.length || ((lsGet(MAC_KEY, {}).info || {}).apple || {chatgpt: true}).chatgpt === false ? [] : ['chatgpt'], ['auto']))) : Array.from(new Set(pinned.concat(last ? [last] : [], await bestModels(id, key, tier), PROVIDERS.find(p=>p.id === id).models)))
         .filter(m=>pinned.indexOf(m) >= 0 || !isBad(id, m)).slice(0, 5);
       const free = models.filter(m=>!resting(id + '|' + m));
       if(models.length && !free.length){ restAll(id, models); skipped.push(pname + ' is at its free limit'); tell(pname + ' is at its free limit — skipping'); continue; }
@@ -892,7 +896,7 @@ const MoneyAI = (function(){
   const setModel = (id, m) => { const h = aiLocal(); h.model = Object.assign({}, h.model, {[id]: m}); saveAiLocal(h); };
 
   return {keysToMac, macLights, macManaged, macMaybe, BACKUP_KEY, LIGHTS_KEY, macModels, macModelLabel, macRequest, MAC_URL, macUp, macFetch, macRemote, setMacRemote, macSignIn, macBase, PRIVATE_MODELS, trialPrivate, removePrivate, privateCached, PROVIDERS, loadAi, aiSettings, aiLocal, saveAiLocal, adoptAppKeys, aiStatus, rankModels, shareableAi, takeSyncedAi,
-          aiAvailable, aiNames, canSee, canSearch, resting, wake, backAt, chat, generate, json, test, setModel, listModels, refreshModels, ranked};
+          aiAvailable, aiNames, canSee, canSearch, resting, wake, backAt, chat, generate, json, test, setModel, listModels, refreshModels, ranked, setAliasModel};
 })();
 
 /* =========================================================

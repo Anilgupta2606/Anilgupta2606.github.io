@@ -373,6 +373,7 @@ code{font-family:var(--mono); font-size:.85em; background:var(--page2); padding:
 .scrim.open{opacity:1; pointer-events:auto}
 .panel{position:fixed; inset:0 0 0 auto; width:min(460px,100%); background:var(--card); transform:translateX(100%); transition:transform .25s ease; overflow-y:auto; z-index:6; padding:22px 20px 40px}
 .panel.open{transform:none}
+.kmodels{margin:14px 0 4px}.kmodels summary{cursor:pointer;font-weight:600}.ktab{width:100%;border-collapse:collapse;font-size:13px;margin-top:8px}.ktab th,.ktab td{text-align:left;vertical-align:top;padding:6px 8px;border-top:1px solid var(--line)}.kmodels .scroll{overflow-x:auto}
 .krow{border:1px solid var(--line); border-radius:14px; padding:12px 14px; margin:0 0 10px; display:grid; gap:8px}
 .krow .khead{display:flex; align-items:center; gap:10px}
 .krow .khead b{flex:1; font-size:15px}
@@ -581,8 +582,8 @@ button, a, summary, label{touch-action:manipulation}
      page's own renderer (markdown() below) draws the answer. -->
 <script defer src="https://cdnjs.cloudflare.com/ajax/libs/marked/18.1.1/lib/marked.umd.min.js" integrity="sha384-7sjOQLpS2mL+qbjUOYVEk350vVNi+nPTKMQFruUWMDTzgcxzTJiwye3rHDJCJ9ZL" crossorigin="anonymous"></script>
 <script defer src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.4.17/purify.min.js" integrity="sha384-P0JNneQf81HOl9VwNXK76cQ9VMD6Nfsnepxb0cCOg8+UzEdzgPHAPV4wVQrvYQSx" crossorigin="anonymous"></script>
-<script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.19.0/katex.min.js" integrity="sha384-QFFtAGzvvj+bfgCGxXJlNZZR1nXEZgvG8tDLCCY1F19xl20WlfTYgguB4VcNdxYk" crossorigin="anonymous"></script>
-<script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.19.0/contrib/auto-render.min.js" integrity="sha384-bjyGPfbij8/NDKJhSGZNP/khQVgtHUE5exjm4Ydllo42FwIgYsdLO2lXGmRBf5Mz" crossorigin="anonymous"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.19.1/katex.min.js" integrity="sha384-a1WQdjRj162i159OYq041X6I4K8NenkrI09LlPmiHg0YOb7CR+wJOraXwK9abpnE" crossorigin="anonymous"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.19.1/contrib/auto-render.min.js" integrity="sha384-bjyGPfbij8/NDKJhSGZNP/khQVgtHUE5exjm4Ydllo42FwIgYsdLO2lXGmRBf5Mz" crossorigin="anonymous"></script>
 <script defer src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.2/highlight.min.js" integrity="sha384-pZ4gLQJIEk/VKnGk59xUSQK8Ne/erZQR9cpnPXPLB9iN1tXsVkRVfHYGdFYrSkv1" crossorigin="anonymous"></script>
 <style>
 /* ================================================================ the new look: "Pearl"
@@ -1067,7 +1068,7 @@ function enhance(root, draft){
     if(!/language-/.test(c.className) && /^[\w+#.-]{1,30}$/.test(lang) && hljs.getLanguage(lang)) c.classList.add('language-' + lang);
     try{ hljs.highlightElement(c); }catch(e){} });
   if(typeof renderMathInElement === 'function' && /\$\$|\\\(|\\\[/.test(root.textContent)){
-    if(!katexCss){ katexCss = true; const l = document.createElement('link'); l.rel = 'stylesheet'; l.href = 'https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.19.0/katex.min.css'; l.integrity = 'sha384-3rdsX6e5mueWyoweR9NIVmtEsUkokpBT/0ALqKKIBMr9j4qhHkaIkAcGgsE6uVlp'; l.crossOrigin = 'anonymous'; document.head.appendChild(l); }
+    if(!katexCss){ katexCss = true; const l = document.createElement('link'); l.rel = 'stylesheet'; l.href = 'https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.19.1/katex.min.css'; l.integrity = 'sha384-WwGtaC6ywCHxA5cstpj/3+xIZvTez8dq2IcBQaXRkenHZ7FVVq1ZROtURwfbtTlG'; l.crossOrigin = 'anonymous'; document.head.appendChild(l); }
     root.querySelectorAll('.md').forEach(m=>{ try{ renderMathInElement(m, {delimiters: [{left: '$$', right: '$$', display: true}, {left: '\\[', right: '\\]', display: true}, {left: '\\(', right: '\\)', display: false}],
       ignoredTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code', 'option'], ignoredClasses: ['code', 'dsrc'], throwOnError: false, errorColor: 'var(--warn-ink)', strict: 'ignore', trust: false}); }catch(e){} });
   }
@@ -1084,12 +1085,15 @@ if(document.readyState === 'loading') document.addEventListener('DOMContentLoade
 // the answer being written: drawn at most every 100 ms (a phone does not flicker redrawing it on every word)
 function drawDraft(el, text){
   el._draftText = text; if(el._draftT) return;
-  el._draftT = setTimeout(()=>flushDraft(el), Math.max(0, 100 - (Date.now() - (el._draftAt || 0))));
+  el._draftT = setTimeout(()=>flushDraft(el), Math.max(0, 250 - (Date.now() - (el._draftAt || 0))));
 }
 function flushDraft(el){
   if(el._draftT){ clearTimeout(el._draftT); el._draftT = 0; } if(el._draftText == null) return;
   const d = el.querySelector('.draft'), t = String(el._draftText); el._draftText = null; el._draftAt = Date.now(); if(!d) return;
+  // the box kept where the reader is: redrawn from the top 10 times a second, it jumped back up and flickered while it worked
+  const top = d.scrollTop, atEnd = d.scrollHeight - top - d.clientHeight < 40;
   d.hidden = !t.trim(); d.innerHTML = '<div class="dlabel">Writing…</div>' + answerMd(t, {}, true); enhance(d, true);
+  d.scrollTop = atEnd ? d.scrollHeight : top;
 }
 const srcCard = (s, i) => { const h = host(s.url) || s.title || ''; const web = !!webUrl(s.url);
   return `<li><a ${web ? `href="${esc(s.url)}" target="_blank" rel="noopener"` : ''} title="${esc(s.url || s.title)}"><span class="av" style="background:hsl(${hue(h)} 65% 55%)">${esc((h || '?')[0].toUpperCase())}</span><span class="tx"><b>${esc(s.title || h)}</b><small>${s.i || i + 1} · ${esc(h)}${s.trust && s.trust !== 'other' ? ` · <em class="tr ${esc(s.trust)}">${esc(s.trust)}</em>` : ''}</small></span></a></li>`; };
@@ -1276,7 +1280,10 @@ async function ask(q, opt){
   }
   const el = turnEl(q, files), box = el.querySelector('.steps'), live = el.querySelector('.live'), steps = [], traces = [];
   request.el = el;                             // kept: coming back to this chat puts this very block back, steps and all
-  const addTrace = t => { traces.push(t); const open = Array.from(live.querySelectorAll('details')).map(d=>d.open); live.innerHTML = timeline(traces, true); live.querySelectorAll('details').forEach((d, i)=>{ if(open[i]) d.open = true; }); };
+  // the timeline redrawn once a frame at most (a coding loop sends dozens of traces a second, each redrawing it all: it flickered)
+  let traceRaf = 0;
+  const drawTraces = () => { traceRaf = 0; const open = Array.from(live.querySelectorAll('details')).map(d=>d.open); live.innerHTML = timeline(traces, true); live.querySelectorAll('details').forEach((d, i)=>{ if(open[i]) d.open = true; }); };
+  const addTrace = t => { traces.push(t); if(!traceRaf) traceRaf = requestAnimationFrame(drawTraces); };
   el.scrollIntoView({behavior: 'smooth', block: 'start'});
   const step = t => {
     const s = {t: tidyStep(t), k: kindOf(t)};
@@ -1553,7 +1560,7 @@ let mermaidReady = null;
 async function drawDiagrams(root){
   const boxes = [...(root || document).querySelectorAll('.diagram:not([data-drawn])')]; if(!boxes.length) return;
   try{
-    if(!mermaidReady) mermaidReady = loadScript('https://cdnjs.cloudflare.com/ajax/libs/mermaid/11.15.0/mermaid.min.js').then(()=>{ const dark = matchMedia('(prefers-color-scheme: dark)').matches && document.documentElement.dataset.theme !== 'light' || document.documentElement.dataset.theme === 'dark'; window.mermaid.initialize({startOnLoad: false, securityLevel: 'strict', suppressErrorRendering: true, theme: dark ? 'dark' : 'default'}); });
+    if(!mermaidReady) mermaidReady = loadScript('https://cdnjs.cloudflare.com/ajax/libs/mermaid/11.17.2/mermaid.min.js').then(()=>{ const dark = matchMedia('(prefers-color-scheme: dark)').matches && document.documentElement.dataset.theme !== 'light' || document.documentElement.dataset.theme === 'dark'; window.mermaid.initialize({startOnLoad: false, securityLevel: 'strict', suppressErrorRendering: true, theme: dark ? 'dark' : 'default'}); });
     await mermaidReady;
     for(const b of boxes){ b.dataset.drawn = '1'; const src = b.querySelector('code').textContent;
       // a label with ( ) < > : ; or quotes in it breaks mermaid ("A[Start (i = 0)]"): such labels are put in quotes and it is
@@ -1657,6 +1664,7 @@ const SKILLS = [
   {c: '/rea', i: '🔬', n: 'REA — look inside software', d: 'An app, a file or an https link: what it is, how it works, with evidence', words: 'An app, a file path or an https link…'},
   {c: '/blueprint', i: '🗺', n: 'Blueprint', d: 'Reverse-engineer a site or app into a plan to build your own', words: 'A site or app to reverse-engineer…'},
   {c: '/design', i: '🎨', n: 'Design', d: 'A design system, logo, banner, slides or brand for a product', words: 'The product (or: logo / banner / slides / brand …)'},
+  {c: '/stitch', i: '🧵', n: 'Stitch', d: 'Google Stitch designs a screen from your words (your Stitch keys, in turn)', words: 'The screen, e.g. a login page for a budgeting app, mobile'},
   {c: '/upskill generate', i: '🎓', n: 'Upskill', d: 'A strong model writes a new skill for a task and tests it', words: 'The task the new skill is for…'},
   {c: '/review', i: '🔍', n: 'Review my changes', d: 'The selected project\'s uncommitted changes checked for bugs', now: true},
   {c: '/verify', i: '✅', n: 'Verify the project', d: 'Its tests run, its app started and looked at — PASS / FAIL', now: true},
@@ -2022,6 +2030,7 @@ const COMMANDS = [
   {c: '/tune', a: 'run · off n · remove n', d: 'Self-tune: the rules it learned from answers that went wrong'},
   {c: '/config', a: 'name value', d: 'Settings and limits (also in Skills → Limits)'},
   {c: '/design', a: 'a product — or logo | banner | slides | brand <brief>', d: 'A design system for a product (ui-ux-pro-max, no AI); or make a logo (SVG + PNG), a banner at the platform\'s size (PNG), an HTML slide deck, brand guidelines with design tokens'},
+  {c: '/stitch', a: 'a screen in words', d: 'Google Stitch designs it - your Stitch keys taken in turn (Your keys → Google Stitch)'},
   {c: '/rea', a: 'an app, a web page (https://…), a .har or a database', d: 'rea looks inside it with evidence — an app\'s screens, IPC and network calls; a page\'s requests, APIs, scripts and structure in Chrome; "<program> explain <function>" decompiles one function (Ghidra); "<https URL> watch 60" records where you go'},
   {c: '/upskill', a: 'generate <task> · eval <skill> · list', d: 'A strong model writes a skill; measured with and without it on the models on your Mac'},
   {c: '/upstream', a: 'run · apply n · drop n', d: 'What changed in the repos our skills came from — suggestions to apply (SoGPT, with tests)'},
@@ -2143,6 +2152,7 @@ async function runCommand(line){
   }
   else if(c === '/context') showContext();
   else if(c === '/design'){ if(!arg) return toast('/design expense tracker, mobile web · /design logo for "Ledgerly" fintech · /design banner twitter header … · /design slides seed pitch deck … · /design brand …'); ask('/design ' + arg); }
+  else if(c === '/stitch'){ if(!arg) return toast('/stitch a login page for a budgeting app, mobile · /stitch a dashboard for my expenses, dark'); ask('/stitch ' + arg); }
   else if(c === '/rea'){ if(!arg) return toast('/rea /Applications/Slack.app · /rea https://zerodha.com · /rea ~/bin/tool explain main — or a .har or .sqlite file'); ask('/rea ' + arg); }
   else if(c === '/upstream') ask('/upstream' + (arg ? ' ' + arg : ''));
   else if(c === '/upskill') ask('/upskill' + (arg ? ' ' + arg : ''));
@@ -2504,8 +2514,8 @@ const LIGHT = {green: '🟢', yellow: '🟡', red: '🔴'};
    one's light (green working, amber resting at a limit, red refused, grey no key). Drag (or ‹ ›) to reorder, × to take off,
    + to add; saved at once. The same as /sequence in the terminal. */
 const SEQ_GROUPS = [['everyday', 'Everyday', ['chat', 'extras', 'checks']], ['think', 'Thinking & Deep', ['think-write', 'think-merge', 'deep-write', 'deep-merge']],
-  ['code', 'Coding', ['code']], ['agents', 'Agents', ['agents']], ['ats', 'ATS', ['ats-market', 'ats-batch']], ['apps', 'Your apps', ['apps']], ['media', 'Pictures & videos', ['pictures', 'videos']], ['private', 'Private', ['private']]];
-const SEQ_ICON = {chat: '💬', extras: '🏷', checks: '✅', 'think-write': '💭', 'think-merge': '🧩', 'deep-write': '🧠', 'deep-merge': '🔗', code: '</>', agents: '🤖', 'ats-market': '📈', 'ats-batch': '🗂', private: '🔒'};
+  ['code', 'Coding', ['code', 'code-review', 'code-judge']], ['agents', 'Agents', ['agents']], ['ats', 'ATS', ['ats-market', 'ats-batch']], ['apps', 'Your apps', ['apps']], ['media', 'Pictures & videos', ['pictures', 'videos']], ['private', 'Private', ['private']]];
+const SEQ_ICON = {chat: '💬', extras: '🏷', checks: '✅', 'think-write': '💭', 'think-merge': '🧩', 'deep-write': '🧠', 'deep-merge': '🔗', code: '</>', 'code-review': '🔍', 'code-judge': '⚖️', agents: '🤖', 'ats-market': '📈', 'ats-batch': '🗂', private: '🔒'};
 let seqData = null, seqSaved = {}, seqLights = {}, seqTab = (()=>{ try{ return store.get('ai.seqTab', 'everyday'); }catch(e){ return 'everyday'; } })();
 async function loadSequences(){
   const lanes = $('#seqLanes');
@@ -2586,6 +2596,15 @@ async function loadKeys(){
     + (x.kind === 'cloud' ? `<div class="kedit"><input type="password" autocomplete="off" spellcheck="false" placeholder="${x.hasKey ? 'Add another account\'s key' : 'Paste your key (' + esc(x.hint || '') + ')'}"><button class="ghost" data-act="save" type="button">${x.hasKey ? 'Add' : 'Save'}</button>${x.hasKey ? '<button class="ghost" data-act="test" type="button">Test</button>' + '' : ''}</div><small><a href="${esc(x.signup)}" target="_blank" rel="noopener">Get a ${x.hasKey ? 'key from another account' : 'key'}</a></small>` : '') + '</div>';
   const group = (title, kind) => { const L = st.services.filter(x=>x.kind === kind); return L.length ? `<div class="kgroup">${title}</div>` + L.map(row).join('') : ''; };
   box.innerHTML = group('Through your Mac (no key needed)', 'apple') + group('Cloud keys', 'cloud') + group('Models on this Mac', 'mac');
+  // the models each key uses now, and the ones retired or gone (the daily refresh; Cloudflare's own dates for the pictures)
+  fetch(HELPER + '/models/live').then(r=>r.json()).then(m=>{ if(!m || !m.models) return;
+    const day = t => new Date(t).toISOString().slice(0, 10), NM = {groq: 'Groq', gemini: 'Gemini', nvidia: 'NVIDIA', cohere: 'Cohere', openrouter: 'OpenRouter', bolt: 'NVIDIA Bolt'};
+    const rows = Object.entries(m.models).map(([id, l])=>{ const h = (m.history || {})[id] || {};
+      return `<tr><td><b>${esc(NM[id] || id)}</b></td><td><b>${esc((l || [])[0] || '—')}</b>${(l || []).length > 1 ? '<br><small>then ' + (l || []).slice(1).map(esc).join(', ') + '</small>' : ''}${(h.came || []).length ? '<br><small>new: ' + h.came.map(g=>esc(g.model) + ' (' + day(g.at) + ')').join(', ') + '</small>' : ''}</td><td>${(h.gone || []).map(g=>'<small>' + esc(g.model) + ' · ' + day(g.at) + '</small>').join('<br>') || '<small>—</small>'}</td></tr>`; }).join('');
+    const cf = (m.cloudflare || []).map(g=>`<tr><td><b>Cloudflare</b></td><td><small>${esc(g.key)}</small></td><td><small>${esc(g.id)} · ${g.past ? 'retired' : 'retires'} ${day(g.date)}</small></td></tr>`).join('');
+    const d = document.createElement('details'); d.className = 'kmodels';
+    d.innerHTML = `<summary>Models — in use and retired <small>(checked ${m.at ? day(m.at) : 'not yet'})</small></summary><div class="scroll"><table class="ktab"><tr><th>Key</th><th>In use (best first)</th><th>Retired / gone</th></tr>${rows}${cf}</table></div>`;
+    box.appendChild(d); }).catch(()=>{});
   box.querySelectorAll('.krow [data-act]').forEach(b=>b.onclick = async () => {
     const r = b.closest('.krow'), id = r.dataset.k, act = b.dataset.act, inp = r.querySelector('input');
     b.disabled = true; b.textContent = act === 'test' ? 'Testing…' : act === 'save' ? 'Saving…' : 'Removing…';
