@@ -364,14 +364,14 @@ const Photos = (function(){
     if(c && Date.now() - c.at < 30 * 864e5) return Promise.resolve(c.files);
     if(pending[k]) return pending[k];
     return pending[k] = (async ()=>{
-      const files = [];
+      const files = []; let answered = false;
       const add = f => { f = decodeURIComponent(String(f || '')).replace(/^File:/, ''); if(/\.jpe?g$/i.test(f) && !SKIP.test(f) && files.indexOf(f) < 0) files.push(f); };
-      try{ const r = await fetch('https://en.wikipedia.org/api/rest_v1/page/summary/' + encodeURIComponent(city)); const j = r.ok ? await r.json() : {};
+      try{ const r = await fetch('https://en.wikipedia.org/api/rest_v1/page/summary/' + encodeURIComponent(city)); if(r.ok || r.status === 404) answered = true; const j = r.ok ? await r.json() : {};
         if(j.originalimage) add(j.originalimage.source.split('/').filter(x=>/\.jpe?g$/i.test(x))[0]); }catch(e){}
-      try{ const r = await fetch('https://en.wikipedia.org/api/rest_v1/page/media-list/' + encodeURIComponent(city)); const j = r.ok ? await r.json() : {};
+      try{ const r = await fetch('https://en.wikipedia.org/api/rest_v1/page/media-list/' + encodeURIComponent(city)); if(r.ok || r.status === 404) answered = true; const j = r.ok ? await r.json() : {};
         (j.items || []).forEach(i=>{ if(i.type === 'image' && files.length < 7) add(i.title); }); }catch(e){}
-      cache[k] = {at: Date.now(), files};
-      try{ localStorage.setItem(KEY, JSON.stringify(cache)); }catch(e){}
+      // kept for 30 days only when Wikipedia answered: offline or a 429 / 5xx is tried again next time
+      if(answered){ cache[k] = {at: Date.now(), files}; try{ localStorage.setItem(KEY, JSON.stringify(cache)); }catch(e){} }
       delete pending[k];
       return files;
     })();
@@ -411,13 +411,13 @@ function keyTestText(keys){
 /* ---------------------------------------------------------------- shell */
 const TABS = [
   {id: 'trips', label: 'Trips', icon: 'home'},
-  {id: 'docs', label: 'Documents', icon: 'doc'},
-  {id: 'check', label: 'Checklist', icon: 'check'},
-  {id: 'plan', label: 'Itinerary', icon: 'map'},
+  {id: 'docs', label: 'Documents', short: 'Docs', icon: 'doc'},
+  {id: 'check', label: 'Checklist', short: 'Checks', icon: 'check'},
+  {id: 'plan', label: 'Itinerary', short: 'Plan', icon: 'map'},
   {id: 'news', label: 'News', icon: 'news'},
   {id: 'flights', label: 'Flights', icon: 'plane'},
-  {id: 'shop', label: 'Shopping', icon: 'bag'},
-  {id: 'food', label: 'Food to try', icon: 'food'},
+  {id: 'shop', label: 'Shopping', short: 'Shop', icon: 'bag'},
+  {id: 'food', label: 'Food to try', short: 'Food', icon: 'food'},
   {id: 'memories', label: 'Memories', icon: 'photo'},
 ];
 const VIEWS = {};
@@ -565,12 +565,16 @@ function render(){
   $('trip-pick').innerHTML = (trips.length ? '' : '<option value="">No trips yet</option>') +
     trips.map(t=>`<option value="${esc(t.id)}"${cur && cur.id === t.id ? ' selected' : ''}>${esc(t.name)}${t.start ? ' · ' + esc(fmtRange(t.start, t.end)) : ''}</option>`).join('') + (cur ? '<option value="__edit">✎ Rename / edit this trip…</option>' : '') + '<option value="__new">+ New trip…</option>';
   const nav = TABS.map(t=>`<a role="tab" href="#${t.id}" class="${t.id === tab ? 'on' : ''}" aria-selected="${t.id === tab}">${icon(t.icon)}<span>${t.label}</span></a>`).join('');
-  $('tabs').innerHTML = nav; $('bottom-nav').innerHTML = nav;
+  // the phone's bottom bar has nine slots of ~40px: below 480px it shows the short names (style.css)
+  const bnav = TABS.map(t=>`<a role="tab" href="#${t.id}" class="${t.id === tab ? 'on' : ''}" aria-selected="${t.id === tab}" aria-label="${esc(t.label)}">${icon(t.icon)}<span class="lbl">${t.label}</span><span class="lbl-s" aria-hidden="true">${t.short || t.label}</span></a>`).join('');
+  $('tabs').innerHTML = nav; $('bottom-nav').innerHTML = bnav;
   const isNew = tvLook() === 'new';
   $('look-btn').innerHTML = isNew ? '<span aria-hidden="true">◐</span><span>Classic view</span>' : '<span aria-hidden="true">✦</span><span>New design</span>';
   $('look-btn').title = isNew ? 'Switch to the classic design' : 'Switch to the new design';
   // the city's photos are the backdrop of the Trips tab only
-  document.body.classList.toggle('hz-on', isNew && tab === 'trips' && !!cur && !betweenTrips(cur));
+  const hzOn = isNew && tab === 'trips' && !!cur && !betweenTrips(cur);
+  document.body.classList.toggle('hz-on', hzOn);
+  if(!hzOn && typeof hzStop === 'function') hzStop();     // hidden backdrop: no timer, no more photo downloads
   const main = $('main');
   try{ VIEWS[tab](main, cur); }
   catch(e){ console.error(e); main.innerHTML = `<div class="card error">Something went wrong drawing this tab: ${esc(e.message)}</div>`; }

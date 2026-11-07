@@ -713,28 +713,37 @@ function placesHTML(){
     <div class="trip-grid">${list.map(v=>`<article class="hz-place" data-city="${esc(v.city)}"><button class="hz-x" data-del-place="${esc(v.id)}" aria-label="Remove ${esc(v.city)}">×</button>
       <div class="tx"><b>${esc(v.city)}</b><small>${esc([v.country, v.year].filter(Boolean).join(' · '))}</small></div></article>`).join('')}</div></section>`;
 }
-let hzTimer = 0, hzSlides = 0, hzCity = '';
+let hzTimer = 0, hzSlides = 0, hzCity = '', hzGen = 0;
+/* stop the slideshow and clear the backdrop: off the Trips tab, on Classic, between trips, City photos off.
+   hzGen tells a slideshow still loading that it has been replaced or stopped */
+function hzStop(){
+  hzGen++; clearInterval(hzTimer); hzTimer = 0; hzCity = '';
+  const bg = $('hz-bg'); if(bg) [...bg.children].forEach(o=>o.remove());
+  const cr = $('hz-credit'); if(cr) cr.textContent = '';
+}
 /* the backdrop: the city's photos, one after another, each drifting slowly */
 async function hzBackdrop(city){
+  if(!Photos.on()){ hzStop(); return; }
   let bg = $('hz-bg');
   if(!bg){ bg = document.createElement('div'); bg.id = 'hz-bg'; bg.setAttribute('aria-hidden', 'true'); document.body.prepend(bg);
     const cr = document.createElement('div'); cr.id = 'hz-credit'; document.body.appendChild(cr); }
-  if(city === hzCity && bg.children.length) return;
-  hzCity = city; clearInterval(hzTimer);
+  if(city === hzCity) return;                  // this city's slideshow is already showing or still loading
+  hzStop(); hzCity = city;
+  const gen = hzGen;
   const files = await Photos.of(city);
-  if(city !== hzCity) return;
+  if(gen !== hzGen) return;
   if(!files.length){ [...bg.children].forEach(o=>o.remove()); $('hz-credit').textContent = ''; return; }
   const show = i => {
     const f = files[i % files.length], img = new Image();
     img.onload = () => {
-      if(city !== hzCity) return;
+      if(gen !== hzGen) return;
       const el = document.createElement('div');
       el.className = 'hz-ph kb' + (1 + (hzSlides++ % 3)); el.style.backgroundImage = `url("${Photos.url(f)}")`;
       bg.appendChild(el); requestAnimationFrame(()=>requestAnimationFrame(()=>el.classList.add('on')));
       [...bg.children].slice(0, -1).forEach(o=>{ o.classList.remove('on'); setTimeout(()=>o.remove(), 1800); });
       $('hz-credit').innerHTML = `${esc(f.replace(/\.jpe?g$/i, '').replace(/_/g, ' '))} · <a href="https://commons.wikimedia.org/wiki/File:${encodeURIComponent(f)}" target="_blank" rel="noopener">Wikimedia Commons</a>`;
     };
-    img.onerror = () => { if(files.length > 1 && i < files.length * 2) show(i + 1); };
+    img.onerror = () => { if(gen === hzGen && files.length > 1 && i < files.length * 2) show(i + 1); };
     img.src = Photos.url(f);
   };
   let i = 0; show(i);

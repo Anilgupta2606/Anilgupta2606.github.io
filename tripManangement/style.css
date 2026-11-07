@@ -139,6 +139,8 @@ label.check input{ width: 18px; height: 18px; min-height: 0; }
 .tabs a.on{ color: var(--accent); background: var(--accent-soft); }
 .tabs a:hover{ color: var(--ink); background: var(--surface-2); }
 .bottom-nav{ display: none; }
+.bottom-nav .lbl-s{ display: none; }
+@media (max-width: 480px){ .bottom-nav .lbl{ display: none; } .bottom-nav .lbl-s{ display: inline; } .bottom-nav a{ min-width: 0; white-space: nowrap; } }
 main{ padding-top: 22px; display: flex; flex-direction: column; gap: 16px; }
 main:focus{ outline: none; }
 .card{ background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); padding: 16px; box-shadow: var(--shadow); }
@@ -605,7 +607,13 @@ body.pin-locked .doc-thumb{ overflow: hidden; }
    Applies only with data-look="new" on <html> (the default; Classic is everything above, unchanged).
    Sea mist and teal with sand on every tab; on the Trips tab the trip's city is the backdrop and the page is glass. */
 .look-link{ cursor: pointer; }
-@media (max-width: 720px){ .look-link span:last-child{ display: none; } }
+@media (max-width: 720px){ .look-link span:last-child{ display: none; } .look-link span:first-child{ display: inline; } }   /* keep the ◐ / ✦ (the round-button rule above hides every span) */
+/* a phone: the trip picker gets its own full-width row under the icons instead of a 40px sliver beside them */
+@media (max-width: 520px){
+  .top-in{ flex-wrap: wrap; row-gap: 8px; }
+  .top-actions{ margin-left: auto; }
+  .trip-pick{ order: 9; flex: 1 1 100%; max-width: none; margin-left: 0; }
+}
 #hz-bg, #hz-credit{ display: none; }
 :root[data-look="new"]{
   --bg:#EEF6F5; --surface:#FFFFFF; --surface-2:#E6F2F1; --surface-3:#D8EBE9;

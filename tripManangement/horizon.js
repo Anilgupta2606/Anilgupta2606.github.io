@@ -49,7 +49,11 @@ function create(canvas){
       }
     }
     // face the middle of the route (or the place, or home)
-    const f = dest && home ? {lat: (home.lat + dest.lat) / 2, lng: (home.lng + dest.lng) / 2} : dest || home || {lat: 20, lng: 60};
+    // the middle along the shortest path, as the arc is drawn: Delhi -> Los Angeles faces the Pacific, not the Atlantic
+    const gcMid = (p, q) => { const v = o => { const la = o.lat * Math.PI / 180, lo = o.lng * Math.PI / 180; return [Math.cos(la) * Math.cos(lo), Math.cos(la) * Math.sin(lo), Math.sin(la)]; };
+      const a = v(p), b = v(q), m = a.map((x, i) => x + b[i]), n = Math.hypot(m[0], m[1], m[2]);
+      return n < 1e-6 ? q : {lat: Math.asin(m[2] / n) * 180 / Math.PI, lng: Math.atan2(m[1], m[0]) * 180 / Math.PI}; };
+    const f = dest && home ? gcMid(home, dest) : dest || home || {lat: 20, lng: 60};
     tgt = {x: f.lat * Math.PI / 180 * .9, y: -(f.lng + 90) * Math.PI / 180};
     while(tgt.y - cr.y > Math.PI) tgt.y -= 2 * Math.PI;
     while(cr.y - tgt.y > Math.PI) tgt.y += 2 * Math.PI;
