@@ -1748,11 +1748,14 @@ const send = v => {
 $('#q').addEventListener('keydown', e=>{ if(e.key === 'Enter' && !e.shiftKey && !e.isComposing){ e.preventDefault(); send($('#q').value); } });
 $('#form').onsubmit = e => { e.preventDefault(); send($('#q').value); };
 document.querySelectorAll('.tries button').forEach(b=>b.onclick = () => ask(b.dataset.q));
-const openPanel = on => { $('#panel').classList.toggle('open', on); $('#scrim').classList.toggle('open', on); if(on) loadLearned(); };
+// ONE SIDE PANEL AT A TIME: opening Skills, Models, Who answers… over another left the old one open under it (7 Nov) - opening one closes the others
+const PANELS = ['#panel', '#usagePanel', '#pwPanel', '#taskPanel', '#seqPanel', '#keysPanel', '#projectPanel', '#skillsPanel', '#connPanel'];
+const closeOthers = keep => PANELS.forEach(sel=>{ const p = $(sel); if(sel !== keep && p && p.classList.contains('open')){ if(sel === '#seqPanel') openSeq(false); else p.classList.remove('open'); } });
+const openPanel = on => { if(on) closeOthers('#panel'); $('#panel').classList.toggle('open', on); $('#scrim').classList.toggle('open', on); if(on) loadLearned(); };
 $('#openLearned').onclick = () => openPanel(true);
 $('#closeLearned').onclick = () => openPanel(false);
-$('#scrim').onclick = () => { openSkills(false); openKeys(false); openPw(false); openUsage(false); openPanel(false); openConn(false); openChats(false); openTasks(false); openProjects(false); };
-document.addEventListener('keydown', e=>{ if(e.key === 'Escape'){ openSkills(false); openKeys(false); openPw(false); openUsage(false); openPanel(false); openConn(false); openChats(false); openTasks(false); openProjects(false); } });
+$('#scrim').onclick = () => { openSeq(false); openSkills(false); openKeys(false); openPw(false); openUsage(false); openPanel(false); openConn(false); openChats(false); openTasks(false); openProjects(false); };
+document.addEventListener('keydown', e=>{ if(e.key === 'Escape'){ openSeq(false); openSkills(false); openKeys(false); openPw(false); openUsage(false); openPanel(false); openConn(false); openChats(false); openTasks(false); openProjects(false); } });
 $('#clear').onclick = () => newChat();
 /* ---------------------------------------------------------------- files you attach: read here, in this browser
    (text as it is; a PDF's text with Mozilla's pdf.js), then sent with the question as numbered sources */
@@ -2441,12 +2444,12 @@ async function loadUsage(){
   box.innerHTML = health + '<h3>Models</h3><p class="sub">Bars: each model\'s share of the ' + total + ' calls in this period — not a limit.</p>' + u.models.map(m=>`<div class="urow"><div class="uhead"><b>${esc(m.model)}</b><small>${esc(m.by)}</small></div><div class="ubar"><i style="width:${Math.max(2, pct(m))}%"></i></div><small>${m.calls} call${m.calls === 1 ? '' : 's'} (${pct(m)}%) · ${m.today} today · ${m.images ? m.images + ' picture' + (m.images === 1 ? '' : 's') : n(m.in) + ' in / ' + n(m.out) + ' out tokens'}${m.ms ? ' · ' + (m.ms / m.calls / 1000).toFixed(1) + 's a call' : ''}<br>${esc(Object.entries(m.roles).map(([r, c])=>r + ' ' + c).join(' · '))}</small></div>`).join('')
     + '<h3>Who wrote the answers</h3>' + u.writers.map(w=>`<div class="urow"><div class="uhead"><b>${esc(w.writer)}</b><small>${w.answers} answer${w.answers === 1 ? '' : 's'} · ${Math.round(w.secs / w.answers)}s on average</small></div><small>${esc(Object.entries(w.kinds).map(([k, c])=>k + ' ' + c).join(' · '))}</small></div>`).join('');
 }
-const openUsage = on => { $('#usagePanel').classList.toggle('open', on); $('#scrim').classList.toggle('open', on); if(on){ openChats(false); loadUsage(); } };
+const openUsage = on => { if(on) closeOthers('#usagePanel'); $('#usagePanel').classList.toggle('open', on); $('#scrim').classList.toggle('open', on); if(on){ openChats(false); loadUsage(); } };
 $('#openUsage').onclick = () => openUsage(true);
 $('#closeUsage').onclick = () => openUsage(false);
 $('#usageDays').onchange = loadUsage;
 // change password (the helper's sign-in; the published page signs in with Money Home's)
-const openPw = on => { $('#pwPanel').classList.toggle('open', on); $('#scrim').classList.toggle('open', on); if(on){ menuOpen(false); $('#pwForm').reset(); $('#pwErr').hidden = true; setTimeout(()=>$('#pwCur').focus(), 50); } };
+const openPw = on => { if(on) closeOthers('#pwPanel'); $('#pwPanel').classList.toggle('open', on); $('#scrim').classList.toggle('open', on); if(on){ menuOpen(false); $('#pwForm').reset(); $('#pwErr').hidden = true; setTimeout(()=>$('#pwCur').focus(), 50); } };
 if(LOCAL_PAGE) $('#openPw').hidden = false;
 $('#openPw').onclick = () => openPw(true);
 $('#closePw').onclick = () => openPw(false);
@@ -2458,7 +2461,7 @@ $('#pwForm').onsubmit = async e => {
   if(!r || !r.ok) return err((r && r.error) || 'Not changed.');
   $('#pwForm').reset(); openPw(false); toast('Password changed' + (r.user ? ' — username: ' + r.user : '') + '. Other devices are signed out.');
 };
-const openTasks = on => { $('#taskPanel').classList.toggle('open', on); $('#scrim').classList.toggle('open', on); if(on){ openChats(false); loadTasks(); } };
+const openTasks = on => { if(on) closeOthers('#taskPanel'); $('#taskPanel').classList.toggle('open', on); $('#scrim').classList.toggle('open', on); if(on){ openChats(false); loadTasks(); } };
 $('#openTasks').onclick = () => openTasks(true);
 $('#closeTasks').onclick = () => openTasks(false);
 
@@ -2583,7 +2586,7 @@ function drawSeqLanes(){
     });
   });
 }
-const openSeq = on => { if(!on && seqChanged().length) toast('Not saved yet: ' + seqChanged().length + ' change' + (seqChanged().length === 1 ? '' : 's') + ' — Save keeps them'); $('#seqPanel').classList.toggle('open', on); $('#scrim').classList.toggle('open', on); if(on){ openChats(false); menuOpen(false); loadSequences(); } };
+const openSeq = on => { if(on) closeOthers('#seqPanel'); if(!on && $('#seqPanel').classList.contains('open') && seqChanged().length) toast('Not saved yet: ' + seqChanged().length + ' change' + (seqChanged().length === 1 ? '' : 's') + ' — Save keeps them'); $('#seqPanel').classList.toggle('open', on); $('#scrim').classList.toggle('open', on); if(on){ openChats(false); menuOpen(false); loadSequences(); } };
 $('#openSeq').onclick = () => openSeq(true);
 $('#closeSeq').onclick = () => openSeq(false);
 async function loadKeys(){
@@ -2633,10 +2636,10 @@ $('#refreshAllKeys').onclick = async () => {
     loadKeys();
   }
 };
-const openKeys = on => { $('#keysPanel').classList.toggle('open', on); $('#scrim').classList.toggle('open', on); if(on){ menuOpen(false); loadKeys(); } };
+const openKeys = on => { if(on) closeOthers('#keysPanel'); $('#keysPanel').classList.toggle('open', on); $('#scrim').classList.toggle('open', on); if(on){ menuOpen(false); loadKeys(); } };
 $('#openKeys').onclick = () => openKeys(true);
 $('#closeKeys').onclick = () => openKeys(false);
-const openProjects = on => { $('#projectPanel').classList.toggle('open', on); $('#scrim').classList.toggle('open', on); if(on){ openChats(false); loadProjects(); } };
+const openProjects = on => { if(on) closeOthers('#projectPanel'); $('#projectPanel').classList.toggle('open', on); $('#scrim').classList.toggle('open', on); if(on){ openChats(false); loadProjects(); } };
 $('#openProjects').onclick = () => openProjects(true);
 $('#closeProjects').onclick = () => openProjects(false);
 
@@ -2757,10 +2760,10 @@ async function loadSkills(){
       try{ const j = await post('/skills', btn.dataset.act === 'test' ? {slug: k, test: true, builtin} : {slug: k, remove: true}); toast(btn.dataset.act === 'test' ? (j.ok ? 'It works ✓' : 'Not working: ' + String(j.why || '').slice(0, 90)) : 'Removed'); }catch(e){ toast('That did not work: ' + e.message); }
       loadSkills(); }; });
 }
-const openSkills = on => { $('#skillsPanel').classList.toggle('open', on); $('#scrim').classList.toggle('open', on); if(on) loadSkills(); };
+const openSkills = on => { if(on) closeOthers('#skillsPanel'); $('#skillsPanel').classList.toggle('open', on); $('#scrim').classList.toggle('open', on); if(on) loadSkills(); };
 $('#openSkills').onclick = () => openSkills(true);
 $('#closeSkills').onclick = () => openSkills(false);
-const openConn = on => { $('#connPanel').classList.toggle('open', on); $('#scrim').classList.toggle('open', on); if(on) loadConn(); };
+const openConn = on => { if(on) closeOthers('#connPanel'); $('#connPanel').classList.toggle('open', on); $('#scrim').classList.toggle('open', on); if(on) loadConn(); };
 $('#openConn').onclick = () => openConn(true);
 $('#closeConn').onclick = () => openConn(false);
 
