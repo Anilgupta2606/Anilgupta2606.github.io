@@ -893,7 +893,29 @@ const MoneyAI = (function(){
   }
   const setModel = (id, m) => { const h = aiLocal(); h.model = Object.assign({}, h.model, {[id]: m}); saveAiLocal(h); };
 
-  return {keysToMac, macLights, macManaged, macMaybe, BACKUP_KEY, LIGHTS_KEY, macModels, macModelLabel, macRequest, MAC_URL, macUp, macFetch, macRemote, setMacRemote, macSignIn, macBase, PRIVATE_MODELS, trialPrivate, removePrivate, privateCached, PROVIDERS, loadAi, aiSettings, aiLocal, saveAiLocal, adoptAppKeys, aiStatus, rankModels, shareableAi, takeSyncedAi,
+  /* YOUR APPS' DATABASE ON THE MAC (cli/appdb.mjs, 7 Nov): JSON documents in collections, per app, kept in SQLite on the
+     Mac - nothing leaves it. Reached like the AI (127.0.0.1, or the Mac's Tailscale address signed in); the Mac must be on.
+       const db = MoneyAI.db('expenses');
+       await db.put('items', {what: 'tea', amount: 20})          -> {id, updated}   (put('items', doc, id) keeps that id)
+       await db.get('items', id)                                  -> the doc, or null
+       await db.list('items', {where: {month: '2026-11'}, order: 'amount', limit: 50})  -> {docs: [{id, doc, updated}], total}
+       await db.remove('items', id) · await db.count('items', {where}) · await MoneyAI.dbApps() */
+  async function dbCall(q){
+    if(!(await macUp(MAC_URL))) throw new Error('Your Mac is not reachable - its database needs it on (here, or over Tailscale signed in).');
+    const r = await macFetch('/db', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(q)});
+    const d = await r.json().catch(()=>({error: 'The Mac answered ' + r.status}));
+    if(!r.ok || d.error) throw new Error(d.error || 'The Mac answered ' + r.status);
+    return d;
+  }
+  const db = app => ({
+    put: (coll, doc, id) => dbCall({app, coll, op: 'put', doc, id}),
+    get: (coll, id) => dbCall({app, coll, op: 'get', id}).then(d=>d.doc),
+    list: (coll, o) => dbCall(Object.assign({}, o || {}, {app, coll, op: 'list'})),
+    remove: (coll, id) => dbCall({app, coll, op: 'delete', id}).then(d=>d.deleted),
+    count: (coll, o) => dbCall({app, coll, op: 'count', where: (o || {}).where}).then(d=>d.count)
+  });
+  const dbApps = async () => { if(!(await macUp(MAC_URL))) throw new Error('Your Mac is not reachable.'); return (await (await macFetch('/db')).json()).apps || []; };
+  return {db, dbApps, keysToMac, macLights, macManaged, macMaybe, BACKUP_KEY, LIGHTS_KEY, macModels, macModelLabel, macRequest, MAC_URL, macUp, macFetch, macRemote, setMacRemote, macSignIn, macBase, PRIVATE_MODELS, trialPrivate, removePrivate, privateCached, PROVIDERS, loadAi, aiSettings, aiLocal, saveAiLocal, adoptAppKeys, aiStatus, rankModels, shareableAi, takeSyncedAi,
           aiAvailable, aiNames, canSee, canSearch, resting, wake, backAt, chat, generate, json, test, setModel, listModels, refreshModels, ranked, setAliasModel};
 })();
 
