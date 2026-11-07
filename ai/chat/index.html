@@ -1811,6 +1811,7 @@ const MODES = {image: '🎨 Create image', video: '🎞 Make a video', deep: '�
 const SKILLS = [
   {c: '/rea', i: '🔬', n: 'REA — look inside software', d: 'An app, a file or an https link: what it is, how it works, with evidence', words: 'An app, a file path or an https link…'},
   {c: '/blueprint', i: '🗺', n: 'Blueprint', d: 'Reverse-engineer a site or app into a plan to build your own', words: 'A site or app to reverse-engineer…'},
+  {c: '/researchApps', i: '🔬', n: 'Research an app', d: 'Blueprint + rea: how an app is built, a full-copy plan (feature parity) and the parts you can reuse, with evidence', words: 'An app or site, then focus: what you want from it…'},
   {c: '/design', i: '🎨', n: 'Design', d: 'A design system, logo, banner, slides or brand for a product', words: 'The product (or: logo / banner / slides / brand …)'},
   {c: '/stitch', i: '🧵', n: 'Stitch', d: 'Google Stitch designs a screen from your words (your Stitch keys, in turn)', words: 'The screen, e.g. a login page for a budgeting app, mobile'},
   {c: '/upskill generate', i: '🎓', n: 'Upskill', d: 'A strong model writes a new skill for a task and tests it', words: 'The task the new skill is for…'},
@@ -2188,6 +2189,7 @@ const COMMANDS = [
   {c: '/upskill', a: 'generate <task> · eval <skill> · list', d: 'A strong model writes a skill; measured with and without it on the models on your Mac'},
   {c: '/upstream', a: 'run · apply n · drop n', d: 'What changed in the repos our skills came from — suggestions to apply (SoGPT, with tests)'},
   {c: '/blueprint', a: 'a site or an app', d: 'Reverse-engineer it: how it is built and what it does, then a plan to build your own (say “build it” after)'},
+  {c: '/researchApps', a: 'a site or app [recording.har] [focus: …]', d: 'Deep research to build the same app or reuse parts: the blueprint plus rea\'s exact evidence, a full-copy (feature parity) plan, “Parts you can reuse”, and with a HAR an agent environment'},
   {c: '/review', a: '[security | performance | tests]', d: 'Review the coding project\'s uncommitted changes for bugs — or as a security, performance or test reviewer (nothing is changed)'},
   {c: '/init', a: '', d: 'Make the coding project\'s notes, so SoGPT knows it'},
   {c: '/model', a: '', d: 'Choose the model that answers (the ✦ menu)'},
@@ -2309,6 +2311,7 @@ async function runCommand(line){
   else if(c === '/rea'){ if(!arg) return toast('/rea /Applications/Slack.app · /rea https://zerodha.com · /rea ~/bin/tool explain main — or a .har or .sqlite file'); ask('/rea ' + arg); }
   else if(c === '/upstream') ask('/upstream' + (arg ? ' ' + arg : ''));
   else if(c === '/upskill') ask('/upskill' + (arg ? ' ' + arg : ''));
+  else if(/^\/researchapps$/i.test(c)){ if(!arg) return toast('/researchApps notion.so focus: the editor — or an app on your Mac, or add ~/Downloads/app.har'); ask('/researchApps ' + arg); }
   else if(c === '/blueprint'){ if(!arg) return toast('/blueprint notion.so — or an app on your Mac'); ask('/blueprint ' + arg); }
   else if(c === '/memory' || c === '/tune' || c === '/config'){ if(mode !== 'mac') return toast('That is kept on your Mac — open this page there (or over Tailscale)');
     const j = await post(c === '/memory' ? '/memory' : c === '/tune' ? '/tune' : '/settings', c === '/memory' ? {memory: arg} : {cmd: arg}).catch(e=>({text: 'Could not reach your Mac: ' + e.message}));
