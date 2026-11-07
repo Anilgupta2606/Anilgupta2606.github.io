@@ -1812,7 +1812,7 @@ const SKILLS = [
   {c: '/rea', i: '🔬', n: 'REA — look inside software', d: 'An app, a file or an https link: what it is, how it works, with evidence', words: 'An app, a file path or an https link…'},
   {c: '/blueprint', i: '🗺', n: 'Blueprint', d: 'Reverse-engineer a site or app into a plan to build your own', words: 'A site or app to reverse-engineer…'},
   {c: '/researchApps', i: '🔬', n: 'Research an app', d: 'Blueprint + rea: how an app is built, a full-copy plan (feature parity) and the parts you can reuse, with evidence', words: 'An app or site, then focus: what you want from it…'},
-  {c: '/design', i: '🎨', n: 'Design', d: 'A design system, logo, banner, slides or brand for a product', words: 'The product (or: logo / banner / slides / brand …)'},
+  {c: '/design', i: '🎨', n: 'Design', d: 'Screens for an app: design system, Hallmark direction, Stitch screens, a preview page — or a logo, banner, slides, brand', words: 'The app or screen (or: logo / banner / slides / brand …)'},
   {c: '/stitch', i: '🧵', n: 'Stitch', d: 'Google Stitch designs a screen from your words (your Stitch keys, in turn)', words: 'The screen, e.g. a login page for a budgeting app, mobile'},
   {c: '/upskill generate', i: '🎓', n: 'Upskill', d: 'A strong model writes a new skill for a task and tests it', words: 'The task the new skill is for…'},
   {c: '/review', i: '🔍', n: 'Review my changes', d: 'The selected project\'s uncommitted changes checked for bugs', now: true},
@@ -2183,7 +2183,7 @@ const COMMANDS = [
   {c: '/memory', a: 'forget n · clear · off · on · add …', d: 'What it remembers about you — kept automatically, no pinning needed'},
   {c: '/tune', a: 'run · off n · remove n', d: 'Self-tune: the rules it learned from answers that went wrong'},
   {c: '/config', a: 'name value', d: 'Settings and limits (also in Skills → Limits)'},
-  {c: '/design', a: 'a product — or logo | banner | slides | brand <brief>', d: 'A design system for a product (ui-ux-pro-max, no AI); or make a logo (SVG + PNG), a banner at the platform\'s size (PNG), an HTML slide deck, brand guidelines with design tokens'},
+  {c: '/design', a: 'an app or screen — or system | logo | banner | slides | brand <brief>', d: 'The design chain: UI UX Pro Max picks the system, Hallmark the direction, Google Stitch draws the screens, a preview page shows them (then “build it”); /design system <brief> for the system alone; or a logo, banner, HTML slide deck, brand guidelines'},
   {c: '/stitch', a: 'a screen in words', d: 'Google Stitch designs it - your Stitch keys taken in turn (Your keys → Google Stitch)'},
   {c: '/rea', a: 'an app, a web page (https://…), a .har or a database', d: 'rea looks inside it with evidence — an app\'s screens, IPC and network calls; a page\'s requests, APIs, scripts and structure in Chrome; "<program> explain <function>" decompiles one function (Ghidra); "<https URL> watch 60" records where you go'},
   {c: '/upskill', a: 'generate <task> · eval <skill> · list', d: 'A strong model writes a skill; measured with and without it on the models on your Mac'},
@@ -2306,7 +2306,7 @@ async function runCommand(line){
     toast('Rewound ' + gone + ' question' + (gone === 1 ? '' : 's'));
   }
   else if(c === '/context') showContext();
-  else if(c === '/design'){ if(!arg) return toast('/design expense tracker, mobile web · /design logo for "Ledgerly" fintech · /design banner twitter header … · /design slides seed pitch deck … · /design brand …'); ask('/design ' + arg); }
+  else if(c === '/design'){ if(!arg) return toast('/design an expense tracker for families, used on the phone · /design system expense tracker · /design logo for "Ledgerly" fintech · /design banner twitter header … · /design slides seed pitch deck … · /design brand …'); ask('/design ' + arg); }
   else if(c === '/stitch'){ if(!arg) return toast('/stitch a login page for a budgeting app, mobile · /stitch a dashboard for my expenses, dark'); ask('/stitch ' + arg); }
   else if(c === '/rea'){ if(!arg) return toast('/rea /Applications/Slack.app · /rea https://zerodha.com · /rea ~/bin/tool explain main — or a .har or .sqlite file'); ask('/rea ' + arg); }
   else if(c === '/upstream') ask('/upstream' + (arg ? ' ' + arg : ''));
