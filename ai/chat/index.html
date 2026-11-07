@@ -1191,10 +1191,14 @@ function mdSetup(){
 }
 // ⚠ and ✔ lines stand alone (a notice), outside code blocks
 const notices = t => String(t || '').split(/(```[\s\S]*?(?:```|$))/).map((p, i)=>i % 2 ? p : p.replace(/^([ \t]*[⚠✔].*)$/gm, '\n$1\n')).join('');
+// a link in an answer opens in a new tab: DOMPurify drops target="_blank", and a source clicked took the chat page away (8 Nov)
+let purifyHook = false;
 function richMd(text, urls){
   const m = mdSetup(); mdUrls = urls || {};
+  if(!purifyHook){ purifyHook = true; DOMPurify.addHook('afterSanitizeAttributes', n => { if(n.tagName === 'A' && n.getAttribute('href')){ n.setAttribute('target', '_blank'); n.setAttribute('rel', 'noopener'); } }); }
   const html = m.parse(notices(text));
-  return DOMPurify.sanitize(html, {ALLOWED_TAGS: MD_TAGS, ALLOWED_ATTR: ['href', 'target', 'rel', 'class', 'type', 'start'], ALLOWED_URI_REGEXP: /^(?:https?:|mailto:)/i, ALLOW_DATA_ATTR: false});
+  return DOMPurify.sanitize(html, {ALLOWED_TAGS: MD_TAGS, ALLOWED_ATTR: ['href', 'target', 'rel', 'class', 'type', 'start'], ALLOWED_URI_REGEXP: /^(?:https?:|mailto:|\/(?:reports|designs)\/[a-z0-9-]+\/)/i,     // (and a page Cygnus made - its relative link was stripped, 8 Nov)
+    ALLOW_DATA_ATTR: false});
 }
 // an answer's text as HTML: rich when the libraries are here, else the page's own renderer (kept to be redrawn rich when
 // they arrive late)
