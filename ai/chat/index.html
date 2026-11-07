@@ -2684,9 +2684,9 @@ const LIGHT = {green: '🟢', yellow: '🟡', red: '🔴'};
 /* 🧭 WHO ANSWERS (its own panel — it was squeezed under Your keys): each kind of work is a lane of models in order, with each
    one's light (green working, amber resting at a limit, red refused, grey no key). Drag (or ‹ ›) to reorder, × to take off,
    + to add; saved at once. The same as /sequence in the terminal. */
-const SEQ_GROUPS = [['everyday', 'Everyday', ['chat', 'extras', 'checks']], ['think', 'Thinking & Deep', ['think-write', 'think-merge', 'deep-write', 'deep-merge']],
+const SEQ_GROUPS = [['everyday', 'Everyday', ['chat', 'extras', 'checks']], ['think', 'Thinking & Deep', ['think-write', 'think-merge', 'deep-write', 'deep-merge', 'report-write']],
   ['code', 'Coding', ['code', 'code-review', 'code-judge', 'vision']], ['agents', 'Agents', ['agents']], ['ats', 'ATS', ['ats-market', 'ats-batch']], ['apps', 'Your apps', ['apps']], ['media', 'Pictures & videos', ['pictures', 'videos']], ['private', 'Private', ['private', 'vision-private']]];
-const SEQ_ICON = {chat: '💬', extras: '🏷', checks: '✅', 'think-write': '💭', 'think-merge': '🧩', 'deep-write': '🧠', 'deep-merge': '🔗', code: '</>', 'code-review': '🔍', 'code-judge': '⚖️', vision: '👁', 'vision-private': '🔐', agents: '🤖', 'ats-market': '📈', 'ats-batch': '🗂', private: '🔒'};
+const SEQ_ICON = {chat: '💬', extras: '🏷', checks: '✅', 'think-write': '💭', 'think-merge': '🧩', 'deep-write': '🧠', 'deep-merge': '🔗', 'report-write': '📊', code: '</>', 'code-review': '🔍', 'code-judge': '⚖️', vision: '👁', 'vision-private': '🔐', agents: '🤖', 'ats-market': '📈', 'ats-batch': '🗂', private: '🔒'};
 let seqData = null, seqSaved = {}, seqLights = {}, seqTab = (()=>{ try{ return store.get('ai.seqTab', 'everyday'); }catch(e){ return 'everyday'; } })();
 async function loadSequences(){
   const lanes = $('#seqLanes');
