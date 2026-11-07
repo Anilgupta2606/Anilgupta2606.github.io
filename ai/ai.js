@@ -57,9 +57,7 @@ const MoneyAI = (function(){
     {id:'mac', name:'Your own AI (on your Mac)', signupUrl:'https://anilgupta2606.github.io/ai/chat/', placeholder:'http://127.0.0.1:8899', models:['auto', 'chatgpt'], keyless:true},
     // NVIDIA's own API (build.nvidia.com): Nemotron straight from NVIDIA, with its own limits — not OpenRouter's shared 50 a day
     {id:'nvidia', name:'NVIDIA (Nemotron)', signupUrl:'https://build.nvidia.com', placeholder:'nvapi-…', models:['nvidia/nemotron-3-ultra-550b-a55b','nvidia/nemotron-3-super-120b-a12b','nvidia/nemotron-3.5-lightning-30b-a3b']},
-    // OLLAMA CLOUD through the Mac's own Ollama (signed in to ollama.com): Beam (Reflection, 501B MoE, 1M context, strong
-    // at coding and tools) — used on the Mac only; no key travels (Ollama holds the sign-in)
-    {id:'ollamacloud', name:'Ollama Cloud (Beam)', signupUrl:'https://ollama.com/library/beam', placeholder:'on', models:['beam:cloud']},
+    // (Ollama Cloud's Beam was here: paid from 9 Nov 2026 - no paid models - so no app can turn it on)
     {id:'gemini', name:'Google Gemini', signupUrl:'https://aistudio.google.com/apikey', placeholder:'AIza…', models:['gemini-flash-latest','gemini-flash-lite-latest'], vision:true, search:true},
     {id:'groq', name:'Groq', signupUrl:'https://console.groq.com/keys', placeholder:'gsk_…', models:['openai/gpt-oss-120b','qwen/qwen3.8-27b','openai/gpt-oss-20b']},
     // Z.ai (GLM's maker): GLM-4.7-Flash and GLM-4.5-Flash free, with no daily cap (their API speaks the OpenAI form)
