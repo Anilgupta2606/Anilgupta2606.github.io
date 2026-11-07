@@ -1044,6 +1044,7 @@ button, a, summary, label{touch-action:manipulation}
 // served by the helper: on this Mac, or from your other devices through Tailscale (https://<your Mac>.<tailnet>.ts.net:8443)
 const LOCAL_PAGE = /^(127\.0\.0\.1|localhost)$/.test(location.hostname) || /\.ts\.net$/.test(location.hostname);
 const HELPER = LOCAL_PAGE ? '' : 'http://127.0.0.1:8899';
+const MADE_PAGE = /^\/(reports|designs)\/[a-z0-9-]+\/[A-Za-z0-9._\/-]*$/;          // a page Cygnus made, served by the helper
 // signed out on the Mac (a new password signs out your other devices, or 30 days passed): the sign-in screen again,
 // instead of empty chats and usage
 if(LOCAL_PAGE){ const _fetch = window.fetch.bind(window); let out = false;
@@ -1096,7 +1097,7 @@ const hue = s => { let h = 0; for(const c of String(s)) h = (h * 31 + c.charCode
    and [n] linked to its sources; ⚠ lines become notices. Everything is escaped first — the model's text never runs. */
 function inline(t, urls){
   const keep = [];                                                   // inline code kept as it is (list[2] is not a source mark)
-  return esc(t).replace(/`([^`\n]+)`/g, (m, c)=>{ keep.push('<code>' + c + '</code>'); return '\u0001' + (keep.length - 1) + '\u0001'; }).replace(/\[([^\]\n]+)\]\((https?:\/\/[^\s)]+)\)/g, (m, x, u)=>{ keep.push('<a class="ln" href="' + u + '" target="_blank" rel="noopener">' + x + '</a>'); return '\u0001' + (keep.length - 1) + '\u0001'; }).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>').replace(/(^|[^*])\*([^*\n]+)\*(?!\*)/g, '$1<i>$2</i>')
+  return esc(t).replace(/`([^`\n]+)`/g, (m, c)=>{ keep.push('<code>' + c + '</code>'); return '\u0001' + (keep.length - 1) + '\u0001'; }).replace(/\[([^\]\n]+)\]\((\/(?:reports|designs)\/[a-z0-9-]+\/[^\s)]*)\)/g, (m, x, u)=>{ keep.push('<a class="ln" href="' + HELPER + u + '" target="_blank" rel="noopener">' + x + '</a>'); return '\u0001' + (keep.length - 1) + '\u0001'; }).replace(/\[([^\]\n]+)\]\((https?:\/\/[^\s)]+)\)/g, (m, x, u)=>{ keep.push('<a class="ln" href="' + u + '" target="_blank" rel="noopener">' + x + '</a>'); return '\u0001' + (keep.length - 1) + '\u0001'; }).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>').replace(/(^|[^*])\*([^*\n]+)\*(?!\*)/g, '$1<i>$2</i>')
     .replace(/\s?\[(\d+)\]/g, (m, n)=>webUrl(urls[n]) ? `<sup><a href="${esc(urls[n])}" target="_blank" rel="noopener">${n}</a></sup>` : `<sup><a>${n}</a></sup>`).replace(/\u0001(\d+)\u0001/g, (m, i)=>keep[+i]);
 }
 function markdown(text, urls){
@@ -1178,7 +1179,8 @@ function mdSetup(){
     paragraph({tokens, text}){ const h = this.parser.parseInline(tokens); return /^⚠/.test(text) ? `<div class="warn">${h}</div>` : /^✔/.test(text) ? `<p class="ok">${h}</p>` : `<p>${h}</p>`; },
     // HTML the model wrote is shown as text (only a <br> in a table cell is kept), as it always was
     html({text}){ return /^<br\s*\/?>$/i.test(text.trim()) ? '<br>' : esc(text); },
-    link({href, tokens}){ const t = this.parser.parseInline(tokens); return /^(https?:|mailto:)/i.test(href || '') ? `<a class="ln" href="${esc(href)}" target="_blank" rel="noopener">${t}</a>` : t; },
+    // (a page Cygnus made - /reports/…, /designs/… - opens from the helper; it was shown as plain text, 8 Nov)
+    link({href, tokens}){ const t = this.parser.parseInline(tokens); if(MADE_PAGE.test(href || '')) return `<a class="ln" href="${esc(HELPER + href)}" target="_blank" rel="noopener">${t}</a>`; return /^(https?:|mailto:)/i.test(href || '') ? `<a class="ln" href="${esc(href)}" target="_blank" rel="noopener">${t}</a>` : t; },
     image({href, text}){ return webUrl(href) ? `<a class="ln" href="${esc(href)}" target="_blank" rel="noopener">${esc(text || 'picture')}</a>` : esc(text); },
     checkbox({checked}){ return checked ? '☑ ' : '☐ '; },
     table(t){ return '<div class="tbl">' + marked.Renderer.prototype.table.call(this, t) + '</div>'; },
