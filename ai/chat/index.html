@@ -382,6 +382,16 @@ code{font-family:var(--mono); font-size:.85em; background:var(--page2); padding:
 .kdot{width:11px; height:11px; border-radius:50%; flex:none; box-shadow:0 0 0 3px color-mix(in srgb, currentColor 18%, transparent)}
 .kdot.grey{background:#9aa0aa; color:#9aa0aa}
 .skrow .khead input[type=checkbox]{width:18px; height:18px; accent-color:var(--think)}
+/* each skill one line; its details behind the ⓘ: a card on hover (a mouse), open below the row after a click or a tap */
+.skrow{position:relative}
+.skrow .khead b{min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.skrow > .khead{min-width:0; max-width:100%}   /* (a long name pushed the ⓘ and the switch off an iPhone's screen) */
+.ski{flex:none; width:22px; height:22px; padding:0; border-radius:50%; border:1px solid color-mix(in srgb, var(--ink2) 45%, transparent); background:transparent; color:var(--ink2); font:italic 600 12px/20px Georgia, serif; cursor:pointer}
+.ski:hover, .ski:focus-visible, .skrow.open .ski{background:var(--think); border-color:var(--think); color:#fff}
+.skmore{display:none; flex-direction:column; gap:4px}
+.skrow.open .skmore{display:flex; margin-top:8px}
+@media (hover:hover){ .skrow:not(.open):has(.ski:hover) .skmore{display:flex; position:absolute; z-index:30; right:8px; top:calc(100% - 6px); width:min(380px, 86vw); padding:12px 14px; border-radius:12px; background:var(--card, var(--bg)); border:1px solid color-mix(in srgb, var(--ink2) 25%, transparent); box-shadow:0 10px 28px rgba(0,0,0,.18)} }
+.skrow .skstate{font-weight:600}
 .skfrom a{word-break:break-word}
 .approve{border:1px solid var(--line, rgba(127,127,127,.3)); border-radius:12px; padding:10px 12px; margin:10px 0} .approve.danger{border-color:#d33} .approve pre{margin:6px 0; white-space:pre-wrap; word-break:break-word} .apb{display:flex; gap:8px; flex-wrap:wrap} .apb button{min-height:40px; padding:0 16px; border-radius:999px; font-weight:600; cursor:pointer} .apb .primary{background:var(--think, #3b6); color:#fff; border:0}
 .skillused{display:inline-flex; align-items:center; gap:4px; font-size:11.5px; padding:2px 8px; border-radius:999px; border:1px solid var(--line, rgba(127,127,127,.25)); opacity:.85; margin-left:6px; white-space:nowrap}
@@ -1819,6 +1829,7 @@ const SKILLS = [
   {c: '/rea', i: '🔬', n: 'REA — look inside software', d: 'An app, a file or an https link: what it is, how it works, with evidence', words: 'An app, a file path or an https link…'},
   {c: '/blueprint', i: '🗺', n: 'Blueprint', d: 'Reverse-engineer a site or app into a plan to build your own', words: 'A site or app to reverse-engineer…'},
   {c: '/audit', i: '🩺', n: 'Audit a project', d: 'A full check: code map, bug hunt with each finding proved, security pass - then fix <n>', words: 'A project or folder (or blank for the open one)…'},
+  {c: '/makeyoutubevideo', i: '▶️', n: 'Make a YouTube video', d: 'A 3-15 min 16:9 video: a script by chapters you review → footage, voice, music, subtitles, chapter times', words: 'A topic… (10 min)'},
   {c: '/clips', i: '✂️', n: 'Clips from a video', d: 'A long video (link or file) → its best moments on a page you review → vertical clips with captions', words: 'A YouTube link or a video file…'},
   {c: '/reel', i: '📱', n: 'Make a reel', d: 'A vertical short for Shorts / Reels: a script you review → stock footage, pictures, cards, voice, captions, music', words: 'A topic…'},
   {c: '/makevideo', i: '🎬', n: 'Make a video', d: 'Topic → research → a script you review → the video (explainer or motion graphics)', words: 'A topic…'},
@@ -2205,8 +2216,9 @@ const COMMANDS = [
   {c: '/upstream', a: 'run · apply n · drop n', d: 'What changed in the repos our skills came from — suggestions to apply (SoGPT, with tests)'},
   {c: '/blueprint', a: 'a site or an app', d: 'Reverse-engineer it: how it is built and what it does, then a plan to build your own (say “build it” after)'},
   {c: '/audit', a: '[project or folder] [focus: …] · fix <n|all> · change <what> · status', d: 'Code map → bug hunt (each finding proved against the code) → security pass, on a report page you review; /audit fix 1 hands a finding to the coding pipeline (a failing test first)'},
-  {c: '/clips', a: '<YouTube link or video file> [n clips] · next · change <what> · status', d: 'The best moments of a long video as vertical shorts: heard on this Mac with word times, moments you review, then 9:16 clips with captions. Nothing is posted (Skills → Clips, off at first)'},
-  {c: '/reel', a: '<topic> · next · change <what> · status', d: 'A vertical short (YouTube Shorts, Instagram Reels) from several skills: research, a script you review (hook, scenes, call to action, description, hashtags); /reel next makes reel.mp4, a thumbnail and post.md. Nothing is posted (Skills → Reels, off at first)'},
+  {c: '/makeyoutubevideo', a: '<topic> [10 min] · next · change <what> · edit <what> · status', d: 'A 3-15 minute YouTube video: research, an outline and its chapters on a page you review, then video.mp4, a thumbnail, subtitles.srt and the description with chapter times. Nothing is posted'},
+  {c: '/clips', a: '<YouTube link or video file> [n clips] · next · change <what> · edit <what> · status', d: 'The best moments of a long video as vertical shorts: heard on this Mac with word times, moments you review, then 9:16 clips with captions. Nothing is posted (Skills → Clips, off at first)'},
+  {c: '/reel', a: '<topic> · like <reel file or link> <topic> · next · change <what> · edit <what> · status', d: 'A vertical short (YouTube Shorts, Instagram Reels) from several skills: research, a script you review (hook, scenes, call to action, description, hashtags); /reel next makes reel.mp4, a thumbnail and post.md; /reel like <a reel> <topic> copies the style of a reel (cuts, pace, captions, music), not its content. Nothing is posted (Skills → Reels)'},
   {c: '/makevideo', a: '<topic> [style: motion] · next [motion] · change <what> · status', d: 'Research, then a script (narration and scenes, humanized) on a page you review; /makevideo next makes the video from that script (explainer with clips and voice, or HyperFrames motion graphics)'},
   {c: '/report', a: '<topic or files> · change <what> · status', d: 'A report page with sources, tables and a diagram: a topic researched on the web, or files read on this Mac (MarkItDown) and written privately'},
   {c: '/explain', a: '[project or folder] [focus: …] · change <what> · status', d: 'Code map + code graph + README → how the project works, with mermaid diagrams, on a page (a private project is written on this Mac)'},
@@ -2334,7 +2346,7 @@ async function runCommand(line){
   else if(c === '/rea'){ if(!arg) return toast('/rea /Applications/Slack.app · /rea https://zerodha.com · /rea ~/bin/tool explain main — or a .har or .sqlite file'); ask('/rea ' + arg); }
   else if(c === '/upstream') ask('/upstream' + (arg ? ' ' + arg : ''));
   else if(c === '/upskill') ask('/upskill' + (arg ? ' ' + arg : ''));
-  else if(c === '/audit' || c === '/makevideo' || c === '/reel' || c === '/clips' || c === '/report' || c === '/explain' || c === '/learn'){ ask(c + (arg ? ' ' + arg : '')); }
+  else if(c === '/audit' || c === '/makevideo' || c === '/reel' || c === '/clips' || c === '/makeyoutubevideo' || c === '/report' || c === '/explain' || c === '/learn'){ ask(c + (arg ? ' ' + arg : '')); }
   else if(c === '/createapp' || /^\/createapp$/i.test(c)){ ask('/createapp' + (arg ? ' ' + arg : '')); }
   else if(/^\/researchapps$/i.test(c)){ if(!arg) return toast('/researchApps notion.so focus: the editor — or an app on your Mac, or add ~/Downloads/app.har'); ask('/researchApps ' + arg); }
   else if(c === '/blueprint'){ if(!arg) return toast('/blueprint notion.so — or an app on your Mac'); ask('/blueprint ' + arg); }
@@ -2861,8 +2873,11 @@ async function loadSkills(){
   const link = u => `<a href="${esc(u)}" target="_blank" rel="noopener">${esc(String(u).replace(/^https:\/\/(www\.)?(github\.com\/)?/, '').replace(/\/$/, ''))}</a>`;
   const repo = s => (s.links || []).length ? '🔗 ' + s.links.map(link).join(' · ') : /^https?:/.test(s.source) ? '🔗 ' + link(s.source) : esc(s.source);
   // installed tools, then the built-in ones (rules and ways of working taken from GitHub repos into the AI's own code)
+  // (8 Nov: each skill one line - its light, name, ⓘ and switch; what it does, its state and its buttons behind the ⓘ - a card
+  // on hover, kept open below the row by a click or a tap, as on the iPhone, where nothing hovers)
+  const ski = name => `<button class="ski" type="button" aria-expanded="false" aria-label="About ${esc(name)}" title="About ${esc(name)}">i</button>`;
   const row = s => { const state = s.pending ? ['yellow', 'Planned — not installed yet (reply “install it” in its chat)'] : s.off ? ['grey', 'Switched off — ' + (s.builtin ? 'not used until you switch it on' : 'kept installed, not used')] : s.tested && s.tested.ok ? ['green', 'Working — checked ' + when(s.tested.at)] : s.tested ? ['red', 'Not working — ' + (s.tested.why || 'failed its check').replace(/\s+/g, ' ').slice(0, 140)] : s.core ? ['green', 'Always on — part of how answers are kept honest'] : s.builtin ? ['green', 'On — press Test to check it'] : ['yellow', 'On, not checked yet — used once its check passes (press Test)'];
-    return `<div class="krow skrow" data-k="${esc(s.slug)}" data-b="${s.builtin ? 1 : ''}"><div class="khead"><span class="kdot ${state[0]}"></span><b>${esc(s.name)}</b>${s.pending || s.core ? '' : `<label title="Use this skill"><input type="checkbox" data-act="on" ${s.off ? '' : 'checked'}></label>`}</div><small>${esc(s.description)}</small><small>${esc(state[1])}</small>${s.builtin && s.used ? `<small class="skused">${s.used.n ? 'Used ' + s.used.n + ' time' + (s.used.n === 1 ? '' : 's') + ' · last ' + when(s.used.last) : 'Not used yet'}</small>` : ''}<div class="kedit">${s.pending ? '' : '<button class="ghost" data-act="test" type="button">Test</button>'}${s.builtin ? '' : '<button class="ghost" data-act="remove" type="button">Remove</button>'}</div>${(d.pairs || {})[s.slug] ? `<small class="skpair">↔ ${esc(d.pairs[s.slug])}</small>` : ''}<small class="skfrom">${s.builtin ? 'Built in' : 'Installed tool'} · ${repo(s)}</small></div>`; };
+    return `<div class="krow skrow" data-k="${esc(s.slug)}" data-b="${s.builtin ? 1 : ''}"><div class="khead"><span class="kdot ${state[0]}"></span><b>${esc(s.name)}</b>${ski(s.name)}${s.pending || s.core ? '' : `<label title="Use this skill"><input type="checkbox" data-act="on" ${s.off ? '' : 'checked'}></label>`}</div><div class="skmore"><small>${esc(s.description)}</small><small class="skstate">${esc(state[1])}</small>${s.builtin && s.used ? `<small class="skused">${s.used.n ? 'Used ' + s.used.n + ' time' + (s.used.n === 1 ? '' : 's') + ' · last ' + when(s.used.last) : 'Not used yet'}</small>` : ''}<div class="kedit">${s.pending ? '' : '<button class="ghost" data-act="test" type="button">Test</button>'}${s.builtin ? '' : '<button class="ghost" data-act="remove" type="button">Remove</button>'}</div>${(d.pairs || {})[s.slug] ? `<small class="skpair">↔ ${esc(d.pairs[s.slug])}</small>` : ''}<small class="skfrom">${s.builtin ? 'Built in' : 'Installed tool'} · ${repo(s)}</small></div></div>`; };
   const b = d.builtin || [];
   // grouped by WHERE each works (coding, every answer, files, money, media); installed tools sit beside the rules that use them
   const all = d.skills.concat(b), placed = new Set(), areas = d.areas || [];
@@ -2874,9 +2889,9 @@ async function loadSkills(){
   const md = d.md || [];
   box.insertAdjacentHTML('beforeend', `<h3 class="skh">Skills from GitHub · ${md.length}</h3>`);
   if(md.length) box.insertAdjacentHTML('beforeend', `<p class="sub">Added with <b>/skills add</b> or <b>integrate &lt;link&gt;</b> in the chat. Used when a question fits them, on the page and in the terminal.</p>`
-    + md.map(m=>`<div class="krow skrow" data-md="${esc(m.slug)}"><div class="khead"><span class="kdot ${m.off ? 'grey' : 'green'}"></span><b>${esc(m.name)}</b><label title="Use this skill"><input type="checkbox" data-md-on ${m.off ? '' : 'checked'}></label></div>`
-      + `<small>${esc(m.off ? 'Switched off — kept, not used' : m.description.slice(0, 220))}</small>${m.source ? `<small>🔗 ${/^https?:/.test(m.source) ? link(m.source) : link('https://github.com/' + m.source)}</small>` : ''}`
-      + `<div class="kedit"><button class="ghost" type="button" data-md-rm>Remove</button></div></div>`).join(''));
+    + md.map(m=>`<div class="krow skrow" data-md="${esc(m.slug)}"><div class="khead"><span class="kdot ${m.off ? 'grey' : 'green'}"></span><b>${esc(m.name)}</b>${ski(m.name)}<label title="Use this skill"><input type="checkbox" data-md-on ${m.off ? '' : 'checked'}></label></div>`
+      + `<div class="skmore"><small>${esc(m.description.slice(0, 400))}</small>${m.off ? '<small class="skstate">Switched off — kept, not used</small>' : ''}${m.source ? `<small>🔗 ${/^https?:/.test(m.source) ? link(m.source) : link('https://github.com/' + m.source)}</small>` : ''}`
+      + `<div class="kedit"><button class="ghost" type="button" data-md-rm>Remove</button></div></div></div>`).join(''));
   // ADD ONE: a GitHub link (or owner/repo) → the skills in it, each to tick → Install (unsafe ones are refused and say why)
   box.insertAdjacentHTML('beforeend', `<div class="krow" id="mdAdd"><div class="khead"><b>Add a skill from GitHub</b></div><small>A GitHub link or owner/repo with SKILL.md skills in it. You see what is in it first; nothing is installed until you pick.</small>`
     + `<div class="kedit"><input id="mdLink" placeholder="https://github.com/owner/repo" autocomplete="off" aria-label="GitHub link"><button class="ghost" id="mdLook" type="button">Look</button></div><div id="mdFound"></div></div>`);
@@ -2932,6 +2947,7 @@ async function loadSkills(){
   const tn = $('#tuneNow'); if(tn) tn.onclick = async () => { tn.disabled = true; tn.textContent = 'Self-tuning… (this uses AI calls)'; try{ const j = await post('/tune', {run: true}); toast(String(j.text || '').split('\n')[0].replace(/\*/g, '').slice(0, 120)); }catch(e){ toast('That did not work: ' + e.message); } loadSkills(); };
   box.querySelectorAll('[data-set-v]').forEach(i=>i.onchange = async () => { const key = i.closest('[data-set]').dataset.set;
     try{ const j = await post('/settings', {key, value: i.type === 'checkbox' ? i.checked : i.value}); toast(j.error ? j.error : key + ' = ' + j.value); }catch(e){ toast('Not saved: ' + e.message); } loadSkills(); });
+  box.querySelectorAll('.ski').forEach(b=>b.onclick = e => { e.preventDefault(); const r = b.closest('.skrow'), open = !r.classList.contains('open'); r.classList.toggle('open', open); b.setAttribute('aria-expanded', open); });
   box.querySelectorAll('[data-act]').forEach(btn=>{ const r = btn.closest('.skrow'), k = r.dataset.k, builtin = !!r.dataset.b;
     if(btn.dataset.act === 'on') btn.onchange = async () => { await post('/skills', {slug: k, on: btn.checked, builtin}); toast(btn.checked ? 'Switched on' : 'Switched off'); loadSkills(); };
     else btn.onclick = async () => { btn.disabled = true; btn.textContent = btn.dataset.act === 'test' ? 'Testing…' : 'Removing…';
