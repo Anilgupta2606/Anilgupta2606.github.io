@@ -1831,6 +1831,7 @@ const SKILLS = [
   {c: '/audit', i: '🩺', n: 'Audit a project', d: 'A full check: code map, bug hunt with each finding proved, security pass - then fix <n>', words: 'A project or folder (or blank for the open one)…'},
   {c: '/makeyoutubevideo', i: '▶️', n: 'Make a YouTube video', d: 'A 3-15 min 16:9 video: a script by chapters you review → footage, voice, music, subtitles, chapter times', words: 'A topic… (10 min)'},
   {c: '/clips', i: '✂️', n: 'Clips from a video', d: 'A long video (link or file) → its best moments on a page you review → vertical clips with captions', words: 'A YouTube link or a video file…'},
+  {c: '/githubIntegrate', i: '🧩', n: 'Add from GitHub', d: 'A GitHub repository → its skills (or the tool it is) shown first → installed when you say', words: 'A GitHub link or owner/repo…'},
   {c: '/reel', i: '📱', n: 'Make a reel', d: 'A vertical short for Shorts / Reels: a script you review → stock footage, pictures, cards, voice, captions, music', words: 'A topic…'},
   {c: '/makevideo', i: '🎬', n: 'Make a video', d: 'Topic → research → a script you review → the video (explainer or motion graphics)', words: 'A topic…'},
   {c: '/report', i: '📊', n: 'Write a report', d: 'A sourced report with diagrams - from the web, or your files (kept private)', words: 'A topic, or files on this Mac…'},
@@ -2218,6 +2219,7 @@ const COMMANDS = [
   {c: '/audit', a: '[project or folder] [focus: …] · fix <n|all> · change <what> · status', d: 'Code map → bug hunt (each finding proved against the code) → security pass, on a report page you review; /audit fix 1 hands a finding to the coding pipeline (a failing test first)'},
   {c: '/makeyoutubevideo', a: '<topic> [10 min] · next · change <what> · edit <what> · status', d: 'A 3-15 minute YouTube video: research, an outline and its chapters on a page you review, then video.mp4, a thumbnail, subtitles.srt and the description with chapter times. Nothing is posted'},
   {c: '/clips', a: '<YouTube link or video file> [n clips] · next · change <what> · edit <what> · status', d: 'The best moments of a long video as vertical shorts: heard on this Mac with word times, moments you review, then 9:16 clips with captions. Nothing is posted (Skills → Clips, off at first)'},
+  {c: '/githubIntegrate', a: '<GitHub link or owner/repo> · install [name] · cancel · status', d: 'Add what a repository offers: its SKILL.md skills (only their own folders, unsafe ones never) or, with none, the tool it is (planned, installed in its own folder, kept when its try works). Nothing runs before you say install'},
   {c: '/reel', a: '<topic> · like <reel file or link> <topic> · next · change <what> · edit <what> · status', d: 'A vertical short (YouTube Shorts, Instagram Reels) from several skills: research, a script you review (hook, scenes, call to action, description, hashtags); /reel next makes reel.mp4, a thumbnail and post.md; /reel like <a reel> <topic> copies the style of a reel (cuts, pace, captions, music), not its content. Nothing is posted (Skills → Reels)'},
   {c: '/makevideo', a: '<topic> [style: motion] · next [motion] · change <what> · status', d: 'Research, then a script (narration and scenes, humanized) on a page you review; /makevideo next makes the video from that script (explainer with clips and voice, or HyperFrames motion graphics)'},
   {c: '/report', a: '<topic or files> · change <what> · status', d: 'A report page with sources, tables and a diagram: a topic researched on the web, or files read on this Mac (MarkItDown) and written privately'},
@@ -2346,7 +2348,7 @@ async function runCommand(line){
   else if(c === '/rea'){ if(!arg) return toast('/rea /Applications/Slack.app · /rea https://zerodha.com · /rea ~/bin/tool explain main — or a .har or .sqlite file'); ask('/rea ' + arg); }
   else if(c === '/upstream') ask('/upstream' + (arg ? ' ' + arg : ''));
   else if(c === '/upskill') ask('/upskill' + (arg ? ' ' + arg : ''));
-  else if(c === '/audit' || c === '/makevideo' || c === '/reel' || c === '/clips' || c === '/makeyoutubevideo' || c === '/report' || c === '/explain' || c === '/learn'){ ask(c + (arg ? ' ' + arg : '')); }
+  else if(c.toLowerCase() === '/githubintegrate' || c === '/audit' || c === '/makevideo' || c === '/reel' || c === '/clips' || c === '/makeyoutubevideo' || c === '/report' || c === '/explain' || c === '/learn'){ ask(c + (arg ? ' ' + arg : '')); }
   else if(c === '/createapp' || /^\/createapp$/i.test(c)){ ask('/createapp' + (arg ? ' ' + arg : '')); }
   else if(/^\/researchapps$/i.test(c)){ if(!arg) return toast('/researchApps notion.so focus: the editor — or an app on your Mac, or add ~/Downloads/app.har'); ask('/researchApps ' + arg); }
   else if(c === '/blueprint'){ if(!arg) return toast('/blueprint notion.so — or an app on your Mac'); ask('/blueprint ' + arg); }
