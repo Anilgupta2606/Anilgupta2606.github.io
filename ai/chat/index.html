@@ -606,6 +606,13 @@ body.ytMode #main, body.ytMode .composer{display:none}
 .ytlearn{background:var(--card); border:1px solid var(--line); border-radius:14px; padding:12px 16px; font-size:14px}
 .ytlearn h2{margin:0 0 6px; font-size:15px} .ytlearn ul{margin:0; padding-left:18px} .ytlearn li{margin:3px 0}
 .ytframe{width:100%; height:max(640px, calc(100vh - 300px)); border:1px solid var(--line); border-radius:14px; background:var(--card)}
+.ytvids{background:var(--card); border:1px solid var(--line); border-radius:14px; padding:12px 16px}
+.ytvids h2{margin:0 0 2px; font-size:15px} .ytvids > .ytsub{margin:0 0 8px}
+.ytv{display:flex; justify-content:space-between; align-items:center; gap:10px; padding:10px 0; border-top:1px solid var(--line); flex-wrap:wrap}
+.ytvt{min-width:0; flex:1 1 240px} .ytvt b{display:block; font-size:14px; line-height:1.3; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.ytvt span{color:var(--mut); font-size:12.5px} .ytvt .unl{font-style:normal; font-weight:700; color:#b45309}
+.ytvb{display:flex; gap:6px; flex-wrap:wrap} .ytvb .ytbtn{padding:6px 10px; font-size:12.5px}
+.ytvb .ytbtn.go{background:#16a34a; border-color:#16a34a; color:#fff}
 .ytempty{background:var(--card); border:1px solid var(--line); border-radius:14px; padding:22px; text-align:center; color:var(--mut)}
 .ytempty b{display:block; color:var(--ink); font-size:16px; margin-bottom:6px}
 @media (max-width:600px){ .ytview{padding:16px 12px 30px} .ythead h1{font-size:22px} .ytstat b{font-size:20px} .ytframe{height:calc(100vh - 220px)} }
@@ -949,9 +956,10 @@ body.ytMode #main, body.ytMode .composer{display:none}
 <!-- YOUTUBE (13 Nov): your channel from /channel - the numbers at a glance, what the next reel avoids, every video's card -->
 <section class="ytview" id="ytView" aria-label="YouTube" hidden>
   <div class="ythead"><div><h1>YouTube</h1><p class="ytsub" id="ytSub">Loading…</p></div>
-    <div class="ytacts"><button class="ytbtn primary" id="ytCheck" type="button">🔄 Check again</button><button class="ytbtn" id="ytIdeas" type="button">💡 Reel ideas</button><a class="ytbtn" id="ytOpen" target="_blank" rel="noopener" hidden>↗ Full page</a></div></div>
+    <div class="ytacts"><button class="ytbtn primary" id="ytCheck" type="button">🔄 Check again</button><button class="ytbtn" id="ytIdeas" type="button">💡 Reel ideas</button><button class="ytbtn" id="ytAllow" type="button" hidden>🔓 Allow edits</button><a class="ytbtn" id="ytOpen" target="_blank" rel="noopener" hidden>↗ Full page</a></div></div>
   <div class="ytstats" id="ytStats"></div>
   <div class="ytlearn" id="ytLearn" hidden></div>
+  <div class="ytvids" id="ytVids" hidden></div>
   <iframe class="ytframe" id="ytFrame" title="Your channel, video by video" hidden></iframe>
 </section>
 
@@ -2908,12 +2916,24 @@ async function loadYT(){
   const L = y.lessons;
   if(L && (L.reasons.length || L.lost.length || L.patterns.length)){ learn.hidden = false;
     learn.innerHTML = '<h2>📺 What your next reel will avoid</h2><ul>' + L.reasons.slice(0, 3).map(r => '<li>' + esc(r) + '</li>').join('') + (L.lost.length ? '<li>Openings like “' + esc(L.lost[0]) + '”</li>' : '') + L.patterns.slice(0, 2).map(p => '<li>' + esc(p) + '</li>').join('') + '</ul>'; }
+  // your videos: watch, get ready (Gemini, thumbnails, new words), apply / undo the words, make an unlisted one public
+  const V = y.videos || [], box = $('#ytVids'); $('#ytAllow').hidden = !!y.edit; box.hidden = !V.length;
+  if(V.length){ const b = (cmd, label, cls) => `<button class="ytbtn ${cls || ''}" type="button" data-cmd="${esc(cmd)}">${label}</button>`;
+    box.innerHTML = '<h2>Your videos</h2><p class="ytsub">Upload <b>unlisted</b> first, then <b>Get ready</b>: Gemini watches it, makes thumbnails and new words. Apply what you like, then make it public.</p>'
+      + V.map(v => `<div class="ytv"><div class="ytvt"><b title="${esc(v.title)}">${esc(v.title)}</b><span>${v.privacy === 'unlisted' ? '<em class="unl">Unlisted</em> · ' : ''}${v.short ? 'Short · ' : ''}${n(v.views)} views${v.label && v.privacy !== 'unlisted' ? ' · ' + esc(v.label) : ''}${v.draft ? ' · new words ' + (v.draft === 'applied' ? 'applied' : 'drafted') : ''}</span></div><div class="ytvb">`
+        + b('/channel ready ' + v.id, '✨ Get ready', v.privacy === 'unlisted' ? 'primary' : '') + b('/channel watch ' + v.id, '🎞 Watch') + (v.draft === 'draft' ? b('/channel apply ' + v.id, '📝 Apply words') : v.draft === 'applied' ? b('/channel undo ' + v.id, '↩️ Undo words') : b('/channel fix ' + v.id, '📝 New words'))
+        + (v.privacy === 'unlisted' ? b('/channel public ' + v.id, '🌍 Make public', 'go') : '') + '</div></div>').join(''); }
   if(y.page){ const src = HELPER + y.page + '?t=' + (y.checked || 0); if(frame.getAttribute('src') !== src) frame.src = src; frame.hidden = false; open.href = src; open.hidden = false; }
 }
 $('#modeYT').onclick = () => showYT(true);
 // (the address …/#youtube opens it straight away - a bookmark on the phone)
 if(location.hash === '#youtube') setTimeout(() => showYT(true), 0);
 $('#ytCheck').onclick = () => { showYT(false); setSide('chat'); ask('/channel'); };
+$('#ytAllow').onclick = () => { showYT(false); setSide('chat'); ask('/channel allow edits'); };
+// (Make public asks for a second tap - it shows the video to everyone)
+$('#ytVids').onclick = e => { const b = e.target.closest('[data-cmd]'); if(!b) return;
+  if(/^\/channel public /.test(b.dataset.cmd) && !b.dataset.sure){ b.dataset.sure = '1'; const t = b.textContent; b.textContent = 'Tap again: make it public'; setTimeout(() => { delete b.dataset.sure; b.textContent = t; }, 4000); return; }
+  showYT(false); setSide('chat'); ask(b.dataset.cmd); };
 $('#ytIdeas').onclick = () => { showYT(false); const q = $('#q'); q.value = '/reel ideas '; q.focus(); toast('Write your niche after /reel ideas - it uses your channel\'s lessons'); };
 $('#keysToSeq').onclick = () => { openKeys(false); openSeq(true); };
 $('#refreshAllKeys').onclick = async () => {
