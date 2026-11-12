@@ -1833,7 +1833,8 @@ const SKILLS = [
   {c: '/cleanvideo', i: '🧹', n: 'Clean a screen recording', d: 'A recording of a reel or Short → the likes, comments, names, caption and bars taken off, the video kept with its sound', words: 'A video file, or attach it…'},
   {c: '/clips', i: '✂️', n: 'Clips from a video', d: 'A long video (link or file) → its best moments on a page you review → vertical clips with captions', words: 'A YouTube link or a video file…'},
   {c: '/clipyoutube', i: '✂️', n: 'Clip for YouTube', d: 'A specific time range from a video (link or file) → the exact range cut, original aspect kept, optional captions', words: 'A YouTube link or file, then start end (e.g. 02:15 03:45)…'},
-  {c: '/copyshort', i: '⬇️', n: 'Copy a YouTube Short', d: 'Download a YouTube Short as-is to this Mac (no re-encoding, original quality)', words: 'A YouTube Shorts link…'},
+  {c: '/copyshort', i: '⬇️', n: 'Copy a Short or your reel', d: 'Download a YouTube Short, or your own Instagram reel to post as a Short, as-is - with three thumbnails', words: 'A YouTube Shorts or Instagram reel link…'},
+  {c: '/channel', i: '📺', n: 'Check my channel', d: 'Why each of your videos and Shorts did or did not travel (YouTube Studio, read-only) - and lessons for your next reel', words: ''},
   {c: '/githubIntegrate', i: '🧩', n: 'Add from GitHub', d: 'A GitHub repository → its skills (or the tool it is) shown first → installed when you say', words: 'A GitHub link or owner/repo…'},
   {c: '/reel', i: '📱', n: 'Make a reel', d: 'A vertical short for Shorts / Reels: a script you review → stock footage, pictures, cards, voice, captions, music', words: 'A topic…'},
   {c: '/makevideo', i: '🎬', n: 'Make a video', d: 'Topic → research → a script you review → the video (explainer or motion graphics)', words: 'A topic…'},
@@ -2223,7 +2224,8 @@ const COMMANDS = [
   {c: '/makeyoutubevideo', a: '<topic> [10 min] · next · change <what> · edit <what> · status', d: 'A 3-15 minute YouTube video: research, an outline and its chapters on a page you review, then video.mp4, a thumbnail, subtitles.srt and the description with chapter times. Nothing is posted'},
   {c: '/cleanvideo', a: '<video file, or attach it> [rotate left|right] [9:16|16:9|square] [cut the first N s] · edit <what> · status', d: 'A screen recording of a video with the app taken off (likes, comments, share, names, caption, status bar, reply box): what stays still while the video moves is cut away; the video kept at full size with its sound, on this Mac'},
   {c: '/clipyoutube', a: '<YouTube link or file> <start> <end> [captions|no-captions] · edit <what> · status', d: 'A specific time range from a video, cut for YouTube upload: original aspect kept (not 9:16), optional word-by-word captions, at platform loudness. For your own videos or reusable content'},
-  {c: '/copyshort', a: '<YouTube Shorts link> · status', d: 'Download a YouTube Short as-is to this Mac (no re-encoding, original quality). For your own videos or reusable content'},
+  {c: '/copyshort', a: '<YouTube Shorts or Instagram reel link> · status', d: 'Download a YouTube Short, or your own Instagram reel to post as a Short, as-is - with three thumbnails and post.md. For your own videos or reusable content'},
+  {c: '/channel', a: '[30] · connect <Google client JSON> · disconnect', d: 'Your YouTube channel from Studio (read-only): why each video did or did not travel, on a page, and lessons every /reel then follows. Connect in Your keys → Connections'},
   {c: '/clips', a: '<YouTube link or video file> [n clips | one short] · next · change <what> · edit <what> · status', d: 'The best moments of a long video as vertical shorts: heard on this Mac with word times, moments you review, then 9:16 clips with captions; "one short" squeezes the whole video into ONE short from its own bits. Nothing is posted (Skills → Clips, off at first)'},
   {c: '/githubIntegrate', a: '<GitHub link or owner/repo> · install [name] · cancel · status', d: 'Add what a repository offers: its SKILL.md skills (only their own folders, unsafe ones never) or, with none, the tool it is (planned, installed in its own folder, kept when its try works). Nothing runs before you say install'},
   {c: '/reel', a: '<topic> · like <reel file or link> <topic> · next · change <what> · edit <what> · status', d: 'A vertical short (YouTube Shorts, Instagram Reels) from several skills: research, a script you review (hook, scenes, call to action, description, hashtags); /reel next makes reel.mp4, a thumbnail and post.md; /reel like <a reel> <topic> copies the style of a reel (cuts, pace, captions, music), not its content. Nothing is posted (Skills → Reels)'},
@@ -2797,6 +2799,7 @@ async function loadKeys(){
     + (x.kind === 'cloud' ? `<div class="kedit"><input type="password" autocomplete="off" spellcheck="false" placeholder="${x.hasKey ? 'Add another account\'s key' : 'Paste your key (' + esc(x.hint || '') + ')'}"><button class="ghost" data-act="save" type="button">${x.hasKey ? 'Add' : 'Save'}</button>${x.hasKey ? '<button class="ghost" data-act="test" type="button">Test</button>' + '' : ''}</div><small><a href="${esc(x.signup)}" target="_blank" rel="noopener">Get a ${x.hasKey ? 'key from another account' : 'key'}</a></small>` : '') + '</div>';
   const group = (title, kind) => { const L = st.services.filter(x=>x.kind === kind); return L.length ? `<div class="kgroup">${title}</div>` + L.map(row).join('') : ''; };
   box.innerHTML = group('Through your Mac (no key needed)', 'apple') + group('Cloud keys', 'cloud') + group('Models on this Mac', 'mac');
+  loadYouTube(box);
   // the models each key uses now, and the ones retired or gone (the daily refresh; Cloudflare's own dates for the pictures)
   fetch(HELPER + '/models/live').then(r=>r.json()).then(m=>{ if(!m || !m.models) return;
     const day = t => new Date(t).toISOString().slice(0, 10), NM = {groq: 'Groq', gemini: 'Gemini', nvidia: 'NVIDIA', cohere: 'Cohere', openrouter: 'OpenRouter', bolt: 'NVIDIA Bolt'};
@@ -2816,6 +2819,35 @@ async function loadKeys(){
     }catch(e){ toast('That did not work: ' + e.message); }
     loadKeys();
   });
+}
+/* YOUTUBE (12 Nov, /channel): your channel read from YouTube Studio, read-only. Google's Desktop-app client file picked here,
+   then the sign-in opened on this Mac (Google sends you back to the helper at 127.0.0.1 - from the phone it cannot). */
+async function loadYouTube(box){
+  let y = null; try{ y = await fetch(HELPER + '/youtube').then(r=>r.json()); }catch(e){}
+  if(!y || y.error) return;
+  box.querySelectorAll('.ytrow').forEach(x=>x.remove());
+  const d = document.createElement('div'); d.className = 'ytrow';
+  const light = y.connected ? 'green' : y.client ? 'yellow' : 'red';
+  const says = y.connected ? (y.channel ? 'Connected: ' + y.channel + (y.checked ? ' · last checked ' + new Date(y.checked).toLocaleDateString('en-IN', {day: 'numeric', month: 'short'}) : '') : 'Connected - check your channel once')
+    : y.client ? 'Google client saved - sign in to finish' : 'Not connected. In Google Cloud: a project with YouTube Data API v3 and YouTube Analytics API on, the consent screen published, then Credentials → OAuth client ID → Desktop app → Download JSON - and pick that file here.';
+  d.innerHTML = `<div class="kgroup">Connections</div><div class="krow"><div class="khead"><span class="kdot ${light}"></span><b>YouTube (your channel, read-only)</b></div>
+    <div class="kmore"><small>${esc(says)}${y.onMac ? '' : ' Signing in works only on the Mac itself.'}</small></div>
+    <div class="kedit"><input type="file" accept=".json,application/json" hidden>
+      ${y.connected ? '<button class="ghost" data-yt="check" type="button">📺 Check my channel</button><button class="ghost" data-yt="out" type="button">Sign out</button>'
+        : (y.client ? '<button class="ghost" data-yt="in" type="button">Sign in to YouTube</button>' : '') + '<button class="ghost" data-yt="file" type="button">' + (y.client ? 'Another client file…' : 'Choose Google client file…') + '</button>'}</div></div>`;
+  box.appendChild(d);
+  const file = d.querySelector('input[type=file]');
+  const signIn = async body => { try{ const j = await post('/youtube', body); if(j.error) return toast(j.error);
+      if(!j.onMac) return toast('Open Cygnus on the Mac to sign in - Google sends you back to the Mac');
+      window.open(j.url, '_blank', 'noopener'); toast('Sign in in the new tab, then come back');
+      let n = 0; const t = setInterval(async () => { n++; const s = await fetch(HELPER + '/youtube').then(r=>r.json()).catch(()=>null);
+        if(s && s.connected){ clearInterval(t); toast('YouTube connected ✓'); loadKeys(); } else if(n > 60) clearInterval(t); }, 3000);
+    }catch(e){ toast('That did not work: ' + e.message); loadKeys(); } };
+  file.onchange = async () => { const f = file.files && file.files[0]; if(!f) return; if(f.size > 20000) return toast('That is not Google\'s client file'); signIn({client: await f.text()}); };
+  d.querySelectorAll('[data-yt]').forEach(b=>b.onclick = async () => { const a = b.dataset.yt;
+    if(a === 'file') file.click(); else if(a === 'in') signIn({signin: true});
+    else if(a === 'check'){ openKeys(false); ask('/channel'); }
+    else if(a === 'out'){ await post('/youtube', {forget: true}).catch(()=>{}); toast('Signed out of YouTube'); loadKeys(); } });
 }
 $('#keysToSeq').onclick = () => { openKeys(false); openSeq(true); };
 $('#refreshAllKeys').onclick = async () => {
