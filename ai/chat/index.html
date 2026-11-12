@@ -587,6 +587,28 @@ button, a, summary, label{touch-action:manipulation}
 .changebox pre.diff{margin:4px 0 0;padding:8px 10px;border:1px solid var(--line);border-radius:8px;overflow-x:auto;font-size:12px;line-height:1.45;max-height:420px}
 .changebox .dadd{color:#1a7f37;background:rgba(46,160,67,.12);display:inline-block;min-width:100%} .changebox .ddel{color:#cf222e;background:rgba(248,81,73,.12);display:inline-block;min-width:100%} .changebox .dhunk{color:var(--mut)}
 .changebox .undo{margin-top:6px} .changebox .undone{display:inline-block;margin-top:6px;font-size:13px}
+
+/* YOUTUBE view (13 Nov) - it takes the chat's place; Chat or Code brings the chat back */
+body.ytMode #main, body.ytMode .composer{display:none}
+.ytview{max-width:1080px; margin:0 auto; padding:24px 20px 40px; display:flex; flex-direction:column; gap:14px; min-height:100vh}
+.ytview[hidden]{display:none}
+.ythead{display:flex; justify-content:space-between; align-items:flex-end; gap:12px; flex-wrap:wrap}
+.ythead h1{margin:0; font-size:26px; letter-spacing:-.01em}
+.ytsub{margin:4px 0 0; color:var(--mut); font-size:13.5px}
+.ytacts{display:flex; gap:8px; flex-wrap:wrap}
+.ytbtn{border:1px solid var(--line); background:var(--card); color:var(--ink); border-radius:10px; padding:8px 12px; font:600 13px/1.2 inherit; cursor:pointer; text-decoration:none}
+.ytbtn.primary{background:var(--ink); color:var(--page); border-color:var(--ink)}
+.ytstats{display:grid; grid-template-columns:repeat(auto-fit, minmax(108px, 1fr)); gap:10px}
+.ytstat{background:var(--card); border:1px solid var(--line); border-radius:14px; padding:12px 14px}
+.ytstat b{display:block; font-size:24px; line-height:1.15; font-variant-numeric:tabular-nums}
+.ytstat span{color:var(--mut); font-size:12.5px}
+.ytstat.good b{color:#16a34a} .ytstat.bad b{color:#ea580c}
+.ytlearn{background:var(--card); border:1px solid var(--line); border-radius:14px; padding:12px 16px; font-size:14px}
+.ytlearn h2{margin:0 0 6px; font-size:15px} .ytlearn ul{margin:0; padding-left:18px} .ytlearn li{margin:3px 0}
+.ytframe{width:100%; height:max(640px, calc(100vh - 300px)); border:1px solid var(--line); border-radius:14px; background:var(--card)}
+.ytempty{background:var(--card); border:1px solid var(--line); border-radius:14px; padding:22px; text-align:center; color:var(--mut)}
+.ytempty b{display:block; color:var(--ink); font-size:16px; margin-bottom:6px}
+@media (max-width:600px){ .ytview{padding:16px 12px 30px} .ythead h1{font-size:22px} .ytstat b{font-size:20px} .ytframe{height:calc(100vh - 220px)} }
 </style>
 <!-- answers: Markdown (marked), sanitising (DOMPurify), maths (KaTeX + auto-render), code colours (highlight.js) - exact
      versions from cdnjs, checked by their hashes. Deferred: the page never waits for them; if one does not load, the
@@ -844,9 +866,10 @@ button, a, summary, label{touch-action:manipulation}
 <canvas id="pearlSky" aria-hidden="true"></canvas>
 <aside class="sidebar" id="sidebar" aria-label="Chats and settings">
   <div class="sbtop"><div class="brand"><div class="orb" id="orb"></div>Cygnus AI</div><button class="iconbtn sbx" id="sbClose" type="button" aria-label="Close the menu">×</button></div>
-  <div class="modeswitch" role="tablist" aria-label="Chat or code">
+  <div class="modeswitch" role="tablist" aria-label="Chat, code or YouTube">
     <button id="modeChat" type="button" role="tab" aria-selected="true" title="Chat — questions, research, your apps; never a coding project"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 17H6a3 3 0 0 1-3-3V7a3 3 0 0 1 3-3h9a3 3 0 0 1 3 3v1"/><path d="M11 11h7a3 3 0 0 1 3 3v3a3 3 0 0 1-3 3h-1l-2 2v-2h-4a3 3 0 0 1-3-3v-3a3 3 0 0 1 3-3z"/></svg><span>Chat</span></button>
     <button id="modeCode" type="button" role="tab" aria-selected="false" title="Code — chats bound to a coding project (SoGPT)"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m8 7-5 5 5 5"/><path d="m16 7 5 5-5 5"/></svg><span>Code</span></button>
+    <button id="modeYT" type="button" role="tab" aria-selected="false" title="YouTube — your channel: why each video did or did not travel, and what your next reel will avoid"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="5" width="19" height="14" rx="4"/><path d="m10 9.2 5 2.8-5 2.8z" fill="currentColor"/></svg><span>YouTube</span></button>
   </div>
   <div class="sbstart"><label class="codeOnly codepick"><span>Project</span><select id="codeProject" aria-label="The project for a new coding chat"></select></label>
   <button class="newchat" id="newChat" type="button"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>New chat</button></div>
@@ -923,6 +946,14 @@ button, a, summary, label{touch-action:manipulation}
   </section>
   <div id="turns"></div>
 </main>
+<!-- YOUTUBE (13 Nov): your channel from /channel - the numbers at a glance, what the next reel avoids, every video's card -->
+<section class="ytview" id="ytView" aria-label="YouTube" hidden>
+  <div class="ythead"><div><h1>YouTube</h1><p class="ytsub" id="ytSub">Loading…</p></div>
+    <div class="ytacts"><button class="ytbtn primary" id="ytCheck" type="button">🔄 Check again</button><button class="ytbtn" id="ytIdeas" type="button">💡 Reel ideas</button><a class="ytbtn" id="ytOpen" target="_blank" rel="noopener" hidden>↗ Full page</a></div></div>
+  <div class="ytstats" id="ytStats"></div>
+  <div class="ytlearn" id="ytLearn" hidden></div>
+  <iframe class="ytframe" id="ytFrame" title="Your channel, video by video" hidden></iframe>
+</section>
 
 <div class="composer">
   <div class="goalbar" id="goalbar" hidden></div>
@@ -2358,7 +2389,7 @@ async function runCommand(line){
   else if(c === '/rea'){ if(!arg) return toast('/rea /Applications/Slack.app · /rea https://zerodha.com · /rea ~/bin/tool explain main — or a .har or .sqlite file'); ask('/rea ' + arg); }
   else if(c === '/upstream') ask('/upstream' + (arg ? ' ' + arg : ''));
   else if(c === '/upskill') ask('/upskill' + (arg ? ' ' + arg : ''));
-  else if(c.toLowerCase() === '/githubintegrate' || c === '/audit' || c === '/makevideo' || c === '/reel' || c === '/clips' || c === '/clipyoutube' || c === '/copyshort' || c === '/cleanvideo' || c === '/makeyoutubevideo' || c === '/report' || c === '/explain' || c === '/learn'){ ask(c + (arg ? ' ' + arg : '')); }
+  else if(c.toLowerCase() === '/githubintegrate' || c === '/audit' || c === '/makevideo' || c === '/reel' || c === '/clips' || c === '/clipyoutube' || c === '/copyshort' || c === '/cleanvideo' || c === '/makeyoutubevideo' || c === '/report' || c === '/explain' || c === '/learn' || c === '/channel' || c === '/which'){ ask(c + (arg ? ' ' + arg : '')); }      // (/channel and /which were missing here: "No such command", 13 Nov)
   else if(c === '/createapp' || /^\/createapp$/i.test(c)){ ask('/createapp' + (arg ? ' ' + arg : '')); }
   else if(/^\/researchapps$/i.test(c)){ if(!arg) return toast('/researchApps notion.so focus: the editor — or an app on your Mac, or add ~/Downloads/app.har'); ask('/researchApps ' + arg); }
   else if(c === '/blueprint'){ if(!arg) return toast('/blueprint notion.so — or an app on your Mac'); ask('/blueprint ' + arg); }
@@ -2470,6 +2501,7 @@ async function listChats(){
   return Object.values(localChats()).map(c=>({id: c.id, title: c.title, source: 'page', updated: c.updated, turns: (c.turns || []).length, project: c.project})).sort((a, b)=>String(b.updated).localeCompare(String(a.updated)));
 }
 async function openChat(id){
+  if(window.ytOn) showYT(false);
   const openSeq = ++chatOpenSeq;
   let x = null;
   if(mode === 'mac'){ try{ x = await fetch(HELPER + '/session?id=' + encodeURIComponent(id)).then(r=>r.ok ? r.json() : null); }catch(e){} }
@@ -2556,6 +2588,7 @@ async function searchChats(){
 }
 $('#chatSearch').oninput = () => { clearTimeout(searchT); searchT = setTimeout(searchChats, 250); };
 function newChat(quiet){
+  if(window.ytOn) showYT(false);
   chatOpenSeq++;
   sessionId = newId(); store.set('ai.session', sessionId); chatName = ''; store.set('ai.chatName', '');
   history = []; store.set('moneyai.history', []); goal = ''; store.set('ai.goal', ''); showGoal(); showProject(null);
@@ -2571,8 +2604,8 @@ const openChats = on => { document.body.classList.toggle('sbOpen', !!on && inner
 $('#sbOpen').onclick = () => openChats(true);
 $('#sbClose').onclick = () => openChats(false);
 $('#newChat').onclick = () => newChat();
-$('#modeChat').onclick = () => setSide('chat');
-$('#modeCode').onclick = () => setSide('code');
+$('#modeChat').onclick = () => { showYT(false); setSide('chat'); };
+$('#modeCode').onclick = () => { showYT(false); setSide('code'); };
 $('#codeProject').onchange = () => { const v = codePick(); try{ store.set('ai.codeProject', v); }catch(e){}
   if(!v) return; if(history.length && projectOf() !== v) newChat(true); else { setChatProject(sessionId, v); showChatProject(); drawChats(); } };
 // the page opens on the side of the chat it shows
@@ -2851,6 +2884,37 @@ async function loadYouTube(box){
     else if(a === 'check'){ openKeys(false); ask('/channel'); }
     else if(a === 'out'){ await post('/youtube', {forget: true}).catch(()=>{}); toast('Signed out of YouTube'); loadKeys(); } });
 }
+/* THE YOUTUBE VIEW (13 Nov): /youtube's status (the last /channel look) as tiles and lessons, the report itself below */
+window.ytOn = false;
+function showYT(on){
+  if(!on && location.hash === '#youtube') history.replaceState(null, '', location.pathname + location.search);
+  window.ytOn = !!on; document.body.classList.toggle('ytMode', !!on); $('#ytView').hidden = !on; $('#modeYT').setAttribute('aria-selected', String(!!on));
+  if(on){ $('#modeChat').setAttribute('aria-selected', 'false'); $('#modeCode').setAttribute('aria-selected', 'false'); if(matchMedia('(max-width: 900px)').matches) openChats(false); window.scrollTo(0, 0); loadYT(); }
+  else paintMode();
+}
+async function loadYT(){
+  const sub = $('#ytSub'), stats = $('#ytStats'), learn = $('#ytLearn'), frame = $('#ytFrame'), open = $('#ytOpen');
+  let y = null; try{ y = await fetch(HELPER + '/youtube').then(r=>r.json()); }catch(e){}
+  learn.hidden = true; frame.hidden = true; open.hidden = true;
+  if(!y || y.error){ sub.textContent = ''; stats.innerHTML = '<div class="ytempty"><b>Your Mac is not answering</b>The YouTube view reads your channel through your AI on the Mac - open this page there, or over Tailscale.</div>'; return; }
+  if(!y.connected){ sub.textContent = 'Not connected'; stats.innerHTML = '<div class="ytempty"><b>Connect your channel first</b>Read-only, from YouTube Studio. <br><br><button class="ytbtn primary" type="button" id="ytConnect">Connect in Your keys</button></div>';
+    $('#ytConnect').onclick = () => { showYT(false); openKeys(true); }; return; }
+  const day = t => new Date(t).toLocaleString('en-IN', {day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit'});
+  sub.textContent = (y.channel || 'Your channel') + (y.checked ? ' · checked ' + day(y.checked) : ' · not checked yet');
+  if(!y.stats){ stats.innerHTML = '<div class="ytempty"><b>Not checked yet</b>Check again reads your last 30 videos from YouTube Studio - about a minute.</div>'; return; }
+  const n = x => x >= 1e5 ? (x / 1e5).toFixed(1).replace(/\.0$/, '') + 'L' : x >= 1e3 ? (x / 1e3).toFixed(1).replace(/\.0$/, '') + 'K' : String(x || 0), s = y.stats;
+  stats.innerHTML = [[n(s.subs), 'subscribers'], [n(s.views), 'views on the last ' + s.videos + ' videos'], [s.good, 'doing well', 'good'], [s.work, 'need work', s.work ? 'bad' : ''], [s.pending, 'waiting for Studio\'s numbers (2-3 days)']]
+    .map(([v, l, c]) => `<div class="ytstat ${c || ''}"><b>${esc(String(v))}</b><span>${esc(l)}</span></div>`).join('');
+  const L = y.lessons;
+  if(L && (L.reasons.length || L.lost.length || L.patterns.length)){ learn.hidden = false;
+    learn.innerHTML = '<h2>📺 What your next reel will avoid</h2><ul>' + L.reasons.slice(0, 3).map(r => '<li>' + esc(r) + '</li>').join('') + (L.lost.length ? '<li>Openings like “' + esc(L.lost[0]) + '”</li>' : '') + L.patterns.slice(0, 2).map(p => '<li>' + esc(p) + '</li>').join('') + '</ul>'; }
+  if(y.page){ const src = HELPER + y.page + '?t=' + (y.checked || 0); if(frame.getAttribute('src') !== src) frame.src = src; frame.hidden = false; open.href = src; open.hidden = false; }
+}
+$('#modeYT').onclick = () => showYT(true);
+// (the address …/#youtube opens it straight away - a bookmark on the phone)
+if(location.hash === '#youtube') setTimeout(() => showYT(true), 0);
+$('#ytCheck').onclick = () => { showYT(false); setSide('chat'); ask('/channel'); };
+$('#ytIdeas').onclick = () => { showYT(false); const q = $('#q'); q.value = '/reel ideas '; q.focus(); toast('Write your niche after /reel ideas - it uses your channel\'s lessons'); };
 $('#keysToSeq').onclick = () => { openKeys(false); openSeq(true); };
 $('#refreshAllKeys').onclick = async () => {
   const btn = $('#refreshAllKeys');
