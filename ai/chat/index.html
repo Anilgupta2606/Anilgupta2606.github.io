@@ -118,8 +118,12 @@ body{padding-left:var(--sb)}
 .flow li .mv{visibility:hidden} .flow li:hover .mv, .flow li:focus-within .mv{visibility:visible} @media (pointer:coarse){ .flow li .mv{visibility:visible} }
 .bench{display:flex; flex-wrap:wrap; gap:6px; margin-top:6px} .bench button{border:1px dashed var(--line); background:none; color:var(--mut); border-radius:10px; padding:5px 9px; font-size:12.5px; cursor:pointer; min-height:30px}
 .bench button:hover{color:var(--ink); border-color:var(--ink)}
-.modeswitch{display:flex; gap:3px; background:var(--page); border:1px solid var(--line); border-radius:12px; padding:3px; align-self:flex-start}
-.modeswitch button{display:flex; align-items:center; gap:6px; border:0; background:transparent; color:var(--mut); padding:6px 12px; border-radius:9px; cursor:pointer; font:600 13px/1 inherit; min-height:34px}
+.modeswitch{display:flex; gap:3px; background:var(--page); border:1px solid var(--line); border-radius:12px; padding:3px; align-self:stretch; min-width:0; box-sizing:border-box}
+.modeswitch button{flex:1 1 0; min-width:0; justify-content:center; display:flex; align-items:center; gap:5px; border:0; background:transparent; color:var(--mut); padding:6px 6px; border-radius:9px; cursor:pointer; font:600 13px/1 inherit; min-height:34px}
+.modeswitch button svg{flex:0 0 auto}
+.modeswitch button span{min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}   /* three tabs share the sidebar's width - never wider than it (13 Nov) */
+.modeswitch{container-type:inline-size}
+@container (max-width: 280px){ .modeswitch button:not([aria-selected="true"]){flex:0 0 auto; padding:6px 11px} .modeswitch button:not([aria-selected="true"]) span{display:none} }   /* narrow: the open tab keeps its name, the others are icons (their names in the tooltip) */
 .modeswitch button[aria-selected="true"]{background:var(--card); color:var(--ink); box-shadow:0 1px 3px rgba(0,0,0,.12)}
 .codepick{display:flex; flex-direction:column; gap:4px; font-size:12px; color:var(--mut)} .codepick select{border:1px solid var(--line); background:var(--card); color:var(--ink); border-radius:10px; padding:8px 10px; font-size:13.5px}
 body:not(.codeMode) .codeOnly, body.codeMode .chatOnly{display:none !important}
