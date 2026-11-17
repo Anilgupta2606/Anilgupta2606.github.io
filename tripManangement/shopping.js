@@ -35,10 +35,11 @@ VIEWS.shop = function(main, cur){
   const people = shopState.people = Array.from(new Set(S.people.map(p=>p.name).concat(travellersOf(cur)))).filter(Boolean);
   main.innerHTML = `
   <section class="section-head"><div><h1>${esc(cur.name)}</h1><p class="muted small">${all.length ? `${done} of ${all.length} bought<span id="sh-spent"></span>` : 'One list for each place: what to buy before you leave, and what to buy there.'}</p></div>
-    <div class="row">${all.length ? `<button class="btn ghost" id="sh-copy">Copy as text</button>` : ''}</div></section>
+    <div class="row">${all.length ? `<button class="btn ghost" id="sh-xlsx">Export to Excel</button><button class="btn ghost" id="sh-copy">Copy as text</button>` : ''}</div></section>
   <section class="shop-grid">${places.map((p, i)=>shopCard(cur, p, i)).join('')}</section>`;
   places.forEach((p, i)=>bindShopCard(cur, p, i, places));
   if($('sh-copy')) $('sh-copy').onclick = ()=>navigator.clipboard.writeText(shopText(cur, places)).then(()=>toast('Copied — paste it in WhatsApp or Notes.'));
+  if($('sh-xlsx')) $('sh-xlsx').onclick = e=>shopExcel(cur, places, e.currentTarget);
   places.filter(p=>!p.home).forEach(p=>loadShopGuide(p));
   fillFx(main, all);
 };
@@ -186,3 +187,56 @@ function shopText(trip, places){
     return '\n' + (p.home ? 'Before leaving (' + p.city + ')' : p.city) + ':\n' + items.map(x=>(x.done ? '✓ ' : '☐ ') + x.text + (x.qty ? ' × ' + x.qty : '') + (x.who ? ' (for ' + x.who + ')' : '') + (x.where ? ' @ ' + x.where : '')).join('\n');
   }).join('\n').trim();
 }
+
+/* Export to Excel: one row per item, every place of the trip, with the price in rupees (at the rate of the
+   day it was bought) and a total. SheetJS is fetched from cdnjs only when asked (kept offline by sw.js after);
+   if it cannot load, the same table is saved as a CSV, which Excel opens too. */
+const SHOP_COLS = ['Place', 'When', 'Item', 'Qty', 'For', 'Where', 'Price', 'Price (₹)', 'Bought', 'Bought on'];
+function shopRows(trip, places, inr){
+  inr = inr || {};
+  const day = t => { if(!t) return ''; const d = new Date(t); return isNaN(d) ? '' : d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
+  const rows = [];
+  places.forEach(p=>shopItems(trip, p.city).forEach(x=>rows.push([p.city, p.home ? 'Before leaving' : 'There', x.text || '', x.qty || '',
+    x.who || '', x.where || '', x.price || '', x.id in inr ? Math.round(inr[x.id]) : '', x.done ? 'Yes' : 'No', x.done ? day(x.boughtAt) : ''])));
+  const spent = rows.filter(r=>r[8] === 'Yes' && r[7] !== '').reduce((a, r)=>a + r[7], 0);
+  return {rows, spent};
+}
+const shopFile = trip => (String(trip.name || 'Trip').replace(/[\\/:*?"<>|]+/g, ' ').replace(/\s+/g, ' ').trim() || 'Trip') + ' - shopping';
+function loadXLSX(){
+  if(window.XLSX) return Promise.resolve(window.XLSX);
+  return loadXLSX.p = loadXLSX.p || new Promise((ok, no)=>{
+    const s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+    s.onload = ()=>window.XLSX ? ok(window.XLSX) : no(new Error('no XLSX'));
+    s.onerror = ()=>{ loadXLSX.p = null; no(new Error('SheetJS did not load')); };
+    document.head.appendChild(s);
+  });
+}
+async function shopExcel(trip, places, btn){
+  if(btn) btn.disabled = true;
+  try{
+    const inr = {};
+    if(typeof FX !== 'undefined') await Promise.all(places.flatMap(p=>shopItems(trip, p.city)).filter(x=>x.price).map(async x=>{
+      const m = FX.parse(x.price); if(!m) return;
+      try{ inr[x.id] = m.currency === 'INR' ? m.amount : (await FX.toINR(m.amount, m.currency, fxDay(x))).inr; }catch(e){}
+    }));
+    const {rows, spent} = shopRows(trip, places, inr);
+    const table = [SHOP_COLS].concat(rows, [[], ['Total spent (bought items)', '', '', '', '', '', '', Math.round(spent)]]);
+    let X = null; try{ X = await loadXLSX(); }catch(e){}
+    if(X){
+      const ws = X.utils.aoa_to_sheet(table);
+      ws['!cols'] = [14, 15, 28, 6, 16, 22, 14, 11, 8, 12].map(w=>({wch: w}));
+      ws['!autofilter'] = {ref: 'A1:J' + (rows.length + 1)};
+      const wb = X.utils.book_new(); X.utils.book_append_sheet(wb, ws, 'Shopping');
+      X.writeFile(wb, shopFile(trip) + '.xlsx');
+      toast('Saved ' + shopFile(trip) + '.xlsx');
+    }else{
+      const q = v => { v = String(v == null ? '' : v); return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };
+      const blob = new Blob(['\ufeff' + table.map(r=>r.map(q).join(',')).join('\r\n')], {type: 'text/csv'});
+      const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = shopFile(trip) + '.csv';
+      document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href), 5000);
+      toast('Excel library could not load (offline?) — saved as CSV, which Excel opens.');
+    }
+  }finally{ if(btn) btn.disabled = false; }
+}
+if(typeof module !== 'undefined') module.exports = {shopRows, shopFile, SHOP_COLS};
