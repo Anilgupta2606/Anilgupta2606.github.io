@@ -611,6 +611,11 @@ body.ytMode #main, body.ytMode .composer{display:none}
 .ytstat span{color:var(--mut); font-size:12.5px}
 .ytstat.good b{color:#16a34a} .ytstat.bad b{color:#ea580c}
 .ytlearn{background:var(--card); border:1px solid var(--line); border-radius:14px; padding:12px 16px; font-size:14px}
+.ytverdict{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px}
+.ytverdict h2{font-size:15px;margin:0 0 7px}.ytverdict h3{font-size:20px;margin:5px 0 8px;line-height:1.25}
+.ytverdict .ytbrief{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:9px 18px;margin:12px 0}
+.ytverdict dt{font-size:12px;color:var(--mut);font-weight:650}.ytverdict dd{margin:2px 0;font-size:14px}
+.ytverdict #ytDiscovery{margin-top:12px}.ytverdict #ytDiscovery li{margin:7px 0}.ytverdict details{margin:12px 0;font-size:13px}.ytverdict summary{cursor:pointer}.ytverdict ul{padding-left:19px}
 .ytlearn h2{margin:0 0 6px; font-size:15px} .ytlearn ul{margin:0; padding-left:18px} .ytlearn li{margin:3px 0}
 .ytframe{width:100%; height:max(640px, calc(100vh - 300px)); border:1px solid var(--line); border-radius:14px; background:var(--card)}
 .ytvids{background:var(--card); border:1px solid var(--line); border-radius:14px; padding:12px 16px}
@@ -964,7 +969,12 @@ body.ytMode #main, body.ytMode .composer{display:none}
 <section class="ytview" id="ytView" aria-label="YouTube" hidden>
   <div class="ythead"><div><h1>YouTube</h1><p class="ytsub" id="ytSub">Loading…</p></div>
     <div class="ytacts"><button class="ytbtn primary" id="ytCheck" type="button">🔄 Check again</button><button class="ytbtn" id="ytIdeas" type="button">💡 Reel ideas</button><button class="ytbtn" id="ytAllow" type="button" hidden>🔓 Allow edits</button><a class="ytbtn" id="ytOpen" target="_blank" rel="noopener" hidden>↗ Full page</a></div></div>
+  <div class="ytacts" role="group" aria-label="YouTube channels" id="ytProfiles">
+    <button class="ytbtn primary" type="button" data-profile="anime" aria-pressed="true">Anime</button>
+    <button class="ytbtn" type="button" data-profile="mystery" aria-pressed="false">Mystery</button>
+  </div>
   <div class="ytprog" id="ytProg" hidden role="progressbar" aria-label="Checking your channel" aria-valuemin="0" aria-valuemax="100"><div class="bar"><i></i></div><span>Starting…</span></div>
+  <section class="ytverdict" id="ytVerdict" hidden aria-label="What to post next"></section>
   <div class="ytstats" id="ytStats"></div>
   <div class="ytlearn" id="ytLearn" hidden></div>
   <div class="ytvids" id="ytVids" hidden></div>
@@ -2883,50 +2893,179 @@ async function loadKeys(){
 }
 /* YOUTUBE (12 Nov, /channel): your channel read from YouTube Studio, read-only. Google's Desktop-app client file picked here,
    then the sign-in opened on this Mac (Google sends you back to the helper at 127.0.0.1 - from the phone it cannot). */
+const youtubeProfiles = {anime: 'Anime', mystery: 'Mystery'};
+let ytProfile = 'anime';
+const youtubeStatus = profile => fetch(HELPER + '/youtube?profile=' + profile).then(r => r.json()).catch(() => null);
+const channelCommand = profile => profile === 'anime' ? '/channel' : '/channel mystery';
 async function loadYouTube(box){
-  let y = null; try{ y = await fetch(HELPER + '/youtube').then(r=>r.json()); }catch(e){}
-  if(!y || y.error) return;
-  box.querySelectorAll('.ytrow').forEach(x=>x.remove());
+  const profiles = Object.keys(youtubeProfiles);
+  const states = await Promise.all(profiles.map(youtubeStatus));
+  box.querySelectorAll('.ytrow').forEach(x => x.remove());
   const d = document.createElement('div'); d.className = 'ytrow';
-  const light = y.connected ? 'green' : y.client ? 'yellow' : 'red';
-  const says = y.connected ? (y.channel ? 'Connected: ' + y.channel + (y.checked ? ' · last checked ' + new Date(y.checked).toLocaleDateString('en-IN', {day: 'numeric', month: 'short'}) : '') : 'Connected - check your channel once')
-    : y.client ? 'Google client saved - sign in to finish' : 'Not connected. In Google Cloud: a project with YouTube Data API v3 and YouTube Analytics API on, the consent screen published, then Credentials → OAuth client ID → Desktop app → Download JSON - and pick that file here.';
-  d.innerHTML = `<div class="kgroup">Connections</div><div class="krow"><div class="khead"><span class="kdot ${light}"></span><b>YouTube (your channel, read-only)</b></div>
-    <div class="kmore"><small>${esc(says)}${y.onMac ? '' : ' Signing in works only on the Mac itself.'}</small></div>
-    <div class="kedit"><input type="file" accept=".json,application/json" hidden>
-      ${y.connected ? '<button class="ghost" data-yt="check" type="button">📺 Check my channel</button><button class="ghost" data-yt="out" type="button">Sign out</button>'
-        : (y.client ? '<button class="ghost" data-yt="in" type="button">Sign in to YouTube</button>' : '') + '<button class="ghost" data-yt="file" type="button">' + (y.client ? 'Another client file…' : 'Choose Google client file…') + '</button>'}</div></div>`;
-  box.appendChild(d);
-  const file = d.querySelector('input[type=file]');
-  const signIn = async body => { try{ const j = await post('/youtube', body); if(j.error) return toast(j.error);
-      if(!j.onMac) return toast('Open Cygnus on the Mac to sign in - Google sends you back to the Mac');
-      window.open(j.url, '_blank', 'noopener'); toast('Sign in in the new tab, then come back');
-      let n = 0; const t = setInterval(async () => { n++; const s = await fetch(HELPER + '/youtube').then(r=>r.json()).catch(()=>null);
-        if(s && s.connected){ clearInterval(t); toast('YouTube connected ✓'); loadKeys(); } else if(n > 60) clearInterval(t); }, 3000);
-    }catch(e){ toast('That did not work: ' + e.message); loadKeys(); } };
-  file.onchange = async () => { const f = file.files && file.files[0]; if(!f) return; if(f.size > 20000) return toast('That is not Google\'s client file'); signIn({client: await f.text()}); };
-  d.querySelectorAll('[data-yt]').forEach(b=>b.onclick = async () => { const a = b.dataset.yt;
-    if(a === 'file') file.click(); else if(a === 'in') signIn({signin: true});
-    else if(a === 'check'){ openKeys(false); ask('/channel'); }
-    else if(a === 'out'){ await post('/youtube', {forget: true}).catch(()=>{}); toast('Signed out of YouTube'); loadKeys(); } });
+  d.innerHTML = '<div class="kgroup">Connections</div>';
+  for(const [i, profile] of profiles.entries()){
+    const y = states[i];
+    if(!y || y.error) continue;
+    const row = document.createElement('div'); row.className = 'krow';
+    const light = y.connected ? 'green' : y.client ? 'yellow' : 'red';
+    const says = y.connected ? 'Connected' + (y.channel ? ' · ' + y.channel : '')
+      : y.client ? 'Google client saved. Sign in to finish.' : 'Choose the Google Desktop OAuth client JSON. You can reuse the same file for both channels.';
+    row.innerHTML = `<div class="khead"><span class="kdot ${light}"></span><b>YouTube · ${youtubeProfiles[profile]}</b></div>
+      <div class="kmore"><small>${esc(says)}${y.onMac ? '' : ' Sign in on the Mac.'}</small></div>
+      <div class="kedit"><input type="file" accept=".json,application/json" hidden>
+        <a class="ghost" data-yt-link hidden>Continue to Google</a>
+        ${y.connected ? '<button class="ghost" data-yt="check" type="button">View channel</button><button class="ghost" data-yt="out" type="button">Sign out</button>'
+          : (y.client ? '<button class="ghost" data-yt="in" type="button">Sign in to YouTube</button>' : '') + '<button class="ghost" data-yt="file" type="button">Choose Google client file…</button>'}</div>`;
+    const file = row.querySelector('input[type=file]');
+    const link = row.querySelector('[data-yt-link]');
+    const signIn = async (body, navigate = false) => {
+      if(!y.onMac) return toast('Open Cygnus on the Mac to sign in.');
+      try{
+        const j = await post('/youtube', {profile, ...await body()});
+        if(!j?.url) throw new Error(j?.error || 'Could not start Google sign-in');
+        link.href = j.url;
+        link.hidden = false;
+        row.querySelector('.kmore small').textContent = 'Choose your ' + youtubeProfiles[profile] + ' YouTube channel in Google.';
+        if(navigate) window.location.assign(j.url);
+        else link.focus();
+      }catch(e){ toast(e.message); }
+    };
+    file.onchange = async () => {
+      const f = file.files?.[0];
+      if(!f) return;
+      file.value = '';
+      if(f.size > 20000) return toast('Choose the Google client JSON file.');
+      await signIn(async () => ({client: await f.text()}));
+    };
+    row.querySelectorAll('[data-yt]').forEach(b => b.onclick = async () => {
+      if(b.dataset.yt === 'file') file.click();
+      if(b.dataset.yt === 'in') await signIn(() => ({}), true);
+      if(b.dataset.yt === 'check'){ openKeys(false); selectYouTubeProfile(profile); showYT(true); }
+      if(b.dataset.yt === 'out'){
+        try{ const j = await post('/youtube', {profile, forget: true}); if(!j?.ok) throw new Error(j?.error || 'Could not sign out'); loadKeys(); }
+        catch(e){ toast(e.message); }
+      }
+    });
+    d.appendChild(row);
+  }
+  if(d.children.length > 1) box.appendChild(d);
 }
+function selectYouTubeProfile(profile){
+  ytProfile = profile;
+  $('#ytProfiles').querySelectorAll('[data-profile]').forEach(b => {
+    const selected = b.dataset.profile === profile;
+    b.classList.toggle('primary', selected);
+    b.setAttribute('aria-pressed', String(selected));
+  });
+  if(window.ytOn) loadYT();
+}
+$('#ytProfiles').onclick = e => {
+  const b = e.target.closest('[data-profile]');
+  if(b && !ytBusy) selectYouTubeProfile(b.dataset.profile);
+};
 /* THE YOUTUBE VIEW (13 Nov): /youtube's status (the last /channel look) as tiles and lessons, the report itself below */
 window.ytOn = false;
 function showYT(on){
-  if(!on && location.hash === '#youtube') history.replaceState(null, '', location.pathname + location.search);
+  if(!on && /^#youtube(?:-(anime|mystery))?$/.test(location.hash)) history.replaceState(null, '', location.pathname + location.search);
   window.ytOn = !!on; document.body.classList.toggle('ytMode', !!on); $('#ytView').hidden = !on; $('#modeYT').setAttribute('aria-selected', String(!!on));
   if(on){ $('#modeChat').setAttribute('aria-selected', 'false'); $('#modeCode').setAttribute('aria-selected', 'false'); if(matchMedia('(max-width: 900px)').matches) openChats(false); window.scrollTo(0, 0); loadYT(); }
   else paintMode();
 }
+const discoveryCache = new Map();
+function paintDiscovery(box, data){
+  const entry = (label, list, metric = () => '') => {
+    if(!list.length) return '';
+    return '<details open><summary>' + label + '</summary><ul>' + list.map(v => {
+      const url = /^https?:\/\//.test(v.url || '') ? v.url : '';
+      const title = url ? '<a href="' + esc(url) + '" target="_blank" rel="noopener noreferrer">' + esc(v.title) + '</a>' : esc(v.title);
+      const details = metric(v);
+      return '<li>' + title + (details ? ' · ' + esc(details) : '') +
+        (v.direction ? '<div class="ytsub">' + esc(v.direction) + '</div>' : '') +
+        (v.command ? ' <button type="button" class="ytbtn" data-next-command="' + esc(v.command) + '">' + (url ? 'Prepare clip' : 'Draft topic') + '</button>' : '') + '</li>';
+    }).join('') + '</ul></details>';
+  };
+  const dates = (v, details) => [v.published, details].filter(Boolean).join(' · ');
+  const recent = data.youtube.filter(v => v.recent), older = data.youtube.filter(v => !v.recent);
+  const recentReels = data.instagram.filter(v => v.recent), otherReels = data.instagram.filter(v => !v.recent);
+  const n = value => Number(value).toLocaleString();
+  box.innerHTML = '<h3>Sources and related topics</h3><p class="ytsub">Searched for ' + esc(data.topic) + ' · ' +
+    esc(new Date(data.checked).toLocaleDateString()) + '</p>'
+    + entry('Your uploads to repurpose', data.own)
+    + entry('YouTube labels as Creative Commons', data.cc, () => 'Check the original rights and credit the creator')
+    + (!data.cc.length ? '<p class="ytsub">No Creative Commons candidates found among the results checked.</p>' : '')
+    + entry('YouTube examples uploaded in the last 30 days', recent, v => dates(v, v.views ? n(v.views) + ' total views' : ''))
+    + entry('Instagram Reels posted in the last 30 days', recentReels, v => dates(v, v.likes ? n(v.likes) + ' likes' : ''))
+    + entry('Other YouTube references', older, v => dates(v, v.views ? n(v.views) + ' total views' : ''))
+    + entry('Other Instagram references', otherReels, v => dates(v, v.likes ? n(v.likes) + ' likes' : ''))
+    + entry('Web research', data.web) + entry('Related topics you could make', data.ideas)
+    + (!recent.length && !recentReels.length ? '<p class="ytsub">No dated videos from the last 30 days came back for this search.</p>' : '');
+  box.onclick = e => {
+    const button = e.target.closest('[data-next-command]');
+    if(button) fillVideoCommand(button.dataset.nextCommand);
+  };
+}
+function fillVideoCommand(command){
+  showYT(false); setSide('chat'); $('#q').value = command; $('#q').focus();
+}
+function paintYouTubeVerdict(y){
+  const box = $('#ytVerdict'), v = y.verdict, c = y.coverage;
+  box.hidden = false;
+  if(!v || !c){
+    box.innerHTML = '<h2>What to post next</h2><p class="ytsub">Run Check again to build a recommendation from this channel’s Studio data.</p>';
+    return;
+  }
+  const rows = [['Format', v.format], ['Length', 'About ' + v.seconds + ' seconds'], ['Suggested title', v.title], ['Description opener', v.description], ['Hook line', v.hook], ['Opening shot', v.opening], ['Story beats', v.flow],
+    ['Cover words', v.cover], ['Pinned comment', v.comment], ['What to measure', v.check]].filter(([label, value]) => value && !(label === 'Suggested title' && value === v.topic));
+  const evidence = (v.evidence || []).filter(e => /^[\w-]{11}$/.test(e.id)).map(e =>
+    '<li><a href="https://www.youtube.com/watch?v=' + e.id + '" target="_blank" rel="noopener">' + esc(e.title) + '</a> · ' +
+    esc(String(e.views)) + ' Studio views · ' + esc(String(e.watched)) + '% average watched</li>').join('');
+  const coverage = ['Studio views for ' + c.studio + ' of ' + c.total + ' public uploads', 'Retention curves for ' + c.retention,
+    'Search queries for ' + c.search, 'YouTube-confirmed formats for ' + c.format, 'Impressions and click rate for ' + c.impressions];
+  if(c.incomparableViews) coverage.push('Engaged-play ratios omitted on ' + c.incomparableViews + ' uploads with inconsistent view totals');
+  if(c.studio && c.search < c.studio) coverage.push('YouTube may withhold search terms or retention for some uploads. Missing reports are left blank.');
+  box.innerHTML = '<h2>What to post next</h2><p class="ytsub">' + esc(v.confidence) + ' · ' + esc(String(v.sample)) + ' comparable Shorts</p>'
+    + '<h3>' + esc(v.topic) + '</h3><p>' + esc(v.why) + '</p>' + (c.analyticsError ? '<p role="status">' + esc(c.analyticsError) + '</p>' : '') + '<dl class="ytbrief">'
+    + rows.map(([label, value]) => '<div><dt>' + label + '</dt><dd>' + esc(value) + '</dd></div>').join('') + '</dl>'
+    + (evidence ? '<details><summary>Videos behind this recommendation</summary><ul>' + evidence + '</ul></details>' : '')
+    + '<details><summary>Data check</summary><ul>' + coverage.map(label => '<li>' + esc(label) + '</li>').join('') + '</ul></details>'
+    + '<div class="ytacts"><button type="button" class="ytbtn primary" id="ytDraftNext">Draft this video</button>'
+    + '<button type="button" class="ytbtn" id="ytDiscover">Find videos and related topics</button></div>'
+    + '<div id="ytDiscovery" aria-live="polite"></div>';
+  $('#ytDraftNext').onclick = () => fillVideoCommand(v.command);
+  const details = $('#ytDiscovery'), find = $('#ytDiscover'), cached = discoveryCache.get(y.profile);
+  if(cached?.checked === y.checked) paintDiscovery(details, cached.data);
+  find.onclick = async () => {
+    find.disabled = true;
+    details.textContent = 'Checking public YouTube, Instagram and web results…';
+    try{
+      const data = await post('/youtube', {profile: y.profile, discover: true});
+      if(data?.error || !Array.isArray(data?.ideas)) throw new Error(data?.error || 'Could not look up related sources');
+      discoveryCache.set(y.profile, {checked: y.checked, data});
+      paintDiscovery(details, data);
+    }catch(e){ details.textContent = e.message; }
+    finally{ find.disabled = false; }
+  };
+
+}
 async function loadYT(){
   const sub = $('#ytSub'), stats = $('#ytStats'), learn = $('#ytLearn'), frame = $('#ytFrame'), open = $('#ytOpen');
-  let y = null; try{ y = await fetch(HELPER + '/youtube').then(r=>r.json()); }catch(e){}
+  const profile = ytProfile;
+  $('#ytVerdict').hidden = true;
   learn.hidden = true; frame.hidden = true; open.hidden = true;
+  $('#ytVids').hidden = true; $('#ytAllow').hidden = true;
+  $('#ytCheck').disabled = true;
+  $('#ytIdeas').hidden = true;
+  stats.textContent = '';
+  sub.textContent = 'Loading…';
+  const y = await youtubeStatus(profile);
+  if(profile !== ytProfile) return;
   if(!y || y.error){ sub.textContent = ''; stats.innerHTML = '<div class="ytempty"><b>Your Mac is not answering</b>The YouTube view reads your channel through your AI on the Mac - open this page there, or over Tailscale.</div>'; return; }
   if(!y.connected){ sub.textContent = 'Not connected'; stats.innerHTML = '<div class="ytempty"><b>Connect your channel first</b>Read-only, from YouTube Studio. <br><br><button class="ytbtn primary" type="button" id="ytConnect">Connect in Your keys</button></div>';
     $('#ytConnect').onclick = () => { showYT(false); openKeys(true); }; return; }
+  $('#ytCheck').disabled = ytBusy; $('#ytIdeas').hidden = false;
   const day = t => new Date(t).toLocaleString('en-IN', {day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit'});
   sub.textContent = (y.channel || 'Your channel') + (y.checked ? ' · checked ' + day(y.checked) : ' · not checked yet');
+  paintYouTubeVerdict(y);
   if(!y.stats){ stats.innerHTML = '<div class="ytempty"><b>Not checked yet</b>Check again reads your last 30 videos from YouTube Studio - about a minute.</div>'; return; }
   const n = x => x >= 1e5 ? (x / 1e5).toFixed(1).replace(/\.0$/, '') + 'L' : x >= 1e3 ? (x / 1e3).toFixed(1).replace(/\.0$/, '') + 'K' : String(x || 0), s = y.stats;
   stats.innerHTML = [[n(s.subs), 'subscribers'], [n(s.views), 'views on the last ' + s.videos + ' videos'], [s.good, 'doing well', 'good'], [s.work, 'need work', s.work ? 'bad' : ''], [s.pending, 'waiting for Studio\'s numbers (2-3 days)']]
@@ -2938,14 +3077,18 @@ async function loadYT(){
   const V = y.videos || [], box = $('#ytVids'); $('#ytAllow').hidden = !!y.edit; box.hidden = !V.length;
   if(V.length){ const b = (cmd, label, cls) => `<button class="ytbtn ${cls || ''}" type="button" data-cmd="${esc(cmd)}">${label}</button>`;
     box.innerHTML = '<h2>Your videos</h2><p class="ytsub">Upload <b>unlisted</b> first, then <b>Get ready</b>: Gemini watches it, makes thumbnails and new words. Apply what you like, then make it public.</p>'
-      + V.map(v => `<div class="ytv"><div class="ytvt"><b title="${esc(v.title)}">${esc(v.title)}</b><span>${v.privacy === 'unlisted' ? '<em class="unl">Unlisted</em> · ' : v.privacy === 'scheduled' ? '<em class="unl">Scheduled' + (v.publishAt ? ' ' + esc(new Date(v.publishAt).toLocaleString([], {day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit'})) : '') + '</em> · ' : ''}${v.short ? 'Short · ' : ''}${n(v.views)} views${v.label && v.privacy !== 'unlisted' && v.privacy !== 'scheduled' ? ' · ' + esc(v.label) : ''}${v.draft ? ' · new words ' + (v.draft === 'applied' ? 'applied' : 'drafted') : ''}</span></div><div class="ytvb">`
-        + b('/channel ready ' + v.id, '✨ Get ready', v.privacy === 'unlisted' ? 'primary' : '') + b('/channel watch ' + v.id, '🎞 Watch') + (v.draft === 'draft' ? b('/channel apply ' + v.id, '📝 Apply words') : v.draft === 'applied' ? b('/channel undo ' + v.id, '↩️ Undo words') : b('/channel fix ' + v.id, '📝 New words'))
-        + (v.privacy === 'unlisted' ? b('/channel public ' + v.id, '🌍 Make public', 'go') : '') + '</div></div>').join(''); }
+      + V.map(v => `<div class="ytv"><div class="ytvt"><b title="${esc(v.title)}">${esc(v.title)}</b><span>${v.privacy === 'unlisted' ? '<em class="unl">Unlisted</em> · ' : v.privacy === 'scheduled' ? '<em class="unl">Scheduled' + (v.publishAt ? ' ' + esc(new Date(v.publishAt).toLocaleString([], {day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit'})) : '') + '</em> · ' : ''}${v.short ? (v.formatSource === 'estimated' ? 'Possible Short · ' : 'Short · ') : ''}${n(v.views)} views${v.label && v.privacy !== 'unlisted' && v.privacy !== 'scheduled' ? ' · ' + esc(v.label) : ''}${v.draft ? ' · new words ' + (v.draft === 'applied' ? 'applied' : 'drafted') : ''}</span></div><div class="ytvb">`
+        + b(channelCommand(profile) + ' ready ' + v.id, '✨ Get ready', v.privacy === 'unlisted' ? 'primary' : '') + b(channelCommand(profile) + ' watch ' + v.id, '🎞 Watch') + (v.draft === 'draft' ? b(channelCommand(profile) + ' apply ' + v.id, '📝 Apply words') : v.draft === 'applied' ? b(channelCommand(profile) + ' undo ' + v.id, '↩️ Undo words') : b(channelCommand(profile) + ' fix ' + v.id, '📝 New words'))
+        + (v.privacy === 'unlisted' ? b(channelCommand(profile) + ' public ' + v.id, '🌍 Make public', 'go') : '') + '</div></div>').join(''); }
   if(y.page){ const src = HELPER + y.page + '?t=' + (y.checked || 0); if(frame.getAttribute('src') !== src) frame.src = src; frame.hidden = false; open.href = src; open.hidden = false; }
 }
 $('#modeYT').onclick = () => showYT(true);
-// (the address …/#youtube opens it straight away - a bookmark on the phone)
-if(location.hash === '#youtube') setTimeout(() => showYT(true), 0);
+// OAuth returns to the selected channel. Existing YouTube bookmarks still work.
+const youtubeReturn = /^#youtube(?:-(anime|mystery))?$/.exec(location.hash);
+if(youtubeReturn) setTimeout(() => {
+  selectYouTubeProfile(youtubeReturn[1] || 'anime');
+  showYT(true);
+}, 0);
 /* CHECK AGAIN stays on this screen (13 Nov, asked): /channel runs on the helper and its steps fill a progress bar here;
    the numbers are read again when it ends. (It opened the chat for it before.) */
 let ytBusy = false;
@@ -2957,7 +3100,7 @@ async function ytCheck(){
   // (the steps are not counted ahead: each one moves the bar a share of what is left, so it never stops short or overshoots)
   let pct = 4; const tick = setInterval(() => { pct += (90 - pct) * 0.02; put(pct); }, 1000);
   try{
-    const r = await fetch(HELPER + '/ask', {method: 'POST', headers: {'content-type': 'application/json'}, body: JSON.stringify({question: '/channel', history: [], cloud: cloudKeys(), session: 'youtube-check'})});
+    const r = await fetch(HELPER + '/ask', {method: 'POST', headers: {'content-type': 'application/json'}, body: JSON.stringify({question: channelCommand(ytProfile), history: [], cloud: cloudKeys(), session: 'youtube-check-' + ytProfile})});
     if(!r.ok) throw new Error((await r.json().catch(() => ({}))).error || 'It answered ' + r.status);
     const reader = r.body.getReader(), dec = new TextDecoder(); let buf = '', out = null;
     for(;;){ const {value, done} = await reader.read(); if(done) break; buf += dec.decode(value, {stream: true}); let i;
@@ -2967,17 +3110,18 @@ async function ytCheck(){
         if(m.error) throw new Error(m.error);
         if(m.answer) out = m.answer; } }
     if(!out) throw new Error('No answer came back.');
+    if(!out.channelChecked) throw new Error(String(out.text || 'No channel report was saved.').split('\n')[0].replace(/\*/g, ''));
     put(100, 'Done'); await loadYT(); toast('📺 Channel checked');
   }catch(e){ label.textContent = '⚠ ' + e.message; toast('The check did not finish: ' + e.message); }
   finally{ clearInterval(tick); ytBusy = false; btn.disabled = false; btn.textContent = '🔄 Check again'; setTimeout(() => { if(!ytBusy && !/^⚠/.test(label.textContent)) prog.hidden = true; }, 1500); }
 }
 $('#ytCheck').onclick = ytCheck;
-$('#ytAllow').onclick = () => { showYT(false); setSide('chat'); ask('/channel allow edits'); };
+$('#ytAllow').onclick = () => { showYT(false); setSide('chat'); ask(channelCommand(ytProfile) + ' allow edits'); };
 // (Make public asks for a second tap - it shows the video to everyone)
 $('#ytVids').onclick = e => { const b = e.target.closest('[data-cmd]'); if(!b) return;
-  if(/^\/channel public /.test(b.dataset.cmd) && !b.dataset.sure){ b.dataset.sure = '1'; const t = b.textContent; b.textContent = 'Tap again: make it public'; setTimeout(() => { delete b.dataset.sure; b.textContent = t; }, 4000); return; }
+  if(/^\/channel (?:mystery )?public /.test(b.dataset.cmd) && !b.dataset.sure){ b.dataset.sure = '1'; const t = b.textContent; b.textContent = 'Tap again: make it public'; setTimeout(() => { delete b.dataset.sure; b.textContent = t; }, 4000); return; }
   showYT(false); setSide('chat'); ask(b.dataset.cmd); };
-$('#ytIdeas').onclick = () => { showYT(false); const q = $('#q'); q.value = '/reel ideas '; q.focus(); toast('Write your niche after /reel ideas - it uses your channel\'s lessons'); };
+$('#ytIdeas').onclick = () => { showYT(false); const q = $('#q'); q.value = ytProfile === 'mystery' ? '/unexplained ideas ' : '/reel ideas '; q.focus(); toast('Enter a topic for your ' + youtubeProfiles[ytProfile] + ' channel'); };
 $('#keysToSeq').onclick = () => { openKeys(false); openSeq(true); };
 $('#refreshAllKeys').onclick = async () => {
   const btn = $('#refreshAllKeys');
