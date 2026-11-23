@@ -2288,7 +2288,7 @@ const COMMANDS = [
   {c: '/anime', a: '[idea | number | story <idea> | mystery <idea>] · next [another track | no music | text: … | remove watermark | auto | <folder>] · posted · status', d: 'A 5-10 s loop for your anime page: one calm, spectacular picture that moves a little (no voice, music from ~/.money-ai/music/anime). You get a prompt for Google Flow, or a picture prompt with the characters\' names (Gemini, Meta AI, ChatGPT) and a folder; /anime next makes the loop from what is saved there - played once, never rewound, a picture alone animated by Wan 2.2. story: 6-8 Flow clips joined in order. mystery: the Odd Signal look. Nothing is uploaded.'},
   {c: '/cleanvideo', a: '<video file, or attach it> [rotate left|right] [9:16|16:9|square] [cut the first N s] · edit <what> · status', d: 'A screen recording of a video with the app taken off (likes, comments, share, names, caption, status bar, reply box): what stays still while the video moves is cut away; the video kept at full size with its sound, on this Mac'},
   {c: '/clipyoutube', a: '<YouTube link or file> <start> <end> [captions|no-captions] · edit <what> · status', d: 'A specific time range from a video, cut for YouTube upload: original aspect kept (not 9:16), optional word-by-word captions, at platform loudness. For your own videos or reusable content'},
-  {c: '/copyshort', a: '<YouTube Shorts or Instagram reel link> · status', d: 'Download a YouTube Short, or your own Instagram reel to post as a Short, as-is - with three thumbnails and post.md. For your own videos or reusable content'},
+  {c: '/copyshort', a: '<YouTube Shorts or Instagram reel link> · status', d: 'Download a YouTube Short, or your own Instagram reel at the highest available source resolution, with three thumbnails and post.md. For your own videos or reusable content'},
   {c: '/joinshortsclip', a: '<link or file> <start> <end> … · next · change <what> · edit <what> · status', d: 'Review a plan for joining video ranges into a vertical Short, then render it'},
   {c: '/brandvideo', a: '<video file> [banner: TEXT] [with host] [watermark: TEXT] [like and subscribe] · edit <what> · status', d: 'Add branding to a video while keeping its original dimensions'},
   {c: '/commentary', a: '<YouTube link or file> [hindi] [no captions] · next [no captions] · change <what> · host [new] · status', d: 'A commentary Short with your channel\'s own AI host: a plan of his lines and 1-2 short moments of the clip on a page, then the 9:16 video with a male voice, captions, a thumbnail and post.md. English unless you add hindi.'},
@@ -2979,8 +2979,11 @@ function paintDiscovery(box, data){
       const url = /^https?:\/\//.test(v.url || '') ? v.url : '';
       const title = url ? '<a href="' + esc(url) + '" target="_blank" rel="noopener noreferrer">' + esc(v.title) + '</a>' : esc(v.title);
       const details = metric(v);
-      return '<li>' + title + (details ? ' · ' + esc(details) : '') +
-        (v.direction ? '<div class="ytsub">' + esc(v.direction) + '</div>' : '') +
+      return '<li>' + (v.label ? '<b>' + esc(v.label) + '</b><br>' : '') + title + (details ? ' · ' + esc(details) : '') +
+        (v.direction ? '<div class="ytsub">' + esc(v.direction) + '</div>' : '')
+        + (v.evidence?.url && /^https?:\/\//.test(v.evidence.url) ? '<div class="ytsub">' + esc(v.signal || 'Reference') + ' · <a href="'
+          + esc(v.evidence.url) + '" target="_blank" rel="noopener">' + esc(v.evidence.title) + '</a></div>' : '')
+        + (v.asset ? '<div class="ytsub">' + esc(v.asset) + '</div>' : '') +
         (v.command ? ' <button type="button" class="ytbtn" data-next-command="' + esc(v.command) + '">' + (url ? 'Prepare clip' : 'Draft topic') + '</button>' : '') + '</li>';
     }).join('') + '</ul></details>';
   };
@@ -2993,7 +2996,7 @@ function paintDiscovery(box, data){
     + entry('Your uploads to repurpose', data.own)
     + entry('YouTube labels as Creative Commons', data.cc, () => 'Check the original rights and credit the creator')
     + (!data.cc.length ? '<p class="ytsub">No Creative Commons candidates found among the results checked.</p>' : '')
-    + entry('YouTube examples uploaded in the last 30 days', recent, v => dates(v, v.views ? n(v.views) + ' total views' : ''))
+    + entry('YouTube examples uploaded in the last 30 days', recent, v => dates(v, v.views ? n(v.views) + ' total views' + (v.viewsPerDay == null ? '' : ' · +' + n(v.viewsPerDay) + ' views/day since the previous check') : ''))
     + entry('Instagram Reels posted in the last 30 days', recentReels, v => dates(v, v.likes ? n(v.likes) + ' likes' : ''))
     + entry('Other YouTube references', older, v => dates(v, v.views ? n(v.views) + ' total views' : ''))
     + entry('Other Instagram references', otherReels, v => dates(v, v.likes ? n(v.likes) + ' likes' : ''))
@@ -3016,16 +3019,29 @@ function paintYouTubeVerdict(y){
   }
   const rows = [['Format', v.format], ['Length', 'About ' + v.seconds + ' seconds'], ['Suggested title', v.title], ['Description opener', v.description], ['Hook line', v.hook], ['Opening shot', v.opening], ['Story beats', v.flow],
     ['Cover words', v.cover], ['Pinned comment', v.comment], ['What to measure', v.check]].filter(([label, value]) => value && !(label === 'Suggested title' && value === v.topic));
-  const evidence = (v.evidence || []).filter(e => /^[\w-]{11}$/.test(e.id)).map(e =>
-    '<li><a href="https://www.youtube.com/watch?v=' + e.id + '" target="_blank" rel="noopener">' + esc(e.title) + '</a> · ' +
-    esc(String(e.views)) + ' Studio views · ' + esc(String(e.watched)) + '% average watched</li>').join('');
+  const evidence = (v.evidence || []).filter(e => /^[\w-]{11}$/.test(e.id)).map(e => {
+    const url = 'https://www.youtube.com/watch?v=' + e.id;
+    const metrics = [[e.views, 'Studio views'], [e.engaged, 'engaged views'], [e.duration, 's average view duration'],
+      [e.watched, '% average watched']].filter(([n]) => n != null).map(([n, label]) => esc(String(n) + ' ' + label));
+    const traffic = [[e.searchViews, 'Search'], [e.feedViews, 'Shorts feed']].filter(([n]) => n != null)
+      .map(([n, source]) => esc(source + ' ' + n));
+    return '<li><a href="' + url + '" target="_blank" rel="noopener">' + esc(e.title) + '</a> · ' + metrics.join(' · ')
+      + (traffic.length ? '<div>Lifetime traffic · ' + traffic.join(' · ') + '</div>' : '')
+      + (e.reviewAt == null ? '' : '<div><a href="' + url + '&amp;t=' + Number(e.reviewAt) + 's" target="_blank" rel="noopener">Review the dip at ' + Number(e.reviewAt) + ' s</a></div>') + '</li>';
+  }).join('');
+  const baseline = [[v.baseline?.engaged, 'engaged views'], [v.baseline?.duration, 's average view duration'],
+    [v.baseline?.watched, '% average watched']].filter(([n]) => n != null)
+    .map(([n, label]) => esc(n.toLocaleString(undefined, {maximumFractionDigits: 1}) + ' ' + label)).join(' · ');
   const coverage = ['Studio views for ' + c.studio + ' of ' + c.total + ' public uploads', 'Retention curves for ' + c.retention,
     'Search queries for ' + c.search, 'YouTube-confirmed formats for ' + c.format, 'Impressions and click rate for ' + c.impressions];
+  coverage.push('Studio’s chose-to-view rate is unavailable through this report.');
   if(c.incomparableViews) coverage.push('Engaged-play ratios omitted on ' + c.incomparableViews + ' uploads with inconsistent view totals');
   if(c.studio && c.search < c.studio) coverage.push('YouTube may withhold search terms or retention for some uploads. Missing reports are left blank.');
   box.innerHTML = '<h2>What to post next</h2><p class="ytsub">' + esc(v.confidence) + ' · ' + esc(String(v.sample)) + ' comparable Shorts</p>'
+    + (v.window ? '<p class="ytsub">' + esc([v.comparison, v.window].filter(Boolean).join(' · ')) + '</p>' : '')
     + '<h3>' + esc(v.topic) + '</h3><p>' + esc(v.why) + '</p>' + (c.analyticsError ? '<p role="status">' + esc(c.analyticsError) + '</p>' : '') + '<dl class="ytbrief">'
     + rows.map(([label, value]) => '<div><dt>' + label + '</dt><dd>' + esc(value) + '</dd></div>').join('') + '</dl>'
+    + (baseline ? '<p class="ytsub">Typical for this group · ' + baseline + '</p>' : '')
     + (evidence ? '<details><summary>Videos behind this recommendation</summary><ul>' + evidence + '</ul></details>' : '')
     + '<details><summary>Data check</summary><ul>' + coverage.map(label => '<li>' + esc(label) + '</li>').join('') + '</ul></details>'
     + '<div class="ytacts"><button type="button" class="ytbtn primary" id="ytDraftNext">Draft this video</button>'
@@ -3076,8 +3092,15 @@ async function loadYT(){
   // your videos: watch, get ready (Gemini, thumbnails, new words), apply / undo the words, make an unlisted one public
   const V = y.videos || [], box = $('#ytVids'); $('#ytAllow').hidden = !!y.edit; box.hidden = !V.length;
   if(V.length){ const b = (cmd, label, cls) => `<button class="ytbtn ${cls || ''}" type="button" data-cmd="${esc(cmd)}">${label}</button>`;
-    box.innerHTML = '<h2>Your videos</h2><p class="ytsub">Upload <b>unlisted</b> first, then <b>Get ready</b>: Gemini watches it, makes thumbnails and new words. Apply what you like, then make it public.</p>'
-      + V.map(v => `<div class="ytv"><div class="ytvt"><b title="${esc(v.title)}">${esc(v.title)}</b><span>${v.privacy === 'unlisted' ? '<em class="unl">Unlisted</em> · ' : v.privacy === 'scheduled' ? '<em class="unl">Scheduled' + (v.publishAt ? ' ' + esc(new Date(v.publishAt).toLocaleString([], {day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit'})) : '') + '</em> · ' : ''}${v.short ? (v.formatSource === 'estimated' ? 'Possible Short · ' : 'Short · ') : ''}${n(v.views)} views${v.label && v.privacy !== 'unlisted' && v.privacy !== 'scheduled' ? ' · ' + esc(v.label) : ''}${v.draft ? ' · new words ' + (v.draft === 'applied' ? 'applied' : 'drafted') : ''}</span></div><div class="ytvb">`
+    const firstWeek = v => {
+      const a = v.firstWeek;
+      if(!a) return '';
+      const values = [[a.engagedViews, 'engaged views'], [a.averageViewDuration, 's average'], [a.averageViewPercentage, '% watched']]
+        .filter(([value]) => value != null).map(([value, label]) => n(value) + ' ' + label);
+      return values.length ? '<span>First seven reporting days · ' + esc(values.join(' · ')) + '</span>' : '';
+    };
+    box.innerHTML = '<h2>Your videos</h2><p class="ytsub">Upload <b>unlisted</b> first, then <b>Get ready</b>: Cygnus reviews sampled frames with private vision and drafts thumbnails and metadata. Apply what you like, then make it public.</p>'
+      + V.map(v => `<div class="ytv"><div class="ytvt"><b title="${esc(v.title)}">${esc(v.title)}</b><span>${v.privacy === 'unlisted' ? '<em class="unl">Unlisted</em> · ' : v.privacy === 'scheduled' ? '<em class="unl">Scheduled' + (v.publishAt ? ' ' + esc(new Date(v.publishAt).toLocaleString([], {day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit'})) : '') + '</em> · ' : ''}${v.short ? (v.formatSource === 'estimated' ? 'Possible Short · ' : 'Short · ') : ''}${n(v.views)} views${v.label && v.privacy !== 'unlisted' && v.privacy !== 'scheduled' ? ' · ' + esc(v.label) : ''}${v.draft ? ' · new words ' + (v.draft === 'applied' ? 'applied' : 'drafted') : ''}</span>${firstWeek(v)}</div><div class="ytvb">`
         + b(channelCommand(profile) + ' ready ' + v.id, '✨ Get ready', v.privacy === 'unlisted' ? 'primary' : '') + b(channelCommand(profile) + ' watch ' + v.id, '🎞 Watch') + (v.draft === 'draft' ? b(channelCommand(profile) + ' apply ' + v.id, '📝 Apply words') : v.draft === 'applied' ? b(channelCommand(profile) + ' undo ' + v.id, '↩️ Undo words') : b(channelCommand(profile) + ' fix ' + v.id, '📝 New words'))
         + (v.privacy === 'unlisted' ? b(channelCommand(profile) + ' public ' + v.id, '🌍 Make public', 'go') : '') + '</div></div>').join(''); }
   if(y.page){ const src = HELPER + y.page + '?t=' + (y.checked || 0); if(frame.getAttribute('src') !== src) frame.src = src; frame.hidden = false; open.href = src; open.hidden = false; }
