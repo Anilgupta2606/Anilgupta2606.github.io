@@ -615,6 +615,11 @@ body.ytMode #main, body.ytMode .composer{display:none}
 .ytverdict h2{font-size:15px;margin:0 0 7px}.ytverdict h3{font-size:20px;margin:5px 0 8px;line-height:1.25}
 .ytverdict .ytbrief{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:9px 18px;margin:12px 0}
 .ytverdict dt{font-size:12px;color:var(--mut);font-weight:650}.ytverdict dd{margin:2px 0;font-size:14px}
+.ytreview{width:min(730px,calc(100vw - 24px));max-height:min(86vh,900px);background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:14px;padding:18px}
+.ytreview::backdrop{background:#11112488}.ytreview h2,.ytreview h3{margin:0 0 8px}.ytreview label{display:block;font-weight:600;margin:9px 0}
+.ytreview input:not([type=checkbox]),.ytreview textarea{display:block;width:100%;background:var(--page);border:1px solid var(--line);border-radius:8px;padding:8px;color:var(--ink);margin-top:3px}
+.ytreview textarea{min-height:78px;resize:vertical}.ytreview details{margin:8px 0;border:1px solid var(--line);border-radius:8px;padding:8px}
+.ytreview summary{cursor:pointer}.ytreview .ytfield{white-space:pre-wrap;overflow-wrap:anywhere}.ytreview .ytacts{flex-wrap:wrap}
 .ytverdict #ytDiscovery{margin-top:12px}.ytverdict #ytDiscovery li{margin:7px 0}.ytverdict details{margin:12px 0;font-size:13px}.ytverdict summary{cursor:pointer}.ytverdict ul{padding-left:19px}
 .ytlearn h2{margin:0 0 6px; font-size:15px} .ytlearn ul{margin:0; padding-left:18px} .ytlearn li{margin:3px 0}
 .ytframe{width:100%; height:max(640px, calc(100vh - 300px)); border:1px solid var(--line); border-radius:14px; background:var(--card)}
@@ -978,6 +983,26 @@ body.ytMode #main, body.ytMode .composer{display:none}
   <div class="ytstats" id="ytStats"></div>
   <div class="ytlearn" id="ytLearn" hidden></div>
   <div class="ytvids" id="ytVids" hidden></div>
+  <dialog id="ytMetadata" class="ytreview" aria-labelledby="ytMetaHeading">
+    <div class="ytacts"><h2 id="ytMetaHeading">Metadata review</h2><button type="button" class="ytbtn" id="ytMetaClose">Close</button></div>
+    <label>Your review or Ask Studio's feedback<textarea id="ytMetaNotes" maxlength="12000" placeholder="Paste your notes or Studio's suggested title, description and tags"></textarea></label>
+    <label>Public topic for YouTube research (optional)<input id="ytMetaTopic" maxlength="120" placeholder="Example: deep-ocean brine pools"></label>
+    <p class="ytsub">YouTube receives only the public topic for related-video search. Pasted notes and unlisted metadata use private processing.</p>
+    <button type="button" class="ytbtn primary" id="ytMetaCompare">Compare wording</button>
+    <p id="ytMetaStatus" class="ytsub" role="status"></p>
+    <div id="ytMetaOptions"></div>
+    <div id="ytMetaPick" hidden>
+      <h3>Your selected wording</h3>
+      <label>Title<input id="ytMetaTitle" maxlength="100"></label>
+      <label>Description<textarea id="ytMetaDescription" maxlength="5000"></textarea></label>
+      <label>Tags<input id="ytMetaTags" maxlength="1200" placeholder="Separate tags with commas"></label>
+      <label><input type="checkbox" id="ytMetaExport"> Also save a local post.md</label>
+      <div class="ytacts">
+        <button type="button" class="ytbtn primary" id="ytMetaSave">Save reviewed draft</button>
+        <button type="button" class="ytbtn" id="ytMetaApply" hidden>Apply saved wording to YouTube</button>
+      </div>
+    </div>
+  </dialog>
   <iframe class="ytframe" id="ytFrame" title="Your channel, video by video" hidden></iframe>
 </section>
 
@@ -3102,7 +3127,8 @@ async function loadYT(){
     box.innerHTML = '<h2>Your videos</h2><p class="ytsub">Upload <b>unlisted</b> first, then <b>Get ready</b>: Cygnus reviews sampled frames with private vision and drafts thumbnails and metadata. Apply what you like, then make it public.</p>'
       + V.map(v => `<div class="ytv"><div class="ytvt"><b title="${esc(v.title)}">${esc(v.title)}</b><span>${v.privacy === 'unlisted' ? '<em class="unl">Unlisted</em> · ' : v.privacy === 'scheduled' ? '<em class="unl">Scheduled' + (v.publishAt ? ' ' + esc(new Date(v.publishAt).toLocaleString([], {day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit'})) : '') + '</em> · ' : ''}${v.short ? (v.formatSource === 'estimated' ? 'Possible Short · ' : 'Short · ') : ''}${n(v.views)} views${v.label && v.privacy !== 'unlisted' && v.privacy !== 'scheduled' ? ' · ' + esc(v.label) : ''}${v.draft ? ' · new words ' + (v.draft === 'applied' ? 'applied' : 'drafted') : ''}</span>${firstWeek(v)}</div><div class="ytvb">`
         + b(channelCommand(profile) + ' ready ' + v.id, '✨ Get ready', v.privacy === 'unlisted' ? 'primary' : '') + b(channelCommand(profile) + ' watch ' + v.id, '🎞 Watch') + (v.draft === 'draft' ? b(channelCommand(profile) + ' apply ' + v.id, '📝 Apply words') : v.draft === 'applied' ? b(channelCommand(profile) + ' undo ' + v.id, '↩️ Undo words') : b(channelCommand(profile) + ' fix ' + v.id, '📝 New words'))
-        + (v.privacy === 'unlisted' ? b(channelCommand(profile) + ' public ' + v.id, '🌍 Make public', 'go') : '') + '</div></div>').join(''); }
+        + (v.privacy === 'unlisted' ? (/^[\w-]{11}$/.test(v.id) ? '<button type="button" class="ytbtn" data-meta-video="' + v.id + '">Review SEO</button>' : '')
+          + b(channelCommand(profile) + ' public ' + v.id, '🌍 Make public', 'go') : '') + '</div></div>').join(''); }
   if(y.page){ const src = HELPER + y.page + '?t=' + (y.checked || 0); if(frame.getAttribute('src') !== src) frame.src = src; frame.hidden = false; open.href = src; open.hidden = false; }
 }
 $('#modeYT').onclick = () => showYT(true);
@@ -3140,8 +3166,102 @@ async function ytCheck(){
 }
 $('#ytCheck').onclick = ytCheck;
 $('#ytAllow').onclick = () => { showYT(false); setSide('chat'); ask(channelCommand(ytProfile) + ' allow edits'); };
+const metaInputs = {title: '#ytMetaTitle', description: '#ytMetaDescription', tags: '#ytMetaTags'};
+function openMetadataReview(profile, id){
+  const dialog = $('#ytMetadata'), status = $('#ytMetaStatus'), options = $('#ytMetaOptions');
+  const compare = $('#ytMetaCompare'), save = $('#ytMetaSave'), apply = $('#ytMetaApply');
+  const note = $('#ytMetaNotes'), topic = $('#ytMetaTopic'), exportPost = $('#ytMetaExport');
+  let revision = '', active = true;
+  note.value = ''; topic.value = ''; exportPost.checked = false; options.textContent = ''; status.textContent = '';
+  $('#ytMetaPick').hidden = true; apply.hidden = true; compare.disabled = false; save.disabled = false; apply.disabled = false;
+  const candidate = () => Object.fromEntries(Object.entries(metaInputs).map(([key, input]) => [key, $(input).value]));
+  const invalidate = () => { revision = ''; apply.hidden = true; };
+  for(const input of Object.values(metaInputs)) $(input).oninput = invalidate;
+  const choose = (item, fields = Object.keys(metaInputs)) => {
+    for(const key of fields) $(metaInputs[key]).value = Array.isArray(item[key]) ? item[key].join(', ') : item[key];
+    invalidate();
+  };
+  const call = async (metadata, payload = {}) => {
+    const result = await post('/youtube', {profile, id, metadata, ...payload});
+    if(result.error) throw Error(result.error);
+    return result;
+  };
+  const button = (label, onClick) => {
+    const el = document.createElement('button'); el.type = 'button'; el.className = 'ytbtn'; el.textContent = label;
+    el.onclick = onClick; return el;
+  };
+  function paint(data){
+    options.textContent = '';
+    const paragraph = text => {
+      const p = document.createElement('p'); p.className = 'ytsub'; p.textContent = text; options.append(p);
+    };
+    paragraph('Editorial scores check wording and field structure. They do not predict reach or verify claims.');
+    if(!data.footageSampled) paragraph('Run Get ready to add sampled footage evidence.');
+    if(data.researchUnavailable) paragraph('Public YouTube research was unavailable for this query.');
+    if(data.writerUnavailable) paragraph('The private writer was unavailable. You can still compare the saved wording and edit it here.');
+    if(data.assessment) paragraph(data.assessment);
+    if(data.examples?.length){
+      const list = document.createElement('details'); list.innerHTML = '<summary>Public YouTube examples</summary>';
+      const ul = document.createElement('ul');
+      for(const example of data.examples){
+        if(!/^https:\/\/www\.youtube\.com\/watch\?v=[\w-]{11}$/.test(example.url)) continue;
+        const li = document.createElement('li'), a = document.createElement('a');
+        a.href = example.url; a.textContent = example.title; a.target = '_blank'; a.rel = 'noopener';
+        li.append(a); ul.append(li);
+      }
+      list.append(ul); options.append(list);
+    }
+    for(const [index, item] of data.options.entries()){
+      const card = document.createElement('details'), heading = document.createElement('summary');
+      heading.textContent = item.name + ' · ' + item.grade.score + '/100'; card.open = index < 2;
+      card.append(heading, button('Use all fields', () => choose(item)));
+      for(const field of Object.keys(metaInputs)){
+        const label = field[0].toUpperCase() + field.slice(1), p = document.createElement('p');
+        p.className = 'ytfield';
+        const strong = document.createElement('strong'); strong.textContent = label;
+        p.append(strong, document.createElement('br'), Array.isArray(item[field]) ? item[field].join(', ') || '—' : item[field] || '—');
+        const missing = item.grade.checks[field].filter(rule => !rule.pass).map(rule => rule.text);
+        if(missing.length){ const hints = document.createElement('small'); hints.textContent = missing.join(' '); p.append(document.createElement('br'), hints); }
+        card.append(p, button('Use ' + field, () => choose(item, [field])));
+      }
+      options.append(card);
+    }
+    if($('#ytMetaPick').hidden && data.options.length) choose(data.options[0]);
+    $('#ytMetaPick').hidden = false;
+  }
+  compare.onclick = async () => {
+    compare.disabled = true; status.textContent = 'Comparing wording…';
+    try{ const data = await call('compare', {notes: note.value, topic: topic.value}); if(active){ paint(data); status.textContent = ''; } }
+    catch(e){ if(active) status.textContent = e.message; }
+    finally{ if(active) compare.disabled = false; }
+  };
+  save.onclick = async () => {
+    save.disabled = true; invalidate(); status.textContent = 'Saving draft…';
+    const picked = candidate();
+    try{
+      const output = await call('save', {candidate: picked, exportPost: exportPost.checked});
+      if(!active) return;
+      if(Object.keys(picked).every(key => picked[key] === candidate()[key])){ revision = output.revision; apply.hidden = !output.canApply; }
+      status.textContent = 'Draft saved on this Mac.' + (output.post ? ' Saved ' + output.post : '') + (output.canApply ? '' : ' Allow YouTube edits to apply it.');
+    }catch(e){ if(active) status.textContent = e.message; }
+    finally{ if(active) save.disabled = false; }
+  };
+  apply.onclick = async () => {
+    if(!revision) return;
+    apply.disabled = true; status.textContent = 'Applying saved wording…';
+    try{ await call('apply', {revision}); if(active){ invalidate(); status.textContent = 'Metadata updated. The video remains unlisted.'; } }
+    catch(e){ if(active) status.textContent = e.message; }
+    finally{ if(active) apply.disabled = false; }
+  };
+  $('#ytMetaClose').onclick = () => dialog.close();
+  dialog.onclose = () => { active = false; if(ytProfile === profile) loadYT(); };
+  dialog.showModal();
+  compare.click();
+}
 // (Make public asks for a second tap - it shows the video to everyone)
-$('#ytVids').onclick = e => { const b = e.target.closest('[data-cmd]'); if(!b) return;
+$('#ytVids').onclick = e => { const review = e.target.closest('[data-meta-video]');
+  if(review){ openMetadataReview(ytProfile, review.dataset.metaVideo); return; }
+  const b = e.target.closest('[data-cmd]'); if(!b) return;
   if(/^\/channel (?:mystery )?public /.test(b.dataset.cmd) && !b.dataset.sure){ b.dataset.sure = '1'; const t = b.textContent; b.textContent = 'Tap again: make it public'; setTimeout(() => { delete b.dataset.sure; b.textContent = t; }, 4000); return; }
   showYT(false); setSide('chat'); ask(b.dataset.cmd); };
 $('#ytIdeas').onclick = () => { showYT(false); const q = $('#q'); q.value = ytProfile === 'mystery' ? '/unexplained ideas ' : '/reel ideas '; q.focus(); toast('Enter a topic for your ' + youtubeProfiles[ytProfile] + ' channel'); };
