@@ -983,6 +983,26 @@ body.ytMode #main, body.ytMode .composer{display:none}
   <div class="ytstats" id="ytStats"></div>
   <div class="ytlearn" id="ytLearn" hidden></div>
   <div class="ytvids" id="ytVids" hidden></div>
+  <dialog id="ytShortReview" class="ytreview" aria-labelledby="ytShortHeading">
+    <div class="ytacts"><h2 id="ytShortHeading">Shorts review</h2><button type="button" class="ytbtn" id="ytShortClose">Close</button></div>
+    <p class="ytsub" id="ytShortStatus" role="status"></p>
+    <div id="ytShortResult"></div>
+    <form id="ytShortForm" hidden>
+      <fieldset id="ytShortFields" style="border:0;padding:0;margin:0">
+        <div id="ytShortStudio" hidden>
+          <h3>Studio feed measurements</h3>
+          <p class="ytsub">Copy these from Studio for the same reporting window.</p>
+          <label>Reporting window<select id="ytShortPeriod" class="ytbtn"><option value="firstWeek">First seven reporting days</option><option value="lifetime">Lifetime so far</option></select></label>
+          <label>Shown in feed<input id="ytShortShown" maxlength="24" inputmode="numeric"></label>
+          <label>Stayed to watch (%)<input id="ytShortStayed" maxlength="12" inputmode="decimal"></label>
+          <p id="ytShortDates" class="ytsub"></p>
+          <p id="ytShortObserved" class="ytsub"></p>
+        </div>
+        <label>One change to test<textarea id="ytShortExperiment" maxlength="400" placeholder="For example, show the main action in the first shot."></textarea></label>
+        <button type="submit" class="ytbtn primary">Save review</button>
+      </fieldset>
+    </form>
+  </dialog>
   <dialog id="ytMetadata" class="ytreview" aria-labelledby="ytMetaHeading">
     <div class="ytacts"><h2 id="ytMetaHeading">Metadata review</h2><button type="button" class="ytbtn" id="ytMetaClose">Close</button></div>
     <label>Your review or Ask Studio's feedback<textarea id="ytMetaNotes" maxlength="12000" placeholder="Paste your notes or Studio's suggested title, description and tags"></textarea></label>
@@ -1364,7 +1384,11 @@ function chartSvg(ch){
   <div class="legend"><span><i style="background:var(--ink)"></i>Close ${fmtN(last)}</span><span><i style="background:var(--search)"></i>20-${esc(ch.unit)}</span><span><i style="background:var(--calc)"></i>50-${esc(ch.unit)}</span><span><i style="background:var(--check)"></i>200-${esc(ch.unit)}</span><span><i class="dash" style="border-color:var(--read)"></i>Support</span><span><i class="dash" style="border-color:var(--check)"></i>Resistance</span></div></figure>`;
 }
 // pictures in an answer (made from a description): shown, with a Download button
-const videosHtml = out => (out.videos || []).map((v, i)=>v.b64 && /^[A-Za-z0-9+/=]+$/.test(v.b64.slice(0, 200)) ? `<figure class="gen"><video src="data:video/mp4;base64,${v.b64}" autoplay loop muted playsinline controls></video><a class="ghost dl" download="cygnus-video-${Date.now()}-${i}.mp4" href="data:video/mp4;base64,${v.b64}">Download</a></figure>` : v.note ? `<figure class="gen"><figcaption class="sub">${esc(v.note)}</figcaption></figure>` : '').join('');
+const videosHtml = out => {
+  const videos = out.videos || [];
+  const html = videos.map((v, i)=>v.b64 && /^[A-Za-z0-9+/=]+$/.test(v.b64.slice(0, 200)) ? `<figure class="gen">${v.label ? `<figcaption>${esc(v.label)}</figcaption>` : ''}<video src="data:video/mp4;base64,${v.b64}" autoplay loop muted playsinline controls></video><a class="ghost dl" download="cygnus-video-${Date.now()}-${i}.mp4" href="data:video/mp4;base64,${v.b64}">Download</a></figure>` : v.note ? `<figure class="gen"><figcaption class="sub">${esc(v.note)}</figcaption></figure>` : '').join('');
+  return videos.length > 1 && videos.every(video => video.label) ? '<div class="gengrid">' + html + '</div>' : html;
+};
 const imagesHtml = out => videosHtml(out) + ((out.images || []).length > 1 ? '<div class="gengrid">' : '') + (out.images || []).map((im, i)=>{ const mime = /^image\/(png|jpeg|webp|gif)$/.test(im.mime || '') ? im.mime : 'image/jpeg', src = im.b64 && /^[A-Za-z0-9+/=]+$/.test(im.b64.slice(0, 200)) ? 'data:' + mime + ';base64,' + im.b64 : /^data:image\//.test(im.thumb || '') ? im.thumb : '';
   const file = String(im.file || '');
   const saved = file && savedEditFile && file === savedEditFile;
@@ -1934,6 +1958,7 @@ const SKILLS = [
   {c: '/design', i: '🎨', n: 'Design', d: 'Screens for an app: design system, Hallmark direction, Stitch screens, a preview page — or a logo, banner, slides, brand', words: 'The app or screen (or: logo / banner / slides / brand …)'},
   {c: '/stitch', i: '🧵', n: 'Stitch', d: 'Google Stitch designs a screen from your words (your Stitch keys, in turn)', words: 'The screen, e.g. a login page for a budgeting app, mobile'},
   {c: '/upskill generate', i: '🎓', n: 'Upskill', d: 'A strong model writes a new skill for a task and tests it', words: 'The task the new skill is for…'},
+  {c: '/reviewvideo', i: '🎞️', n: 'Review a video', d: 'Check your finished local export', words: 'Local video path…'},
   {c: '/review', i: '🔍', n: 'Review my changes', d: 'The selected project\'s uncommitted changes checked for bugs', now: true},
   {c: '/verify', i: '✅', n: 'Verify the project', d: 'Its tests run, its app started and looked at — PASS / FAIL', now: true},
   {c: '/init', i: '📝', n: 'Project notes', d: 'Notes on the selected project, so answers know it', now: true},
@@ -2315,7 +2340,7 @@ const COMMANDS = [
   {c: '/clipyoutube', a: '<YouTube link or file> <start> <end> [captions|no-captions] · edit <what> · status', d: 'A specific time range from a video, cut for YouTube upload: original aspect kept (not 9:16), optional word-by-word captions, at platform loudness. For your own videos or reusable content'},
   {c: '/copyshort', a: '<YouTube Shorts or Instagram reel link> · status', d: 'Download a YouTube Short, or your own Instagram reel at the highest available source resolution, with three thumbnails and post.md. For your own videos or reusable content'},
   {c: '/joinshortsclip', a: '<link or file> <start> <end> … · next · change <what> · edit <what> · status', d: 'Review a plan for joining video ranges into a vertical Short, then render it'},
-  {c: '/brandvideo', a: '<video file> [banner: TEXT] [with host] [watermark: TEXT] [like and subscribe] · edit <what> · status', d: 'Add branding to a video while keeping its original dimensions'},
+  {c: '/brandvideo', a: '[local video file] [hook: TEXT] [banner: TEXT] [with host] [watermark: TEXT] [like and subscribe] · status', d: 'Add branding to a video while keeping its original dimensions'},
   {c: '/commentary', a: '<YouTube link or file> [hindi] [no captions] · next [no captions] · change <what> · host [new] · status', d: 'A commentary Short with your channel\'s own AI host: a plan of his lines and 1-2 short moments of the clip on a page, then the 9:16 video with a male voice, captions, a thumbnail and post.md. English unless you add hindi.'},
   {c: '/which', a: '<what you want>', d: 'Which command does it, ready to run (also: "which command should I use to …")'},
   {c: '/channel', a: '[30] · connect <Google client JSON> · disconnect', d: 'Your YouTube channel from Studio (read-only): why each video did or did not travel, on a page, and lessons every /reel then follows. Connect in Your keys → Connections'},
@@ -2329,6 +2354,7 @@ const COMMANDS = [
   {c: '/learn', a: '<YouTube link or file> · change <what> · status', d: 'The transcript (captions, else heard on this Mac) → notes on a page, and a notebook with the transcript so /nb answers from the video'},
   {c: '/createapp', a: 'an app or an idea [focus: …] · next · change <what> · skip design · status', d: 'Research (as /researchApps), then its screens (as /design, from the research), then one project built from both - the spec first, then go; you review each step on its page and fix it with /createapp change'},
   {c: '/researchApps', a: 'a site or app [recording.har] [focus: …]', d: 'Deep research to build the same app or reuse parts: the blueprint plus rea\'s exact evidence, a full-copy (feature parity) plan, “Parts you can reuse”, and with a HAR an agent environment'},
+  {c: '/reviewvideo', a: '<local video path> [studio: feedback] · apply', d: 'Review a video or prepare edits from Studio feedback'},
   {c: '/review', a: '[security | performance | tests]', d: 'Review the coding project\'s uncommitted changes for bugs — or as a security, performance or test reviewer (nothing is changed)'},
   {c: '/init', a: '', d: 'Make the coding project\'s notes, so SoGPT knows it'},
   {c: '/model', a: '', d: 'Choose the model that answers (the ✦ menu)'},
@@ -2457,6 +2483,7 @@ async function runCommand(line){
   else if(c === '/memory' || c === '/tune' || c === '/config'){ if(mode !== 'mac') return toast('That is kept on your Mac — open this page there (or over Tailscale)');
     const j = await post(c === '/memory' ? '/memory' : c === '/tune' ? '/tune' : '/settings', c === '/memory' ? {memory: arg} : {cmd: arg}).catch(e=>({text: 'Could not reach your Mac: ' + e.message}));
     note(c + (arg ? ' ' + arg : ''), j.text || j.error || 'Done.', c === '/memory' ? 'Memory' : c === '/tune' ? 'Self-tune' : 'Settings'); }
+  else if(c === '/reviewvideo'){ if(mode !== 'mac') return toast('Open the Mac helper to review a local video'); ask(c + ' ' + arg); }
   else if(c === '/review' || c === '/init'){ if(mode !== 'mac') return toast('Coding projects are on your Mac — open this page there (or over Tailscale)'); if(!projectOf()) return toast('Choose a coding project first (/project)'); ask(c + (c === '/review' && arg ? ' ' + arg : '')); }
   else if(c === '/data-usage' || c === '/usage') openUsage(true);
   else if(c === '/model') $('#stModel').click();
@@ -3127,6 +3154,8 @@ async function loadYT(){
     box.innerHTML = '<h2>Your videos</h2><p class="ytsub">Upload <b>unlisted</b> first, then <b>Get ready</b>: Cygnus reviews sampled frames with private vision and drafts thumbnails and metadata. Apply what you like, then make it public.</p>'
       + V.map(v => `<div class="ytv"><div class="ytvt"><b title="${esc(v.title)}">${esc(v.title)}</b><span>${v.privacy === 'unlisted' ? '<em class="unl">Unlisted</em> · ' : v.privacy === 'scheduled' ? '<em class="unl">Scheduled' + (v.publishAt ? ' ' + esc(new Date(v.publishAt).toLocaleString([], {day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit'})) : '') + '</em> · ' : ''}${v.short ? (v.formatSource === 'estimated' ? 'Possible Short · ' : 'Short · ') : ''}${n(v.views)} views${v.label && v.privacy !== 'unlisted' && v.privacy !== 'scheduled' ? ' · ' + esc(v.label) : ''}${v.draft ? ' · new words ' + (v.draft === 'applied' ? 'applied' : 'drafted') : ''}</span>${firstWeek(v)}</div><div class="ytvb">`
         + b(channelCommand(profile) + ' ready ' + v.id, '✨ Get ready', v.privacy === 'unlisted' ? 'primary' : '') + b(channelCommand(profile) + ' watch ' + v.id, '🎞 Watch') + (v.draft === 'draft' ? b(channelCommand(profile) + ' apply ' + v.id, '📝 Apply words') : v.draft === 'applied' ? b(channelCommand(profile) + ' undo ' + v.id, '↩️ Undo words') : b(channelCommand(profile) + ' fix ' + v.id, '📝 New words'))
+        + (v.short && ['public', 'unlisted'].includes(v.privacy) && /^[\w-]{11}$/.test(v.id)
+          ? '<button type="button" class="ytbtn" data-short-review="' + v.id + '">Shorts review</button>' : '')
         + (v.privacy === 'unlisted' ? (/^[\w-]{11}$/.test(v.id) ? '<button type="button" class="ytbtn" data-meta-video="' + v.id + '">Review SEO</button>' : '')
           + b(channelCommand(profile) + ' public ' + v.id, '🌍 Make public', 'go') : '') + '</div></div>').join(''); }
   if(y.page){ const src = HELPER + y.page + '?t=' + (y.checked || 0); if(frame.getAttribute('src') !== src) frame.src = src; frame.hidden = false; open.href = src; open.hidden = false; }
@@ -3258,8 +3287,81 @@ function openMetadataReview(profile, id){
   dialog.showModal();
   compare.click();
 }
+async function openShortsReview(profile, id){
+  const dialog = $('#ytShortReview'), status = $('#ytShortStatus'), result = $('#ytShortResult'), form = $('#ytShortForm');
+  const period = $('#ytShortPeriod'), shown = $('#ytShortShown'), stayed = $('#ytShortStayed'), experiment = $('#ytShortExperiment');
+  const fields = $('#ytShortFields'), studio = $('#ytShortStudio');
+  let active = true, saved = {};
+  status.textContent = 'Loading review…'; result.replaceChildren(); form.hidden = true; fields.disabled = false;
+  dialog.onclose = () => { active = false; };
+  $('#ytShortClose').onclick = () => dialog.close();
+  const line = (label, text) => {
+    const p = document.createElement('p'), b = document.createElement('strong');
+    b.textContent = label + ' '; p.append(b, text); result.append(p);
+  };
+  const value = (number, suffix = '') => number == null ? 'Unavailable' : Number(number).toLocaleString(undefined, {maximumFractionDigits: 1}) + suffix;
+  const loadReading = () => {
+    const entry = saved[period.value];
+    shown.value = entry?.shown ?? '';
+    stayed.value = entry?.stayed ?? '';
+    $('#ytShortObserved').textContent = entry?.at ? 'Copied from Studio on ' + new Date(entry.at).toLocaleDateString() + '.' : '';
+  };
+  const call = async (shorts, data = {}) => {
+    const reply = await post('/youtube', {profile, id, shorts, ...data});
+    if(reply.error) throw Error(reply.error);
+    return reply;
+  };
+  const paint = ({review: v, saved: copy, firstWeekDates}, window = '') => {
+    saved = copy; result.replaceChildren();
+    $('#ytShortHeading').textContent = 'Shorts review · ' + v.title;
+    studio.hidden = v.privacy !== 'public';
+    $('#ytShortDates').textContent = firstWeekDates ? 'First seven reporting days in Studio · ' + firstWeekDates.start + ' to ' + firstWeekDates.end : '';
+    if(saved.experiment && saved.experimentStage) line('Experiment', saved.experimentStage === 'unlisted'
+      ? 'Logged before publishing.' : 'Logged after publishing.');
+    if(!studio.hidden){
+      line('Studio feed', saved.firstWeek ? value(saved.firstWeek.shown) + ' shown · ' + value(saved.firstWeek.stayed, '%') + ' stayed in the first seven reporting days'
+        : saved.lifetime ? value(saved.lifetime.shown) + ' shown · ' + value(saved.lifetime.stayed, '%') + ' stayed in the lifetime snapshot'
+        : 'Add the Studio measurements below to review feed exposure and the opening.');
+      line(v.apiWindow, value(v.engagedViews) + ' engaged views · ' + value(v.averageViewDuration, ' s') + ' average · ' + value(v.averageViewPercentage, '%') + ' watched');
+      if(v.playRatio != null) line('Engaged plays ÷ counted plays', value(v.playRatio * 100, '%'));
+      line('Lifetime traffic', 'Search ' + value(v.searchViews) + ' views · Shorts feed ' + value(v.feedViews) + ' views');
+      if(v.checked) line('Analytics checked', new Date(v.checked).toLocaleDateString());
+      else line('Analytics', 'Use Check again on this channel to load API measurements.');
+      if(v.baseline.watched != null || v.baseline.stayed != null) line('Channel comparison', v.cohort + ' · first seven reporting days · ' +
+        (v.baseline.watched == null ? '' : value(v.baseline.watched, '%') + ' median watched (' + v.baseline.sample + ' Shorts) · ') +
+        (v.baseline.stayed == null ? '' : value(v.baseline.stayed, '%') + ' median stayed (' + v.baseline.stayedSample + ' Shorts)'));
+      else line('Channel comparison', 'Too few similar Shorts with first-week measurements.');
+      line(v.next.kind, v.next.text);
+      if(v.dip != null || v.next.at != null){
+        const a = document.createElement('a'), at = v.next.at ?? v.dip;
+        a.href = 'https://www.youtube.com/watch?v=' + encodeURIComponent(id) + '&t=' + at + 's';
+        a.textContent = at === 0 ? 'Watch the opening' : 'Watch at ' + at + ' seconds';
+        a.target = '_blank'; a.rel = 'noopener'; result.append(a);
+      }
+    }else line('Before publishing', 'Use Get ready to review the opening and payoff. Record one change below to compare after launch.');
+    period.value = window || (saved.lifetime && !saved.firstWeek ? 'lifetime' : 'firstWeek');
+    experiment.value = saved.experiment || ''; loadReading(); form.hidden = false;
+  };
+  period.onchange = loadReading;
+  form.onsubmit = async event => {
+    event.preventDefault();
+    const window = period.value;
+    const data = {experiment: experiment.value};
+    if(!studio.hidden) data.reading = {period: window, shown: shown.value, stayed: stayed.value};
+    fields.disabled = true; status.textContent = 'Saving review…';
+    try{ const response = await call('save', data); if(active){ paint(response, window); status.textContent = 'Review saved on this Mac.'; } }
+    catch(e){ if(active) status.textContent = e.message; }
+    finally{ if(active) fields.disabled = false; }
+  };
+  dialog.showModal();
+  try{ const response = await call('review'); if(active){ paint(response); status.textContent = ''; } }
+  catch(e){ if(active) status.textContent = e.message; }
+}
 // (Make public asks for a second tap - it shows the video to everyone)
-$('#ytVids').onclick = e => { const review = e.target.closest('[data-meta-video]');
+$('#ytVids').onclick = e => {
+  const short = e.target.closest('[data-short-review]');
+  if(short){ openShortsReview(ytProfile, short.dataset.shortReview); return; }
+  const review = e.target.closest('[data-meta-video]');
   if(review){ openMetadataReview(ytProfile, review.dataset.metaVideo); return; }
   const b = e.target.closest('[data-cmd]'); if(!b) return;
   if(/^\/channel (?:mystery )?public /.test(b.dataset.cmd) && !b.dataset.sure){ b.dataset.sure = '1'; const t = b.textContent; b.textContent = 'Tap again: make it public'; setTimeout(() => { delete b.dataset.sure; b.textContent = t; }, 4000); return; }
